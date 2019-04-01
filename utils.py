@@ -23,5 +23,7 @@ def get_encodings(triplets, model):
     return xr.DataArray(
         encodings, dims=('tile_id', 'enc_dim'),
         coords=dict(tile_id=tile_id),
-        attrs=dict(tile_used=tile_used[1])
+        attrs=dict(tile_used=tile_used[1],
+        source_path=str(triplets.path.absolute())
+        )
     )
