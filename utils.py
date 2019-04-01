@@ -3,6 +3,9 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
+from pathlib import Path
+
+from PIL import Image
 
 def get_encodings(triplets, model):
     tile_used = (0, 'anchor')
@@ -27,3 +30,14 @@ def get_encodings(triplets, model):
         source_path=str(triplets.path.absolute())
         )
     )
+
+class ImageLoader:
+    def __init__(self, path):
+        self.path = Path(path)
+
+    def __getitem__(self, n):
+        img_path = self.path/"{:05d}_anchor.png".format(n)
+        return Image.open(img_path)
+
+def get_triplets_from_encodings(encodings):
+    return ImageLoader(encodings.source_path)
