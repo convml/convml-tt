@@ -21,11 +21,11 @@ def get_encodings(triplets, model):
 
     encodings = np.asarray(torch.stack(encodings))
     # we're picking out the anchor tile above
-    tile_id = np.asarray(triplet_ids)
+    tile_id = np.asarray(triplet_ids).astype(int)
 
     return xr.DataArray(
         encodings, dims=('tile_id', 'enc_dim'),
-        coords=dict(tile_id=tile_id),
+        coords=dict(tile_id=tile_id, enc_dim=np.arange(encodings.shape[1])),
         attrs=dict(tile_used=tile_used[1],
         source_path=str(triplets.path.absolute())
         )
