@@ -8,7 +8,7 @@ import sklearn.decomposition
 from sklearn.preprocessing import StandardScaler
 from scipy.cluster import hierarchy as hc
 
-from ..utils import get_triplets_from_encodings
+from ...utils import get_triplets_from_encodings
 
 
 # In[13]:
