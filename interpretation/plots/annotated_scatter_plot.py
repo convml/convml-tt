@@ -9,7 +9,7 @@ from .utils import calc_point_offsets
 from scipy.spatial import ConvexHull
 from scipy.interpolate import CubicSpline
 
-def scatter_annotated(x, y, points, ax=None, size=0.2):
+def scatter_annotated(x, y, points, ax=None, size=0.1):
     if ax is None:
         fig, ax = plt.subplots(figsize=(14, 10))
     else:
@@ -26,7 +26,7 @@ def scatter_annotated(x, y, points, ax=None, size=0.2):
         y_sample = y.sel(tile_id=points)
     else:
         raise NotImplementedError(type(points))
-        
+
     ax.scatter(x, y, marker='.', alpha=0.2, color='grey')
 
     ax.scatter(x_sample, y_sample, marker='.')
@@ -36,6 +36,9 @@ def scatter_annotated(x, y, points, ax=None, size=0.2):
 
     pts = np.array([x_sample, y_sample]).T
     pts_offset = calc_point_offsets(pts, scale=3*size)
+
+    ax.scatter(*pts_offset.T, alpha=0.0)
+    ax.margins(0.2)
 
     def transform(coord):
         return (ax.transData + fig.transFigure.inverted()).transform(coord)
