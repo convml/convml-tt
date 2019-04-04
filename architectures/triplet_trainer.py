@@ -1,6 +1,10 @@
 from torch.utils.data import Dataset, DataLoader
 
-from fastai.vision.data import ImageItemList
+try:
+    from fastai.vision.data import ImageList
+except ImportError:
+    from fastai.vision.data import ImageItemList as ImageList
+
 from fastai.vision.image import Image, pil2tensor
 from fastai.data_block import get_files
 from fastai.basics import *
@@ -90,7 +94,7 @@ class MultiImageDataBunch(ImageDataBunch):
         #self.denorm = self.denorm[0]
         return self
     
-class NPMultiImageItemList(ImageItemList): 
+class NPMultiImageList(ImageList): 
     c = 100
     
     _bunch = MultiImageDataBunch
@@ -192,3 +196,8 @@ def monkey_patch_fastai():
         import fastai.basic_train
         loss_batch_orig = fastai.basic_train.loss_batch
     fastai.basic_train.loss_batch = loss_batch
+
+
+
+# for backward compatability
+NPMultiImageItemList = NPMultiImageList
