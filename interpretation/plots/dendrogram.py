@@ -14,7 +14,11 @@ from ...utils import get_triplets_from_encodings
 # In[13]:
 
 def dendrogram(encodings, n_clusters_max=14, debug=False, ax=None,
-    n_samples=10, show_legend=False):
+    n_samples=10, show_legend=False, label_clusters=False,
+    **kwargs):
+    """
+    Additional kwargs will be passed to scipy.cluster.hierarchy.dendrogram
+    """
 
     triplets = get_triplets_from_encodings(encodings)
 
@@ -25,7 +29,8 @@ def dendrogram(encodings, n_clusters_max=14, debug=False, ax=None,
 
     Z = hc.linkage(y=encodings, method='ward',)
 
-    ddata = hc.dendrogram(Z=Z, truncate_mode='lastp', p=n_clusters_max, get_leaves=True)
+    ddata = hc.dendrogram(Z=Z, truncate_mode='lastp', p=n_clusters_max,
+                          get_leaves=True, **kwargs)
 
     if debug:
         for ii in range(len(ddata['icoord'])):
@@ -78,6 +83,9 @@ def dendrogram(encodings, n_clusters_max=14, debug=False, ax=None,
 
     w_pad = 0.02
     size = (3.6 - (n_clusters_max - 1.)*w_pad)/float(n_clusters_max)
+    y_offset = 1.4
+    if label_clusters:
+        y_offset += 0.2
 
     for lid, leaf_id in enumerate(ddata['leaves']):
         img_idxs_in_cluster = encodings.tile_id.values[leaf_mapping == leaf_id].astype(int)
@@ -101,10 +109,21 @@ def dendrogram(encodings, n_clusters_max=14, debug=False, ax=None,
 
             img = triplets[img_idx]
 
-            ax1=fig.add_axes([xp-0.5*size, yh-size*1.1*(n + 1.4), size, size])
+            ax1=fig.add_axes([xp-0.5*size, yh-size*1.1*(n + y_offset), size, size])
             ax1.set_aspect(1)
             ax1.axison = False
             ax1.imshow(img)
 
+    if label_clusters:
+        # this is a hack so we can add a letter for each cluster, we just reuse
+        # the existing label and add a letter
+        new_labels = [
+            "{}\n{}".format(t.get_text(), chr(i+97).upper())
+            for (i, t) in enumerate(ax.get_xticklabels())
+        ]
+        ax.set_xticklabels(new_labels)
+
     if show_legend:
         ax.legend()
+
+    return ax
