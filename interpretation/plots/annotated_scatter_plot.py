@@ -4,7 +4,7 @@ import mpl_toolkits.axes_grid1.inset_locator as il
 
 from ...utils import get_triplets_from_encodings
 
-from .mpl_autopos_annotation import calc_offset_points
+# from .mpl_autopos_annotation import calc_offset_points
 from .mpl_autopos_annotation.convex_hull import calc_point_offsets as calc_offset_points_ch
 
 from scipy.spatial import ConvexHull
@@ -36,9 +36,9 @@ def scatter_annotated(x, y, points, ax=None, size=0.1, autopos_method='forces'):
     ax.set_ylabel(y._title_for_slice())
 
     pts = np.array([x_sample, y_sample]).T
-    if autopos_method == 'forces':
-        pts_offset = calc_offset_points(pts, scale=3*size)
-    elif autopos_method == 'convex_hull':
+    # if autopos_method == 'forces':
+        # pts_offset = calc_offset_points(pts, scale=3*size)
+    if autopos_method == 'convex_hull':
         pts_offset = calc_offset_points_ch(pts, scale=3*size)
     else:
         raise NotImplementedError(autopos_method)
