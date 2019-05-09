@@ -32,7 +32,8 @@ def calc_point_offsets(points, scale=0.2, show_plot=False):
         return t
 
     t = make_t(x_h, y_h)
-    nt = np.linspace(0, 1, 100)
+    Nt = 100
+    nt = np.linspace(0, 1, Nt)
 
     cs_x = CubicSpline(t, x_h, bc_type='periodic')
     cs_y = CubicSpline(t, y_h, bc_type='periodic')
@@ -66,7 +67,10 @@ def calc_point_offsets(points, scale=0.2, show_plot=False):
             if show_plot:
                 plt.plot(point_nearest[0], point_nearest[1], marker='s', color='red')
 
-            d = points_s[k+1] - points_s[k-1]
+            kl, kr = k-5, k+5
+            if kr > Nt:
+                kr -= Nt
+            d = points_s[kr] - points_s[kl]
             d[0] /= lx
             d[1] /= ly
             d = np.array([d[1], -d[0]])
