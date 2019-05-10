@@ -68,7 +68,7 @@ def calc_point_offsets(points, scale=0.2, show_plot=False):
                 plt.plot(point_nearest[0], point_nearest[1], marker='s', color='red')
 
             kl, kr = k-5, k+5
-            if kr > Nt:
+            if kr >= Nt:
                 kr -= Nt
             d = points_s[kr] - points_s[kl]
             d[0] /= lx
