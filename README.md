@@ -17,8 +17,6 @@ for my project:
 │       ├── architectures
 │       ├── data
 │       │   └── satdata  <-- the `satdata` repository is cloned into here
-│       ├── example_notebooks
-│       ├── examples
 │       └── interpretation
 ├── data
 │   └── storage -> /nfs/see-fs-02_users/earlcd/datastore/a321/ml-data/
@@ -80,10 +78,11 @@ can be download
 tar-ball should be extracted into `~/ml_project/data/storage/tiles/goes16/`
 
 An example of how to generate a dataset can be see in
-`examples/goes16_training_and_study.py`. This script attempts to store training
-and study triplets in `data/storage/triplets/` and attempts to read from
-`data/storage/sources/goes16` to create composites for the analysis domain. The
-example will fetch GOES-16 data from Amazon S3 if it isn't found locally.
+`training_gen_examples/goes16_training_and_study.py`. This script attempts to
+store training and study triplets in `data/storage/triplets/` and attempts to
+read from `data/storage/sources/goes16` to create composites for the analysis
+domain. The example will fetch GOES-16 data from Amazon S3 if it isn't found
+locally.
 
 
 ### Training on ARC3
