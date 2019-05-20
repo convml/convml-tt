@@ -103,6 +103,7 @@ class NPMultiImageList(ImageList):
             super().__init__(*args, **kwargs)
             self.fn = fn
             self.id = fn.split('/')[-1].split('_')[0]
+            self.extra_info = {}  # placeholder dict we can fill later
 
         @property
         def size(self):

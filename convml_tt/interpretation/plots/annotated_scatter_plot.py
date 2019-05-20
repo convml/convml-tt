@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import mpl_toolkits.axes_grid1.inset_locator as il
+import xarray as xr
 
 from ...utils import get_triplets_from_encodings
 
@@ -32,8 +33,8 @@ def scatter_annotated(x, y, points, ax=None, size=0.1, autopos_method='forces'):
 
     ax.scatter(x_sample, y_sample, marker='.')
 
-    ax.set_xlabel(x._title_for_slice())
-    ax.set_ylabel(y._title_for_slice())
+    ax.set_xlabel(x._title_for_slice() + '\n' + xr.plot.utils.label_from_attrs(x))
+    ax.set_ylabel(y._title_for_slice() + '\n' + xr.plot.utils.label_from_attrs(y))
 
     pts = np.array([x_sample, y_sample]).T
     if autopos_method == 'forces':
