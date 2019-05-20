@@ -63,7 +63,7 @@ a new conda environment and install the dependencies:
 conda create -n fastai python=3.6 -y
 conda activate fastai
 conda install matplotlib xarray netCDF4 jupyter
-pip instal fastai==1.0.48
+pip install fastai==1.0.48
 conda install pytorch torchvision cudatoolkit=9.0 -c pytorch
 ```
 
@@ -99,9 +99,9 @@ Request a node with a GPU attached
 [earlcd@login1.arc3 ~]$ qrsh -l coproc_k80=1,h_rt=1:0:0 -pty y /bin/bash -i
 ```
 
-Once the node has spun up and the prompt is again available you will noticed
-the hostname has now changed (to something containing "gpu", here `db12gpu1`).
-Now activate your conda environment (installed as above) and start a jupyter
+Once the node has spun up and the prompt is again available you will notice the
+hostname has now changed (to something containing "gpu", here `db12gpu1`). Now
+activate your conda environment (installed as above) and start a jupyter
 notebook
 
 ```bash
