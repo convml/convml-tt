@@ -1,10 +1,6 @@
 from torch.utils.data import Dataset, DataLoader
 
-try:
-    from fastai.vision.data import ImageList
-except ImportError:
-    from fastai.vision.data import ImageItemList as ImageList
-
+from fastai.vision.data import ImageItemList
 from fastai.vision.image import Image, pil2tensor
 from fastai.data_block import get_files
 from fastai.basics import *
@@ -50,6 +46,28 @@ class MultiImageDeviceDataLoader(DeviceDataLoader):
                     x = f((x, y))
         return b
 
+def normalize(x:TensorImage, mean:FloatTensor,std:FloatTensor)->TensorImage:
+    "Normalize `x` with `mean` and `std`."
+    return (x-mean[...,None,None]) / std[...,None,None]
+
+def denormalize(x:TensorImage, mean:FloatTensor,std:FloatTensor, do_x:bool=True)->TensorImage:
+    "Denormalize `x` with `mean` and `std`."
+    return x.cpu().float()*std[...,None,None] + mean[...,None,None] if do_x else x.cpu()
+
+def _normalize_batch(b:Tuple[Tensor,Tensor], mean:FloatTensor, std:FloatTensor, do_x:bool=True, do_y:bool=False)->Tuple[Tensor,Tensor]:
+    "`b` = `x`,`y` - normalize `x` array of imgs and `do_y` optionally `y`."
+    x,y = b
+    mean,std = mean.to(x.device),std.to(x.device)
+    if do_x: x = normalize(x,mean,std)
+    if do_y and len(y.shape) == 4: y = normalize(y,mean,std)
+    return x,y
+
+def normalize_funcs(mean:FloatTensor, std:FloatTensor, do_x:bool=True, do_y:bool=False)->Tuple[Callable,Callable]:
+    "Create normalize/denormalize func using `mean` and `std`, can specify `do_y` and `device`."
+    mean,std = tensor(mean),tensor(std)
+    return (partial(_normalize_batch, mean=mean, std=std, do_x=do_x, do_y=do_y),
+            partial(denormalize, mean=mean, std=std, do_x=do_x))
+
     
 class MultiImageDataBunch(ImageDataBunch):
     _ddl_cls = MultiImageDeviceDataLoader
@@ -81,20 +99,11 @@ class MultiImageDataBunch(ImageDataBunch):
         x = self.one_batch(ds_type=DatasetType.Valid, denorm=False)[0][0].cpu()
         return [func(channel_view(x), 1) for func in funcs]
 
-    
-    def normalize2(self, stats:Collection[Tensor]=None, do_x:bool=True, do_y:bool=False)->None:
-        "Add normalize transform using `stats` (defaults to `DataBunch.batch_stats`)"
-        if getattr(self,'norm',False): raise Exception('Can not call normalize twice')
-        if stats is None: self.stats = self.batch_stats()
-        else:             self.stats = stats
-        #print(self.stats)
-        #self.norm,self.denorm = zip(*[normalize_funcs(*s, do_x=do_x, do_y=do_y) for s in self.stats])
-        self.add_tfm(self.norm)
-        # for prediction we just keep track of one denorm for now, hack hack hack
-        #self.denorm = self.denorm[0]
-        return self
-    
-class NPMultiImageList(ImageList): 
+    def show_batch(self, rows:int=5, ds_type:DatasetType=DatasetType.Train, reverse:bool=False, **kwargs)->None:
+        raise NotImplementedError("Leif: haven't made this work with the triplet trainer yet")
+
+
+class NPMultiImageItemList(ImageItemList): 
     c = 100
     
     _bunch = MultiImageDataBunch
@@ -103,7 +112,6 @@ class NPMultiImageList(ImageList):
             super().__init__(*args, **kwargs)
             self.fn = fn
             self.id = fn.split('/')[-1].split('_')[0]
-            self.extra_info = {}  # placeholder dict we can fill later
 
         @property
         def size(self):
@@ -197,8 +205,3 @@ def monkey_patch_fastai():
         import fastai.basic_train
         loss_batch_orig = fastai.basic_train.loss_batch
     fastai.basic_train.loss_batch = loss_batch
-
-
-
-# for backward compatability
-NPMultiImageItemList = NPMultiImageList
