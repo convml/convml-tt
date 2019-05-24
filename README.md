@@ -53,18 +53,36 @@ ln -s ~/git-repos/convml_tt/convml_tt ~/ml_project/code/convml_tt
 
 ### Installing dependecies
 
-To train the model and do the model interpretation you will need to install the
-fastai and pytorch python. At the moment I am using fastai `v1.0.48`. It's
-easiest to install and keep track of the python modules using
-[conda](https://www.anaconda.com/distribution/). Once conda is installed create
-a new conda environment and install the dependencies:
+To train the model and do the model interpretation there are number of python
+modules which are needed. It's easiest to install and keep track of the python
+modules using [conda](https://www.anaconda.com/distribution/). Once conda is
+installed create a new conda environment and install the dependencies:
 
 ```bash
 conda create -n fastai python=3.6 -y
 conda activate fastai
-conda install matplotlib xarray netCDF4 jupyter
-pip install fastai==1.0.48
+```
+
+Depending on whether you have a GPU available or not you will need a different
+version of `pytorch` (see https://pytorch.org/get-started for details)
+
+For GPU training on ARC3 (CUDA v9.0) use:
+
+```bash
 conda install pytorch torchvision cudatoolkit=9.0 -c pytorch
+```
+
+for (local) CPU based training
+
+```bash
+conda install pytorch-cpu torchvision-cpu -c pytorch
+```
+
+Finally the remaining dependencies can be installed with
+
+```bash
+conda install matplotlib xarray netCDF4 jupyter
+pip install fastai==1.0.43 sklearn
 ```
 
 ## Training
