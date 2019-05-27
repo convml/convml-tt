@@ -4,7 +4,6 @@ from fastai.vision.data import ImageItemList
 from fastai.vision.image import Image, pil2tensor
 from fastai.data_block import get_files
 from fastai.basics import *
-from fastai.data_block import PreProcessors
 from fastai.vision.data import ImageDataBunch, channel_view, normalize_funcs
 from fastai.vision import Image
 from fastai.basic_data import DeviceDataLoader
@@ -29,6 +28,14 @@ def loss_func(ys, margin=1.00, l2=0.01):
         loss += l2 * (torch.norm(z_p) + torch.norm(z_n) + torch.norm(z_d))
     return loss
 
+class TileType:
+    """
+    Simple enum for mapping into triplet array """
+    ANCHOR = 0
+    NEIGHBOR = 1
+    DISTANT = 2
+
+    NAMES = ["anchor", "neighbor", "distant"]
 
 class MultiImageDeviceDataLoader(DeviceDataLoader):
     def proc_batch(self,b:Tensor)->Tensor:
@@ -46,32 +53,12 @@ class MultiImageDeviceDataLoader(DeviceDataLoader):
                     x = f((x, y))
         return b
 
-def normalize(x:TensorImage, mean:FloatTensor,std:FloatTensor)->TensorImage:
-    "Normalize `x` with `mean` and `std`."
-    return (x-mean[...,None,None]) / std[...,None,None]
-
-def denormalize(x:TensorImage, mean:FloatTensor,std:FloatTensor, do_x:bool=True)->TensorImage:
-    "Denormalize `x` with `mean` and `std`."
-    return x.cpu().float()*std[...,None,None] + mean[...,None,None] if do_x else x.cpu()
-
-def _normalize_batch(b:Tuple[Tensor,Tensor], mean:FloatTensor, std:FloatTensor, do_x:bool=True, do_y:bool=False)->Tuple[Tensor,Tensor]:
-    "`b` = `x`,`y` - normalize `x` array of imgs and `do_y` optionally `y`."
-    x,y = b
-    mean,std = mean.to(x.device),std.to(x.device)
-    if do_x: x = normalize(x,mean,std)
-    if do_y and len(y.shape) == 4: y = normalize(y,mean,std)
-    return x,y
-
-def normalize_funcs(mean:FloatTensor, std:FloatTensor, do_x:bool=True, do_y:bool=False)->Tuple[Callable,Callable]:
-    "Create normalize/denormalize func using `mean` and `std`, can specify `do_y` and `device`."
-    mean,std = tensor(mean),tensor(std)
-    return (partial(_normalize_batch, mean=mean, std=std, do_x=do_x, do_y=do_y),
-            partial(denormalize, mean=mean, std=std, do_x=do_x))
-
-    
 class MultiImageDataBunch(ImageDataBunch):
     _ddl_cls = MultiImageDeviceDataLoader
-    
+
+    # this is only included here so that we can ensure that our own DataLoader
+    # class is used as we need to handle the triplet of images in each training
+    # example
     def __init__(self, train_dl:DataLoader, valid_dl:DataLoader, fix_dl:DataLoader=None, test_dl:Optional[DataLoader]=None,
                  device:torch.device=None, dl_tfms:Optional[Collection[Callable]]=None, path:PathOrStr='.',
                  collate_fn:Callable=data_collate, no_check:bool=False):
@@ -86,7 +73,7 @@ class MultiImageDataBunch(ImageDataBunch):
         self.single_dl = _create_dl(DataLoader(valid_dl.dataset, batch_size=1, num_workers=0))
         self.path = Path(path)
         if not no_check: self.sanity_check()
-    
+
     def batch_stats(self, funcs:Collection[Callable]=None)->Tensor:
         "Grab a batch of data and call reduction function `func` per channel"
         funcs = ifnone(funcs, [torch.mean,torch.std])
@@ -102,74 +89,59 @@ class MultiImageDataBunch(ImageDataBunch):
     def show_batch(self, rows:int=5, ds_type:DatasetType=DatasetType.Train, reverse:bool=False, **kwargs)->None:
         raise NotImplementedError("Leif: haven't made this work with the triplet trainer yet")
 
-
-class NPMultiImageItemList(ImageItemList): 
+class NPMultiImageList(ImageItemList):
     c = 100
-    
+
+    TILE_FILENAME_FORMAT = "{triplet_id:05d}_{tile_type}.png"
+    TRIPLET_META_FILENAME_FORMAT = "{triplet_id:05d}_meta.yaml"
+
     _bunch = MultiImageDataBunch
     class ImagesList(list):
-        def __init__(self, fn, *args, **kwargs):
+        def __init__(self, src_path, id, *args, **kwargs):
             super().__init__(*args, **kwargs)
-            self.fn = fn
-            self.id = fn.split('/')[-1].split('_')[0]
+            self.id = id
+            self.src_path = src_path
 
         @property
         def size(self):
             return self[0].size
-        
+
         def apply_tfms(self, tfms, **kwargs):
             items = []
             for item in self:
                 items.append(item.apply_tfms(tfms, **kwargs))
-                
             return items
 
-    def open(self, fn, div:bool=True):
-        
-        fn = str(fn)
-        
-        images = self.ImagesList(fn)
+    def open(self, fns, div:bool=True):
+        src_path = fns[0].parent
+        triplet_id = int(fns[0].name.split('_')[0])
 
-        
-        fns = [
-            fn,
-            fn.replace('anchor', 'neighbor'),
-            fn.replace('anchor', 'distant')
-        ]
-        
+        images = self.ImagesList(id=triplet_id, src_path=src_path)
+
         for fn_ in fns:
-            if fn.endswith('.npy'):
-                x = np.load(fn_)[:,:,:-1]  # NAIP -> RGB (4 -> 3 channels)
-                x = PILImage.fromarray(x).convert('RGB')  # need to make the image RGB here otherwise we get an alpha channel
-            
-                # copied from fastai.vision.image.open_image
-                x = pil2tensor(x,np.float32)
-                if div: x.div_(255)
-                    
-                images.append(Image(x))
-            else:
-                x = open_image(fn_)
-                images.append(x)
-
-            
-            
+            x = open_image(fn_)
+            images.append(x)
         return images
-    
 
-    
     @classmethod
-    def from_folder(cls, path:PathOrStr='.', extensions:Collection[str]=None,
-                    recurse:bool=True, include:Optional[Collection[str]]=None,
-                    processor:PreProcessors=None, **kwargs)->ItemList:
+    def from_folder(cls, path:PathOrStr='.', **kwargs)->ItemList:
         path = Path(path)
-        
-        files = get_files(path, extensions, recurse=recurse, include=include)
-        
-        # only get our anchor files for now
-        files = filter(lambda p: 'anchor' in p.name, files)
-               
-       # return cls(items=files, path=path, processor=processor, **kwargs)
-        return cls(files, path=path, processor=processor, **kwargs)
+
+        files_by_type = []
+        for tt in TileType.NAMES:
+            fn_tiletype = cls.TILE_FILENAME_FORMAT.format(tile_type=tt,
+                                                          triplet_id=0)
+            fn_tiletype = fn_tiletype.replace('00000', '*')
+            files_by_type.append(list(path.glob(fn_tiletype)))
+
+        num_files_by_type = [len(files) for files in files_by_type]
+        if len(set(num_files_by_type)) != 1:
+            raise Exception("There appear to an uneven number of anchor,"
+                            " neighbor or distanta tiles.")
+
+        files = zip(*files_by_type)
+
+        return cls(files, path=path, processor=None, **kwargs)
 
 def loss_batch(model:nn.Module, xb:Tensor, yb:Tensor, loss_func:OptLossFunc=None, opt:OptOptimizer=None,
                cb_handler:Optional[CallbackHandler]=None)->Tuple[Union[Tensor,int,float,str]]:
@@ -205,3 +177,6 @@ def monkey_patch_fastai():
         import fastai.basic_train
         loss_batch_orig = fastai.basic_train.loss_batch
     fastai.basic_train.loss_batch = loss_batch
+
+# for backward compatability
+NPMultiImageItemList = NPMultiImageList
