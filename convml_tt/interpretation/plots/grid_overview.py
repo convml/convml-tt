@@ -3,7 +3,7 @@ import math
 import matplotlib.pyplot as plt
 import numpy as np
 
-from ... import TileType
+from ...architectures.triplet_trainer import TileType
 
 
 def grid_overview(triplets, points, tile=TileType.ANCHOR,
