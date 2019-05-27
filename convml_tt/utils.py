@@ -10,7 +10,15 @@ from PIL import Image
 def get_encodings(triplets, model):
     tile_used = (0, 'anchor')
     def _get_encoding(image_set, *args, **kwargs):
-        v = model.predict(image_set[tile_used[0]])[1]
+        try:
+            v = model.predict(image_set[tile_used[0]])[1]
+        except RuntimeError:
+            # XXX: because of how I've restructured the normalization and how
+            # basic_train.Learner.predict is written model.predict will always
+            # return the prediction for the first tile which is the `anchor`
+            # tile. Ideally I'd rewrite this at some point so we can define
+            # which tile we'd like to use
+            v = model.predict(image_set)[1]
         return image_set.id, v
 
     triplet_ids_and_encodings = [

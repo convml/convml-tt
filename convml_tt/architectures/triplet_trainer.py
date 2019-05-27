@@ -2,7 +2,7 @@ from torch.utils.data import Dataset, DataLoader
 
 from fastai.vision.data import ImageItemList
 from fastai.vision.image import Image, pil2tensor
-from fastai.data_block import get_files
+from fastai.data_block import get_files, EmptyLabelList
 from fastai.basics import *
 from fastai.vision.data import ImageDataBunch, channel_view, normalize_funcs
 from fastai.vision import Image
@@ -37,42 +37,50 @@ class TileType:
 
     NAMES = ["anchor", "neighbor", "distant"]
 
-class MultiImageDeviceDataLoader(DeviceDataLoader):
-    def proc_batch(self,b:Tensor)->Tensor:
-        "Process batch `b` of `TensorImage`."
-        b = to_device(b, self.device)
-        
-        xs, y = b
-        for f in listify(self.tfms):
-            # self.tfms contains a set of transforms for each x in xs
-            if isinstance(f, list):
-                for (f_, x) in zip(f, xs):
-                    x = f_((x, y))
-            else:
-                for x in xs:
-                    x = f((x, y))
-        return b
+
+def normalize_triplet(x:TensorImage, mean:FloatTensor,std:FloatTensor)->TensorImage:
+    "Normalize `x` with `mean` and `std`."
+    return [
+        (x_-mean[...,None,None]) / std[...,None,None]
+        for x_ in x
+    ]
+
+def denormalize_triplet(x:List[TensorImage], mean:FloatTensor,std:FloatTensor, do_x:bool=True)->TensorImage:
+    "Denormalize `x` with `mean` and `std`."
+    return [
+        x_.cpu().float()*std[...,None,None] + mean[...,None,None] 
+        if do_x else x_.cpu()
+        for x_ in x
+    ]
+
+def _normalize_triplet_batch(b:Tuple[Tensor,Tensor], mean:FloatTensor, std:FloatTensor, do_x:bool=True, do_y:bool=False)->Tuple[Tensor,Tensor]:
+    "`b` = `x`,`y` - normalize `x` array of imgs and `do_y` optionally `y`."
+    x,y = b
+    mean, std = mean.to(y.device), std.to(y.device)
+    if do_x:
+        x = normalize_triplet(x, mean, std)
+    if do_y:
+        raise Exception("`y` isn't used for the triplet trainer, we shouldn't"
+                        " be trying to normalize it")
+    return x,y
+
+def normalize_triplet_funcs(mean:FloatTensor, std:FloatTensor, do_x:bool=True, do_y:bool=False)->Tuple[Callable,Callable]:
+    "Create normalize/denormalize func using `mean` and `std`, can specify `do_y` and `device`."
+    mean,std = tensor(mean),tensor(std)
+    return (partial(_normalize_triplet_batch, mean=mean, std=std, do_x=do_x, do_y=do_y),
+            partial(denormalize_triplet, mean=mean, std=std, do_x=do_x))
+
 
 class MultiImageDataBunch(ImageDataBunch):
-    _ddl_cls = MultiImageDeviceDataLoader
 
-    # this is only included here so that we can ensure that our own DataLoader
-    # class is used as we need to handle the triplet of images in each training
-    # example
-    def __init__(self, train_dl:DataLoader, valid_dl:DataLoader, fix_dl:DataLoader=None, test_dl:Optional[DataLoader]=None,
-                 device:torch.device=None, dl_tfms:Optional[Collection[Callable]]=None, path:PathOrStr='.',
-                 collate_fn:Callable=data_collate, no_check:bool=False):
-        self.dl_tfms = listify(dl_tfms)
-        self.device = defaults.device if device is None else device
-        assert not isinstance(train_dl,self._ddl_cls)
-        def _create_dl(dl, **kwargs):
-            if dl is None: return None
-            return self._ddl_cls(dl, self.device, self.dl_tfms, collate_fn, **kwargs)
-        self.train_dl,self.valid_dl,self.fix_dl,self.test_dl = map(_create_dl, [train_dl,valid_dl,fix_dl,test_dl])
-        if fix_dl is None: self.fix_dl = self.train_dl.new(shuffle=False, drop_last=False)
-        self.single_dl = _create_dl(DataLoader(valid_dl.dataset, batch_size=1, num_workers=0))
-        self.path = Path(path)
-        if not no_check: self.sanity_check()
+    def normalize(self, stats:Collection[Tensor]=None, do_x:bool=True, do_y:bool=False)->None:
+        "Add normalize transform using `stats` (defaults to `DataBunch.batch_stats`)"
+        if getattr(self,'norm',False): raise Exception('Can not call normalize twice')
+        if stats is None: self.stats = self.batch_stats()
+        else:             self.stats = stats
+        self.norm,self.denorm = normalize_triplet_funcs(*self.stats, do_x=do_x, do_y=do_y)
+        self.add_tfm(self.norm)
+        return self
 
     def batch_stats(self, funcs:Collection[Callable]=None)->Tensor:
         "Grab a batch of data and call reduction function `func` per channel"
@@ -88,6 +96,12 @@ class MultiImageDataBunch(ImageDataBunch):
 
     def show_batch(self, rows:int=5, ds_type:DatasetType=DatasetType.Train, reverse:bool=False, **kwargs)->None:
         raise NotImplementedError("Leif: haven't made this work with the triplet trainer yet")
+
+class UnlabelledTripletsList(EmptyLabelList):
+    pass
+
+
+
 
 class NPMultiImageList(ImageItemList):
     c = 100
@@ -142,6 +156,12 @@ class NPMultiImageList(ImageItemList):
         files = zip(*files_by_type)
 
         return cls(files, path=path, processor=None, **kwargs)
+
+    def label_empty(self, **kwargs):
+        "Label every item with an `UnlabelledTripletsList`."
+        kwargs['label_cls'] = UnlabelledTripletsList
+        return self.label_from_func(func=lambda o: 0., **kwargs)
+
 
 def loss_batch(model:nn.Module, xb:Tensor, yb:Tensor, loss_func:OptLossFunc=None, opt:OptOptimizer=None,
                cb_handler:Optional[CallbackHandler]=None)->Tuple[Union[Tensor,int,float,str]]:
