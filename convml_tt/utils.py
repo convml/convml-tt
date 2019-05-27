@@ -19,7 +19,7 @@ def get_encodings(triplets, model):
 
     triplet_ids, encodings = zip(*triplet_ids_and_encodings)
 
-    encodings = np.asarray(torch.stack(encodings))
+    encodings = np.asarray(torch.stack(encodings).squeeze())
     # we're picking out the anchor tile above
     tile_id = np.asarray(triplet_ids).astype(int)
 
