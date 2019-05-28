@@ -1,18 +1,15 @@
-from fastai.datasets import untar_data, _checks
+from fastai.datasets import untar_data
 import fastai.vision
 
 from convml_tt.architectures.triplet_trainer import (NPMultiImageItemList,
                                                      loss_func,
                                                      monkey_patch_fastai)
 
-SRC_DATA_URL = "http://homepages.see.leeds.ac.uk/~earlcd/ml-datasets/Nx256_s200000.0_N0study_N10train"
-_checks[SRC_DATA_URL] = (1144669, 'c599454acb4ff07fbd1551135c350ba9')
+from convml_tt.data.examples import ExampleData
 
 
 def test_load_data_and_train():
-    data_path = untar_data(SRC_DATA_URL)
-
-    print(data_path)
+    data_path = untar_data(ExampleData.TINY10)
 
     monkey_patch_fastai()
 
@@ -22,7 +19,7 @@ def test_load_data_and_train():
 
     src = (item_list
            .random_split_by_pct()
-           .label_empty()
+           .label_empty(embedding_length=100)
            )
 
     data = (src
@@ -32,7 +29,7 @@ def test_load_data_and_train():
             )
 
     learn = fastai.vision.create_cnn(data=data,
-                                     arch=fastai.vision.models.resnet18,
+                                     base_arch=fastai.vision.models.resnet18,
                                      loss_func=loss_func
                                      )
 

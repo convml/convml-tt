@@ -28,4 +28,4 @@ dependencies:
     - satpy==0.12.0
     - esmpy
     - progressbar
-    - fastai==1.0.43post1
+    - fastai==1.0.52
