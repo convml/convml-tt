@@ -9,5 +9,5 @@ setup(
     author_email='leifdenby@gmail.com',
     url='https://github.com/leifdenby/convml_tt',
     classifiers=[],
-    install_requires=["xarray", "matplotlib", "fastai==1.0.42", "sklearn"]
+    install_requires=["xarray", "matplotlib", "fastai==1.0.52", "sklearn"]
 )
