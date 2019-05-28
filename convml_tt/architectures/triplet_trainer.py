@@ -1,13 +1,27 @@
 from torch.utils.data import Dataset, DataLoader
 
-from fastai.vision.data import ImageItemList
+# fastai v1.0.46: ImageItemList -> ImageList
+try:
+    from fastai.vision.data import ImageList
+except ImportError:
+    from fastai.vision.data import ImageItemList as ImageList
+
 from fastai.vision.image import Image, pil2tensor
-from fastai.data_block import get_files, EmptyLabelList
-from fastai.basics import *
+from fastai.data_block import get_files, EmptyLabelList, ItemList
 from fastai.vision.data import ImageDataBunch, channel_view, normalize_funcs
-from fastai.vision import Image
-from fastai.basic_data import DeviceDataLoader
+from fastai.basic_data import DeviceDataLoader, DatasetType
 from fastai.vision import open_image
+
+from fastai.torch_core import TensorImage, FloatTensor, OptLossFunc
+from fastai.torch_core import OptOptimizer, tensor, F
+from fastai.torch_core import List, Tuple, Tensor, Callable, Collection
+from fastai.core import PathOrStr, Optional, Union, partial, ifnone, is_listy
+from fastai.callback import CallbackHandler
+
+from pathlib import Path
+
+import torch.nn as nn
+import torch
 
 import numpy as np
 
@@ -98,13 +112,11 @@ class MultiImageDataBunch(ImageDataBunch):
         raise NotImplementedError("Leif: haven't made this work with the triplet trainer yet")
 
 class UnlabelledTripletsList(EmptyLabelList):
-    pass
+    def __init__(self, *args, **kwargs):
+        self.c = kwargs.pop('embedding_length', 100)
+        super().__init__(*args, **kwargs)
 
-
-
-
-class NPMultiImageList(ImageItemList):
-    c = 100
+class NPMultiImageList(ImageList):
 
     TILE_FILENAME_FORMAT = "{triplet_id:05d}_{tile_type}.png"
     TRIPLET_META_FILENAME_FORMAT = "{triplet_id:05d}_meta.yaml"
@@ -171,17 +183,23 @@ def loss_batch(model:nn.Module, xb:Tensor, yb:Tensor, loss_func:OptLossFunc=None
     if not is_listy(yb): yb = [yb]
     out = [model(x) for x in xb]
     out = cb_handler.on_loss_begin(out)
-        
-    #out = cb_handler.on_loss_begin(out)
 
     if not loss_func: return to_detach(out), yb[0].detach()
-    
-    #print(out)
+
     loss = loss_func(out)
 
     if opt is not None:
         loss = cb_handler.on_backward_begin(loss)
-        loss.backward()
+        # fastai v1.0.52 introduced the possibility for the backwards step to
+        # be optional by returning a tuple here
+        # see https://github.com/fastai/fastai/commit/6fcaad870e0e833d325052b57e72e23a450ebc6f#diff-0730afdfa67f9712e46ad7866b0123f8L32
+        if type(loss) == tuple:
+            loss, skip_bwd = loss
+            if not skip_bwd:
+                loss.backward()
+        else:
+            loss.backward()
+
         cb_handler.on_backward_end()
         opt.step()
         cb_handler.on_step_end()

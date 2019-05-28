@@ -22,7 +22,7 @@ def test_load_data_and_train():
 
     src = (item_list
            .random_split_by_pct()
-           .label_empty()
+           .label_empty(embedding_length=100)
            )
 
     data = (src
@@ -32,7 +32,7 @@ def test_load_data_and_train():
             )
 
     learn = fastai.vision.create_cnn(data=data,
-                                     arch=fastai.vision.models.resnet18,
+                                     base_arch=fastai.vision.models.resnet18,
                                      loss_func=loss_func
                                      )
 
