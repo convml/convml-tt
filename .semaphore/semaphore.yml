@@ -1,0 +1,110 @@
+# Use the latest stable version of Semaphore 2.0 YML syntax:
+version: v1.0
+
+# Name your pipeline. In case you connect multiple pipelines with promotions,
+# the name will help you differentiate between, for example, a CI build phase
+# and delivery phases.
+name: convml_tt pipeline
+
+# An agent defines the environment in which your code runs.
+# It is a combination of one of available machine types and operating
+# system images.
+# See https://docs.semaphoreci.com/article/20-machine-types
+# and https://docs.semaphoreci.com/article/32-ubuntu-1804-image
+agent:
+  machine:
+    type: e1-standard-2
+    os_image: ubuntu1804
+
+# Blocks are the heart of a pipeline and are executed sequentially.
+# Each block has a task that defines one or more jobs. Jobs define the
+# commands to execute.
+# See https://docs.semaphoreci.com/article/62-concepts
+blocks:
+  - name: "Install Dependencies"
+    task:
+      # This block install the required Linux packages
+      # as well as the python dependencies.
+      # The prologue section is always executed before each job on
+      # the block.
+      # See https://docs.semaphoreci.com/article/50-pipeline-yaml#prologue
+      prologue:
+        commands:
+          # Set the python version to 3.7.
+          # See https://docs.semaphoreci.com/article/54-toolbox-reference#sem-version
+          - sem-version python 3.7
+          # Install miniconda, https://github.com/astrofrog/example-travis-conda/blob/master/.travis.yml
+          - wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
+          - chmod +x miniconda.sh
+          - ./miniconda.sh -b -p $HOME/miniconda
+          - export PATH=$HOME/miniconda/bin:$PATH
+          - conda update --yes conda
+      jobs:
+        - name: conda & pip
+          commands:
+            # Get the latest version of our source code from GitHub:
+            # See https://docs.semaphoreci.com/article/54-toolbox-reference#checkout
+            - checkout
+            # handle requirements from conda
+            - cache restore requirements-conda-$SEMAPHORE_GIT_BRANCH-$(checksum environment-cpu.yml),requirements-conda-$SEMAPHORE_GIT_BRANCH-,requirements-conda-master-
+            # cache restore uses relative paths always, so we need to move things
+            # ourselves. This might fail though so we ensure exitcode=0
+            - mv home/semaphore/miniconda/pkgs/* $HOME/miniconda/pkgs || true
+            # install requirements through conda
+            - conda env create -f environment-cpu.yml
+            - cache store requirements-conda-$SEMAPHORE_GIT_BRANCH-$(checksum environment-cpu.yml) $HOME/miniconda/pkgs
+            - source activate convml_tt
+            # cache everything related to conda so we don't have to install it
+            # again and have our environment available later, we remove the packages though since we're done with them now
+            - rm -rf $HOME/miniconda/pkgs
+            - cache store conda-env-$SEMAPHORE_GIT_BRANCH-$(checksum environment-cpu.yml) $HOME/miniconda
+
+  #- name: "Run Code Analysis"
+    #task:
+      ## This block executes code analysis tests with pylint.
+      #prologue:
+        #commands:
+          #- sem-version python 3.7
+          #- checkout
+          ## we need conda again
+          #- cache restore conda-env-$SEMAPHORE_GIT_BRANCH-$(checksum environment-cpu.yml)
+          ## cache restore uses relative paths always, so we need to move things
+          ## ourselves. This might fail though so we ensure exitcode=0
+          #- mv home/semaphore/miniconda/ $HOME/miniconda || true
+          ## the cache restore appears to put things in slightly the wrong
+          ## place, not using relative paths
+          #- ln -s $HOME/home/semaphore/miniconda $HOME/miniconda
+          #- export PATH=$HOME/miniconda/bin:$PATH
+          #- source activate convml_tt
+          #- pip install pylint
+      #jobs:
+        #- name: Pylint
+          #commands:
+            ## list out files that are in directory and working tree
+            ## grep -v will exclude the files being considered for pylint
+            ## grep -E will matches files having .py extension
+            ## This command will help to pass required python files to pylint along with pylint_djanog plugin
+            ## Pylint with -E option will display only if there is any error
+            #- git ls-files | grep -v 'migrations' | grep -v 'settings.py' | grep -v 'manage.py' | grep -E '.py$' |
+              #xargs pylint -E
+
+  - name: "Run Unit Tests"
+    task:
+      # This block runs the unit tests.
+      prologue:
+        commands:
+          - sem-version python 3.7
+          - checkout
+          # we need conda again
+          - cache restore conda-env-$SEMAPHORE_GIT_BRANCH-$(checksum environment-cpu.yml)
+          # cache restore uses relative paths always, so we need to move things
+          # ourselves. This might fail though so we ensure exitcode=0
+          - mv home/semaphore/miniconda/ $HOME/miniconda || true
+          - export PATH=$HOME/miniconda/bin:$PATH
+          - source activate convml_tt
+          - pip install pytest
+          - pip install .
+      jobs:
+        - name: Tests
+          commands:
+            - python -m pytest
