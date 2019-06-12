@@ -13,7 +13,7 @@ from fastai.basic_data import DeviceDataLoader, DatasetType
 from fastai.vision import open_image
 
 from fastai.torch_core import TensorImage, FloatTensor, OptLossFunc
-from fastai.torch_core import OptOptimizer, tensor, F
+from fastai.torch_core import OptOptimizer, tensor, F, to_detach
 from fastai.torch_core import List, Tuple, Tensor, Callable, Collection
 from fastai.core import PathOrStr, Optional, Union, partial, ifnone, is_listy
 from fastai.callback import CallbackHandler
@@ -116,6 +116,9 @@ class UnlabelledTripletsList(EmptyLabelList):
         self.c = kwargs.pop('embedding_length', 100)
         super().__init__(*args, **kwargs)
 
+    def reconstruct(self, *args, **kwargs):
+        return None
+
 class NPMultiImageList(ImageList):
 
     TILE_FILENAME_FORMAT = "{triplet_id:05d}_{tile_type}.png"
@@ -173,6 +176,9 @@ class NPMultiImageList(ImageList):
         "Label every item with an `UnlabelledTripletsList`."
         kwargs['label_cls'] = UnlabelledTripletsList
         return self.label_from_func(func=lambda o: 0., **kwargs)
+
+    def reconstruct(self, *args, **kwargs):
+        return None
 
 
 def loss_batch(model:nn.Module, xb:Tensor, yb:Tensor, loss_func:OptLossFunc=None, opt:OptOptimizer=None,
