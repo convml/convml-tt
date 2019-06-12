@@ -134,14 +134,14 @@ def aggregate_channel_over_tiles(tiles, channel, op, resample, cli,
     ], dim='tile_id')
 
     da_channel.name = "{}_{}".format(da_channel.name, op.__name__)
-    da_channel.attrs['resampled'] = resample
+    da_channel.attrs['resampled'] = str(resample)
     da_channel.attrs['long_name'] = "{} {}".format(da_channel.long_name,
                                                    op.__name__)
     da_channel['channel'] = channel
 
     # give this `source_path` attribute so we can plot examples with the
     # annotated scatterplot
-    da_channel.attrs['source_path'] = tiles[0].data_path
+    da_channel.attrs['source_path'] = str(tiles[0].data_path)
 
     return da_channel
 
