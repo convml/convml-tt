@@ -12,11 +12,12 @@ from scipy.spatial import ConvexHull
 from scipy.interpolate import CubicSpline
 
 
-def _find_nearest_tile(x_sample, y_sample, x, y):
+def find_nearest_tile(x_sample, y_sample, x, y, dim='tile_id', scaling=1.0):
     """
     Given the data arrays `x` and `y` which have the dimension `tile_id`, i.e.
     there's a value for each tile, find the nearest `tile_id`s to each point
-    pair in `x_sample`, `y_sample`
+    pair in `x_sample`, `y_sample`. Optionally `scaling` can be provided in
+    case the range of values in x and y are very different
     """
     # x_sample and y_sample might just be numpy arrays so create data arrays
     # here so we get the correct broadcasting
@@ -24,11 +25,11 @@ def _find_nearest_tile(x_sample, y_sample, x, y):
     y_sample = xr.DataArray(y_sample, dims=('point',))
 
     dx = x_sample - x
-    dy = y_sample - y
+    dy = (y_sample - y)*scaling
 
     dl = np.sqrt(dx*dx + dy*dy)
 
-    return dl.argmin(dim='tile_id')
+    return dl.argmin(dim=dim)
 
 
 def scatter_annotated(x, y, points, ax=None, size=0.1, autopos_method='forces',
@@ -80,7 +81,7 @@ def scatter_annotated(x, y, points, ax=None, size=0.1, autopos_method='forces',
                 (x_c, x_err), (y_c, y_err) = points
         except Exception as e:
             raise NotImplementedError(type(points), e)
-        tile_ids = _find_nearest_tile(x_sample=x_c, y_sample=y_c, x=x, y=y)
+        tile_ids = find_nearest_tile(x_sample=x_c, y_sample=y_c, x=x, y=y)
 
         # For the annotations we want to draw a line to where these tiles
         # actually exist
@@ -120,12 +121,12 @@ def scatter_annotated(x, y, points, ax=None, size=0.1, autopos_method='forces',
         if x_c is not None and y_c is not None:
             if x_err is not None and y_err is not None:
                 ax.errorbar(x=x_c[n], y=y_c[n], xerr=x_err[n], yerr=y_err[n],
-                            marker='+', color=line.get_color())
+                            marker='+', color=line.get_color(), capsize=2)
             else:
                 ax.scatter(x=x_c[n], y=y_c[n], marker='+',
                            color=line.get_color())
 
-        ax.scatter(*pts[n], marker='.', color=line.get_color())
+        sc = ax.scatter(*pts[n], marker='.', color=line.get_color())
 
         xp, yh = transform((x_, y_))
 
@@ -143,3 +144,5 @@ def scatter_annotated(x, y, points, ax=None, size=0.1, autopos_method='forces',
     # calculated the offset for the annotations
     ax.set_xlim(xlim)
     ax.set_ylim(ylim)
+
+    return sc, pts
