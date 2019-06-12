@@ -13,6 +13,9 @@ from ...utils import get_triplets_from_encodings
 
 # In[13]:
 
+def _make_letter_labels(n_labels):
+    return np.array([chr(i+97).upper() for i in np.arange(n_labels)])
+
 def _fix_labels(ax, leaf_mapping, label_clusters=False):
     """
     Initially the labels simply correspond the leaf index, but we want to plot
@@ -114,6 +117,8 @@ def dendrogram(encodings, n_clusters_max=14, debug=False, ax=None,
     mapping = dict(zip(M, L))
     leaf_mapping = np.array(list(map(lambda i: mapping[i], T)))
 
+    N_leaves = len(np.unique(leaf_mapping))
+
     # counts per leaf
     # [(n, sum(leaf_mapping == n)) for n in L]
 
@@ -156,6 +161,14 @@ def dendrogram(encodings, n_clusters_max=14, debug=False, ax=None,
         ax.legend()
 
     if return_clusters:
-        return ax, leaf_mapping
+        # instead of returning the actual indecies of the leaves here (as were
+        # used above) we remap so that they run from 0...N_leaves
+        leaf_idxs_remapped = np.array([
+            list(leaf_indecies_from_labels).index(i) for i in leaf_mapping
+        ])
+        if not label_clusters:
+            return ax, leaf_idxs_remapped
+        else:
+            return ax, _make_letter_labels(N_leaves)[leaf_idxs_remapped]
     else:
         return ax
