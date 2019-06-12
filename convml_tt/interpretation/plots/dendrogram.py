@@ -15,7 +15,7 @@ from ...utils import get_triplets_from_encodings
 
 def dendrogram(encodings, n_clusters_max=14, debug=False, ax=None,
     n_samples=10, show_legend=False, label_clusters=False,
-    return_clusters=False, **kwargs):
+    return_clusters=False, color=None, **kwargs):
     """
     Additional kwargs will be passed to scipy.cluster.hierarchy.dendrogram
     """
@@ -28,6 +28,9 @@ def dendrogram(encodings, n_clusters_max=14, debug=False, ax=None,
         fig = ax.figure
 
     Z = hc.linkage(y=encodings, method='ward',)
+
+    if color is not None:
+        kwargs['link_color_func'] = lambda k: color
 
     ddata = hc.dendrogram(Z=Z, truncate_mode='lastp', p=n_clusters_max,
                           get_leaves=True, **kwargs)
