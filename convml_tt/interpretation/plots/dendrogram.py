@@ -15,7 +15,7 @@ from ...utils import get_triplets_from_encodings
 
 def dendrogram(encodings, n_clusters_max=14, debug=False, ax=None,
     n_samples=10, show_legend=False, label_clusters=False,
-    **kwargs):
+    return_clusters=False, **kwargs):
     """
     Additional kwargs will be passed to scipy.cluster.hierarchy.dendrogram
     """
@@ -126,4 +126,7 @@ def dendrogram(encodings, n_clusters_max=14, debug=False, ax=None,
     if show_legend:
         ax.legend()
 
-    return ax
+    if return_clusters:
+        return ax, leaf_mapping
+    else:
+        return ax
