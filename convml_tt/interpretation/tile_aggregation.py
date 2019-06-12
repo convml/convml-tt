@@ -11,6 +11,7 @@ import yaml
 from tqdm import tqdm
 import numpy as np
 import xarray as xr
+from scipy.constants import pi
 
 from ..data.sources import satdata
 from ..architectures.triplet_trainer import TileType
@@ -143,3 +144,19 @@ def aggregate_channel_over_tiles(tiles, channel, op, resample, cli,
     da_channel.attrs['source_path'] = tiles[0].data_path
 
     return da_channel
+
+def scale_to_approximate_flux(da_rad):
+    channel = int(da_rad.channel)
+    # get channel width in meters
+    df_channel = satdata.Goes16AWS.CHANNEL_WIDTHS[channel] * 1.0e6
+
+    assert da_rad.units == "W m-2 sr-1 um-1"
+
+    da_flux_approx = 4*pi*channel*da_rad
+
+    da_flux_approx.attrs['units'] = "W/m^2"
+    da_flux_approx.attrs['long_name'] = "approximate channel flux"
+
+    da_flux_approx.name = 'F_approx'
+
+    return da_flux_approx
