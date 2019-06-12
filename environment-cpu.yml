@@ -1,0 +1,30 @@
+name: convml_tt
+
+channels:
+  - pytorch
+  - fastai
+  - defaults
+  - conda-forge
+dependencies:
+  - pip=19.0.1
+  - python=3.7
+  - boto3
+  - cartopy
+  - jupyter
+  - matplotlib
+  - netcdf4
+  - tqdm
+  - xarray
+  - scikit-learn
+  - pytorch-cpu
+  - torchvision-cpu
+  # dependencies below are necessary for the `satdata` code which will
+  # eventually be forked from `convml_tt`
+  - esmpy
+  - xesmf
+  - pip:
+    # satpy deps
+    - satpy==0.12.0
+    - esmpy
+    - progressbar
+    - fastai==1.0.52

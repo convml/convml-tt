@@ -1,3 +1,0 @@
-[submodule "convml_tt/sources/satdata"]
-	path = convml_tt/data/sources/satdata
-	url = https://github.com/leifdenby/satdata
