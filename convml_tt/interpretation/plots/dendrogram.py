@@ -13,6 +13,24 @@ from ...utils import get_triplets_from_encodings
 
 # In[13]:
 
+def _fix_labels(ax, leaf_mapping, label_clusters=False):
+    """
+    Initially the labels simply correspond the leaf index, but we want to plot
+    the number of items that belong to that leaf. And optionally give each leaf
+    node a label (A, B, C, etc)
+    """
+    new_labels = []
+
+    for (i, label) in enumerate(ax.get_xticklabels()):
+        leaf_index = int(label.get_text())
+        num_items_in_leaf = np.sum(leaf_index==leaf_mapping)
+        new_label = str(num_items_in_leaf)
+        if label_clusters:
+            new_label += "\n{}".format(chr(i+97).upper())
+        new_labels.append(new_label)
+
+    return new_labels
+
 def dendrogram(encodings, n_clusters_max=14, debug=False, ax=None,
     n_samples=10, show_legend=False, label_clusters=False,
     return_clusters=False, color=None, **kwargs):
@@ -31,6 +49,12 @@ def dendrogram(encodings, n_clusters_max=14, debug=False, ax=None,
 
     if color is not None:
         kwargs['link_color_func'] = lambda k: color
+
+    # we want to label the leaf by the index of the leaf node, at least
+    # initially. Below we will change the labels to have the count in each
+    # leaf, but we don't know that number yet
+    leaf_label_func = lambda i: str(i)
+    kwargs['leaf_label_func'] = leaf_label_func
 
     ddata = hc.dendrogram(Z=Z, truncate_mode='lastp', p=n_clusters_max,
                           get_leaves=True, **kwargs)
@@ -58,7 +82,9 @@ def dendrogram(encodings, n_clusters_max=14, debug=False, ax=None,
     assert(set(L) == set(ddata['leaves']))
 
     # getting leaf locations
-    # the order in `L` (leaders) above is the same as the order of points in icoord
+    # the order in `L` (leaders) above unfortunately is *not* same as the order
+    # of points in icoord so instead we pick up the order from the actual
+    # labels used
     bl_pts = np.array([
         np.asarray(ddata['icoord'])[:,0], # x at bottom-right corner
         np.asarray(ddata['dcoord'])[:,0]  # y at bottom-right corner
@@ -69,17 +95,24 @@ def dendrogram(encodings, n_clusters_max=14, debug=False, ax=None,
     ])
 
     leaf_pts = np.append(bl_pts, br_pts, axis=1)
-    # remove pts where y != 0 as these mark joins within the diagram and don't connect to the edge
+    # remove pts where y != 0 as these mark joins within the diagram and don't
+    # connect to the edge
     leaf_pts = leaf_pts[:,~(leaf_pts[1] > 0)]
-
-    leaf_pts_mapping = dict(zip(L, leaf_pts.T))
-
-    assert len(leaf_pts_mapping) == len(ddata['leaves'])
+    # sort by x-coordinate for leaf labels, so that the positions are in the
+    # same order as the axis labels
+    leaf_pts = leaf_pts[:,leaf_pts[0,:].argsort()]
+    # get the actual leaf from the indecies (these were set by providing the
+    # `leaf_label_func` above)
+    leaf_indecies_from_labels = np.array([
+        int(lab.get_text()) for lab in ax.get_xticklabels()
+    ])
+    # create mapping from the leaf indecies to the (x,y)-points in the
+    # dendrogram where these leaves terminate
+    leaf_pts_mapping = dict(zip(leaf_indecies_from_labels, leaf_pts.T))
 
     # work out which leaf each item (image) belongs to
     mapping = dict(zip(M, L))
     leaf_mapping = np.array(list(map(lambda i: mapping[i], T)))
-    leaf_mapping
 
     # counts per leaf
     # [(n, sum(leaf_mapping == n)) for n in L]
@@ -109,7 +142,6 @@ def dendrogram(encodings, n_clusters_max=14, debug=False, ax=None,
             ax.scatter(*leaf_xy, marker='s', label=lid, s=100)
 
         for n, img_idx in enumerate(img_idxs):
-
             img = triplets[img_idx]
 
             ax1=fig.add_axes([xp-0.5*size, yh-size*1.1*(n + y_offset), size, size])
@@ -117,14 +149,8 @@ def dendrogram(encodings, n_clusters_max=14, debug=False, ax=None,
             ax1.axison = False
             ax1.imshow(img)
 
-    if label_clusters:
-        # this is a hack so we can add a letter for each cluster, we just reuse
-        # the existing label and add a letter
-        new_labels = [
-            "{}\n{}".format(t.get_text(), chr(i+97).upper())
-            for (i, t) in enumerate(ax.get_xticklabels())
-        ]
-        ax.set_xticklabels(new_labels)
+    ax.set_xticklabels(_fix_labels(ax=ax, leaf_mapping=leaf_mapping,
+                                   label_clusters=label_clusters))
 
     if show_legend:
         ax.legend()
