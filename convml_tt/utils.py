@@ -7,18 +7,20 @@ from pathlib import Path
 
 from PIL import Image
 
-def get_encodings(triplets, model):
-    tile_used = (0, 'anchor')
+from .architectures.triplet_trainer import TileType
+
+def get_encodings(triplets, model, tile_type=TileType.ANCHOR):
     def _get_encoding(image_set, *args, **kwargs):
         try:
-            v = model.predict(image_set[tile_used[0]])[1]
+            v = model.predict(image_set[tile_type])[1]
         except RuntimeError:
-            # XXX: because of how I've restructured the normalization and how
-            # basic_train.Learner.predict is written model.predict will always
-            # return the prediction for the first tile which is the `anchor`
-            # tile. Ideally I'd rewrite this at some point so we can define
-            # which tile we'd like to use
-            v = model.predict(image_set)[1]
+            # "... eturns a tuple of three things: the object predicted (with
+            # the class in this instance), the underlying data (here the
+            # corresponding index) and the raw probabilities"
+            # https://docs.fast.ai/tutorial.inference.html#Vision
+            # we only want the underlying data (the three embeddings for the
+            # triplet provided)
+            v = model.predict(image_set)[1][tile_type]
         return image_set.id, v
 
     triplet_ids_and_encodings = [
@@ -34,7 +36,7 @@ def get_encodings(triplets, model):
     return xr.DataArray(
         encodings, dims=('tile_id', 'enc_dim'),
         coords=dict(tile_id=tile_id, enc_dim=np.arange(encodings.shape[1])),
-        attrs=dict(tile_used=tile_used[1],
+        attrs=dict(tile_used=TileType.NAMES[tile_type],
         source_path=str(triplets.path.absolute())
         )
     )
