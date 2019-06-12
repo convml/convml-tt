@@ -7,7 +7,7 @@ from ...architectures.triplet_trainer import TileType
 
 
 def grid_overview(triplets, points, tile=TileType.ANCHOR,
-                  figwidth=16, ncols=10, include_number=True):
+                  figwidth=16, ncols=10, label='tile_id'):
     """
     Plot a grid overview of the chosen tile at the selected `points`. If
     `points` is an integer the first N=points tiles will be plotted, if
@@ -39,8 +39,16 @@ def grid_overview(triplets, points, tile=TileType.ANCHOR,
         ax.set_aspect('equal')
         ax.set_xticklabels([])
         ax.set_yticklabels([])
-        if include_number:
-            ax.text(0.1, 0.1, i, transform=ax.transAxes,
+        label_text = None
+        if type(label) == str and label == 'tile_id':
+            label_text = str(i)
+        elif type(label) == list:
+            label_text = label[n]
+        else:
+            raise NotImplementedError(label)
+
+        if label_text:
+            ax.text(0.1, 0.1, label_text, transform=ax.transAxes,
                     bbox={'facecolor': 'white', 'alpha': 0.4, 'pad': 2})
 
     for n in range(len(idxs), nrows*ncols):
