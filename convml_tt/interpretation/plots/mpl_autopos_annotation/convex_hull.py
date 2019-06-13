@@ -8,6 +8,17 @@ def _import_matplotlib():
     import matplotlib.pyplot as plt
     return plt
 
+MIN_DISTANCE = 0.1
+
+def _filter_close_points(x, y):
+    # if any two neihbouring points are very close we might end up with kinks
+    # in the cubic spline, so we filter out those close points here so we end
+    # up with a smooth shape
+    points = np.array([x, y])
+    dl = np.linalg.norm(points - np.roll(points, 1, axis=0), axis=0)
+
+    return x[dl>MIN_DISTANCE], y[dl>MIN_DISTANCE]
+
 def calc_point_offsets(points, scale=0.2, show_plot=False):
     """
     Calculate offset point for each point in points which is outside a smooth
@@ -30,6 +41,8 @@ def calc_point_offsets(points, scale=0.2, show_plot=False):
         t = np.arange(x.shape[0], dtype=float)
         t /= t[-1]
         return t
+
+    x_h, y_h = _filter_close_points(x_h, y_h)
 
     t = make_t(x_h, y_h)
     Nt = 100

@@ -20,7 +20,7 @@ delta_t = .5
 # tolerance on max kinetic energy before stopping interation
 e_tolerance = 1.0e-5
 
-def _norm(pts, mean=None, scaling=None, target_scale=None):
+def _norm(pts, mean=None, scaling=None,):
     """
     Rescale the points so the length-scale it spans fits into the domain while
     having space for the offset points
@@ -30,12 +30,7 @@ def _norm(pts, mean=None, scaling=None, target_scale=None):
         mean = x.mean(axis=0)
     x -= mean
 
-    if scaling is None:
-        if target_scale is None:
-            raise Exception("If scaling is not provided target_scale must be")
-        scaling = 2*np.max(np.abs(x), axis=0)*(1. + target_scale)
-
-
+    scaling = 2*np.max(np.abs(x), axis=0)
     x = x/scaling + 0.5
 
     return x, mean, scaling
@@ -54,7 +49,7 @@ def _pseudo_coulomb_force(xi, xj, b):
     else:
         # const = b / (ds2 * ds)
         const = b / (ds * ds)
-    return [-const * dx, -const * dy]
+    return np.array([-const * dx, -const * dy])
 
 def _hooke_force(xi, xj, dij):
     dx = xj[0] - xi[0]
@@ -64,8 +59,13 @@ def _hooke_force(xi, xj, dij):
     const = k * dl / ds
     return [const * dx, const * dy]
 
-def calc_offset_points(pts, scale=0.2, callback=None):
+def calc_offset_points(pts, scale=0.2, callback=None, debug=False):
     N = pts.shape[0]
+
+    if debug:
+        from pathlib import Path
+        p = Path(__file__)
+        np.savetxt(str(p.parent/'points.npz'), pts)
 
     def update(x, v):
         x_new = np.copy(x)
@@ -99,10 +99,10 @@ def calc_offset_points(pts, scale=0.2, callback=None):
     # x, pts_mean, pts_scaling = _norm(pts_offset)
     # x_fixed, _, _ = _norm(pts, mean=pts_mean, scaling=pts_scaling)
 
-    x_fixed, pts_mean, pts_scaling = _norm(pts, target_scale=scale*4.)
+    x_fixed, pts_mean, pts_scaling = _norm(pts)
     x = ch_calc_point_offsets(x_fixed, scale=scale)
 
-    dij = scale*np.max(pts_scaling)
+    dij = scale
 
     if callback is not None:
         callback(x, x_fixed)
@@ -170,7 +170,7 @@ def interactive_calc_offset_points(pts, scale=0.2):
 
     results_iter = iter(results)
 
-    UPDATE_FREQ = 100
+    UPDATE_FREQ = 10
 
     def move_oval(id, xi):
         newx = int(xi[0] * 500)
@@ -188,6 +188,7 @@ def interactive_calc_offset_points(pts, scale=0.2):
         try:
             x, x_fixed = next(results_iter)
         except StopIteration:
+            print('done')
             return
 
         m = len(x)

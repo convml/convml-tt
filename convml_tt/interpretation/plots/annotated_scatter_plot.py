@@ -33,7 +33,7 @@ def find_nearest_tile(x_sample, y_sample, x, y, dim='tile_id', scaling=1.0):
 
 
 def scatter_annotated(x, y, points, ax=None, size=0.1, autopos_method='forces',
-                      use_closest_point=True):
+                      use_closest_point=True, annotation_dist=1.0):
     """
     create scatter plot from values in `x` and `y` picking out points to
     highlight with a tile-graphic annotation based on what is passed in as
@@ -96,10 +96,16 @@ def scatter_annotated(x, y, points, ax=None, size=0.1, autopos_method='forces',
     ax.set_ylabel(y._title_for_slice() + '\n' + xr.plot.utils.label_from_attrs(y))
 
     pts = np.array([x_sample, y_sample]).T
+    # if tiles are spaced uniformly round a circle, then
+    # N*s=2*pi*r
+    # => r ~ N*s/6.
+    # and we want the radius to be three units relative to the size, so
+    scale = pts.shape[0]*size/2.*annotation_dist
+
     if autopos_method == 'forces':
-        pts_offset = calc_offset_points(pts, scale=3*size)
+        pts_offset = calc_offset_points(pts, scale=scale)
     elif autopos_method == 'convex_hull':
-        pts_offset = calc_offset_points_ch(pts, scale=3*size)
+        pts_offset = calc_offset_points_ch(pts, scale=scale)
     else:
         raise NotImplementedError(autopos_method)
 
@@ -112,11 +118,13 @@ def scatter_annotated(x, y, points, ax=None, size=0.1, autopos_method='forces',
     def transform(coord):
         return (ax.transData + fig.transFigure.inverted()).transform(coord)
 
+    lines = []
+
     for n, tile_id in enumerate(tile_ids):
         x_, y_ = pts_offset[n]
 
         pts_connector = np.c_[pts_offset[n], pts[n]]
-        line, = ax.plot(*pts_connector, linestyle='--', alpha=0.5)
+        line, = ax.plot(*pts_connector, linestyle='--', alpha=0.5, marker='.')
 
         if x_c is not None and y_c is not None:
             if x_err is not None and y_err is not None:
@@ -126,7 +134,8 @@ def scatter_annotated(x, y, points, ax=None, size=0.1, autopos_method='forces',
                 ax.scatter(x=x_c[n], y=y_c[n], marker='+',
                            color=line.get_color())
 
-        sc = ax.scatter(*pts[n], marker='.', color=line.get_color())
+        # sc = ax.scatter(*pts[n], marker='.', color=line.get_color())
+        lines.append(line)
 
         xp, yh = transform((x_, y_))
 
@@ -145,4 +154,4 @@ def scatter_annotated(x, y, points, ax=None, size=0.1, autopos_method='forces',
     ax.set_xlim(xlim)
     ax.set_ylim(ylim)
 
-    return sc, pts
+    return lines, pts
