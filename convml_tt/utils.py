@@ -3,14 +3,21 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
+import warnings
+
 from pathlib import Path
 
 from PIL import Image
 
 from .architectures.triplet_trainer import TileType
 
-def get_encodings(triplets, model, tile_type=TileType.ANCHOR):
-    def _get_encoding(image_set, *args, **kwargs):
+def get_embeddings(triplets, model, tile_type=TileType.ANCHOR):
+    """
+    Use the provided model to calculate the embeddings for the given set of
+    input triplets. If `tile_type` is None the embedding for all three tiles of
+    the triplet will be returned.
+    """
+    def _get_embedding(image_set, *args, **kwargs):
         try:
             v = model.predict(image_set[tile_type])[1]
         except RuntimeError:
@@ -20,26 +27,38 @@ def get_encodings(triplets, model, tile_type=TileType.ANCHOR):
             # https://docs.fast.ai/tutorial.inference.html#Vision
             # we only want the underlying data (the three embeddings for the
             # triplet provided)
-            v = model.predict(image_set)[1][tile_type]
+            v = model.predict(image_set)[1]
         return image_set.id, v
 
-    triplet_ids_and_encodings = [
-        _get_encoding(image_set) for image_set in tqdm(triplets)
+    triplet_ids_and_embeddings = [
+        _get_embedding(image_set) for image_set in tqdm(triplets)
     ]
 
-    triplet_ids, encodings = zip(*triplet_ids_and_encodings)
+    triplet_ids, embeddings = zip(*triplet_ids_and_embeddings)
 
-    encodings = np.asarray(torch.stack(encodings).squeeze())
+    coords=dict(tile_id=tile_id, emb_dim=np.arange(embeddings.shape[1]))
+    if tile_type is not None:
+        embeddings = embeddings[tile_type]
+        dims = ('tile_id', 'emb_dim')
+    else:
+        dims = ('tile_id', 'emb_dim', 'tile_type')
+        coords['tile_type'] = TileType.NAMES
+
+    embeddings = np.asarray(torch.stack(embeddings).squeeze())
     # we're picking out the anchor tile above
     tile_id = np.asarray(triplet_ids).astype(int)
 
     return xr.DataArray(
-        encodings, dims=('tile_id', 'enc_dim'),
-        coords=dict(tile_id=tile_id, enc_dim=np.arange(encodings.shape[1])),
+        embeddings, dims=dims, coords=coords,
         attrs=dict(tile_used=TileType.NAMES[tile_type],
         source_path=str(triplets.path.absolute())
         )
     )
+
+def get_encodings(triplets, model, tile_type=TileType.ANCHOR):
+    warnings.warn("`get_encodings` has been renamed `get_embeddings`")
+    return get_embeddings(triplets=tripelts, model=model, tile_type=tile_type)
+
 
 class ImageLoader:
     def __init__(self, path):
