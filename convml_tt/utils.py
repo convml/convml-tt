@@ -18,16 +18,15 @@ def get_embeddings(triplets, model, tile_type=TileType.ANCHOR):
     the triplet will be returned.
     """
     def _get_embedding(image_set, *args, **kwargs):
-        try:
-            v = model.predict(image_set[tile_type])[1]
-        except RuntimeError:
-            # "... eturns a tuple of three things: the object predicted (with
-            # the class in this instance), the underlying data (here the
-            # corresponding index) and the raw probabilities"
-            # https://docs.fast.ai/tutorial.inference.html#Vision
-            # we only want the underlying data (the three embeddings for the
-            # triplet provided)
-            v = model.predict(image_set)[1]
+        # "`predict` returns a tuple of three things: the object predicted (with
+        # the class in this instance), the underlying data (here the
+        # corresponding index) and the raw probabilities"
+        # https://docs.fast.ai/tutorial.inference.html#Vision
+        # we only want the underlying data (the three embeddings for the
+        # triplet provided)
+        T_emb = model.predict(image_set)[1]
+        v = np.array([np.array(a.cpu()) for a in T_emb])
+
         return image_set.id, v
 
     triplet_ids_and_embeddings = [
@@ -35,24 +34,21 @@ def get_embeddings(triplets, model, tile_type=TileType.ANCHOR):
     ]
 
     triplet_ids, embeddings = zip(*triplet_ids_and_embeddings)
+    embeddings = np.asarray(np.stack(embeddings).squeeze())
 
-    coords=dict(tile_id=tile_id, emb_dim=np.arange(embeddings.shape[1]))
+    tile_id = np.asarray(triplet_ids).astype(int)
+    coords=dict(tile_id=tile_id, emb_dim=np.arange(embeddings.shape[-1]))
+    attrs=dict(source_path=str(triplets.path.absolute()))
     if tile_type is not None:
-        embeddings = embeddings[tile_type]
+        embeddings = embeddings[:,tile_type]
         dims = ('tile_id', 'emb_dim')
+        attrs['tile_used'] = TileType.NAMES[tile_type]
     else:
-        dims = ('tile_id', 'emb_dim', 'tile_type')
+        dims = ('tile_id', 'tile_type', 'emb_dim')
         coords['tile_type'] = TileType.NAMES
 
-    embeddings = np.asarray(torch.stack(embeddings).squeeze())
-    # we're picking out the anchor tile above
-    tile_id = np.asarray(triplet_ids).astype(int)
-
     return xr.DataArray(
-        embeddings, dims=dims, coords=coords,
-        attrs=dict(tile_used=TileType.NAMES[tile_type],
-        source_path=str(triplets.path.absolute())
-        )
+        embeddings, dims=dims, coords=coords, attrs=attrs
     )
 
 def get_encodings(triplets, model, tile_type=TileType.ANCHOR):

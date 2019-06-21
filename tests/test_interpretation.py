@@ -7,7 +7,7 @@ from convml_tt.architectures.triplet_trainer import (NPMultiImageItemList,
 
 from convml_tt.data.examples import ExampleData
 
-from convml_tt.utils import get_encodings
+from convml_tt.utils import get_embeddings
 
 
 def test_getting_embeddings():
@@ -38,4 +38,10 @@ def test_getting_embeddings():
     learn.fit_one_cycle(cyc_len=3, max_lr=4.0e-2)
 
 
-    get_encodings(triplets=item_list, model=learn)
+    items_study = item_list[:2]
+    embs_anchor = get_embeddings(triplets=items_study, model=learn)
+    embs_all = get_embeddings(triplets=items_study, model=learn, tile_type=None)
+
+    assert len(items_study) == embs_all.tile_id.count()
+
+    assert (embs_all.sel(tile_type='anchor') == embs_anchor).all()
