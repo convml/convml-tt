@@ -8,6 +8,11 @@ from convml_tt.architectures.triplet_trainer import (NPMultiImageItemList,
 from convml_tt.data.examples import ExampleData
 
 from convml_tt.utils import get_embeddings
+from convml_tt.interpretation import tile_aggregation
+
+import convml_tt.data.triplets
+
+import satdata
 
 
 def test_getting_embeddings():
@@ -45,3 +50,14 @@ def test_getting_embeddings():
     assert len(items_study) == embs_all.tile_id.count()
 
     assert (embs_all.sel(tile_type='anchor') == embs_anchor).all()
+
+
+def test_tile_loading():
+    data_path = untar_data(ExampleData.TINY10)
+
+    monkey_patch_fastai()
+
+    tile_path = data_path/"train"
+    triplets = NPMultiImageItemList.from_folder(path=tile_path)
+
+    tiles = convml_tt.data.triplets.load_tile_definitions(triplets=triplets)
