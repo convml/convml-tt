@@ -40,12 +40,12 @@ def get_embeddings(triplets, model, tile_type=TileType.ANCHOR):
     coords=dict(tile_id=tile_id, emb_dim=np.arange(embeddings.shape[-1]))
     attrs=dict(source_path=str(triplets.path.absolute()))
     if tile_type is not None:
-        embeddings = embeddings[:,tile_type]
+        embeddings = embeddings[:,tile_type.value]
         dims = ('tile_id', 'emb_dim')
-        attrs['tile_used'] = TileType.NAMES[tile_type]
+        attrs['tile_used'] = tile_type.name.lower()
     else:
         dims = ('tile_id', 'tile_type', 'emb_dim')
-        coords['tile_type'] = TileType.NAMES
+        coords['tile_type'] = [s.lower() for s in TileType.__members__.keys()]
 
     return xr.DataArray(
         embeddings, dims=dims, coords=coords, attrs=attrs

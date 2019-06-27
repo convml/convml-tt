@@ -3,7 +3,8 @@ import fastai.vision
 
 from convml_tt.architectures.triplet_trainer import (NPMultiImageItemList,
                                                      loss_func,
-                                                     monkey_patch_fastai)
+                                                     monkey_patch_fastai,
+                                                     TileType)
 
 from convml_tt.data.examples import ExampleData
 
@@ -60,4 +61,8 @@ def test_tile_loading():
     tile_path = data_path/"train"
     triplets = NPMultiImageItemList.from_folder(path=tile_path)
 
-    tiles = convml_tt.data.triplets.load_tile_definitions(triplets=triplets)
+    print(triplets)
+
+    for tile_type in TileType:
+        convml_tt.data.triplets.load_tile_definitions(triplets=triplets,
+                                                      tile_type=tile_type)

@@ -19,6 +19,7 @@ from fastai.core import PathOrStr, Optional, Union, partial, ifnone, is_listy
 from fastai.callback import CallbackHandler
 
 from pathlib import Path
+import enum
 
 import torch.nn as nn
 import torch
@@ -42,14 +43,12 @@ def loss_func(ys, margin=1.00, l2=0.01):
         loss += l2 * (torch.norm(z_p) + torch.norm(z_n) + torch.norm(z_d))
     return loss
 
-class TileType:
+class TileType(enum.Enum):
     """
     Simple enum for mapping into triplet array """
     ANCHOR = 0
     NEIGHBOR = 1
     DISTANT = 2
-
-    NAMES = ["anchor", "neighbor", "distant"]
 
 
 def normalize_triplet(x:TensorImage, mean:FloatTensor,std:FloatTensor)->TensorImage:
@@ -157,9 +156,10 @@ class NPMultiImageList(ImageList):
         path = Path(path)
 
         files_by_type = []
-        for tt in TileType.NAMES:
-            fn_tiletype = cls.TILE_FILENAME_FORMAT.format(tile_type=tt,
-                                                          triplet_id=0)
+        for tt in TileType:
+            fn_tiletype = cls.TILE_FILENAME_FORMAT.format(
+                tile_type=tt.name.lower(), triplet_id=0
+            )
             fn_tiletype = fn_tiletype.replace('00000', '*')
             files_by_type.append(list(path.glob(fn_tiletype)))
 

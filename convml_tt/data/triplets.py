@@ -27,19 +27,24 @@ def load_tile_definitions(triplets, tile_type=TileType.ANCHOR):
 
         # the things stored in the triplet are actually the RGB images, these
         # will be handy for plotting later
-        rgb_img = triplet[tile_type]
+        rgb_img = triplet[tile_type.value]
 
         meta = yaml.load(open(path_triplet_meta))
-        meta_group = meta['target']
-        if not tile_type==TileType.ANCHOR:
+        if tile_type in [TileType.ANCHOR, TileType.NEIGHBOR]:
+            meta_group = meta['target']
+            tile_meta = meta_group[tile_type.name.lower()]
+            source_files = meta_group['source_files']
+        elif tile_type == TileType.DISTANT:
+            tile_meta = meta['distant']['loc']
+            source_files = meta['distant']['source_files']
+        else:
             raise NotImplementedError
 
-        anchor_meta = meta_group['anchor']
         tile = TripletTile(
             rgb_img=rgb_img,
-            meta=dict(rgb_source_files=meta_group['source_files']),
-            lat0=anchor_meta['lat'], lon0=anchor_meta['lon'],
-            size=anchor_meta['size'],
+            meta=dict(rgb_source_files=source_files),
+            lat0=tile_meta['lat'], lon0=tile_meta['lon'],
+            size=tile_meta['size'],
             tile_id=triplet.id, data_path=triplets.path.absolute()
         )
 
