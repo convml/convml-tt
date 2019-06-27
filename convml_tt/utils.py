@@ -53,7 +53,7 @@ def get_embeddings(triplets, model, tile_type=TileType.ANCHOR):
 
 def get_encodings(triplets, model, tile_type=TileType.ANCHOR):
     warnings.warn("`get_encodings` has been renamed `get_embeddings`")
-    return get_embeddings(triplets=tripelts, model=model, tile_type=tile_type)
+    return get_embeddings(triplets=triplets, model=model, tile_type=tile_type)
 
 
 class ImageLoader:
