@@ -13,8 +13,6 @@ from convml_tt.interpretation import tile_aggregation
 
 import convml_tt.data.triplets
 
-import satdata
-
 
 def test_getting_embeddings():
     data_path = untar_data(ExampleData.TINY10)
