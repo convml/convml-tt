@@ -7,13 +7,19 @@ In a jupyter notebook cells simply run the command:
 >>> DomainPicker().m
 """
 
-from ipyleaflet import (Map, basemaps, basemap_to_tiles, Marker, Polygon,
-                        WidgetControl)
-from ipywidgets import IntSlider, ColorPicker, Button, link
+try:
+    from ipyleaflet import (Map, basemaps, basemap_to_tiles, Marker, Polygon,
+                            WidgetControl)
+except ImportError:
+    raise Exception("To use the domain picker UI you will need to install"
+                    " `ipyleaflet`")
+
+from ipywidgets import IntSlider, ColorPicker, Button, link, Text
 
 import datetime
 
 from functools import partial
+import yaml
 
 
 class DomainPicker():
@@ -36,12 +42,15 @@ class DomainPicker():
 
         button_reset = Button(description='reset')
         button_reset.on_click(self._clear_domain)
-        button_print = Button(description='print domain')
-        button_print.on_click(self._print_domain)
+        button_save = Button(description='save domain')
+        button_save.on_click(self._save_domain)
+        self.name_textfield = Text(value='domain_name', width=10)
 
-        self.m.add_control(WidgetControl(widget=button_print,
+        self.m.add_control(WidgetControl(widget=button_save,
             position='bottomright'))
         self.m.add_control(WidgetControl(widget=button_reset,
+            position='bottomright'))
+        self.m.add_control(WidgetControl(widget=self.name_textfield,
             position='bottomright'))
 
     def _update_domain_render(self):
@@ -82,5 +91,8 @@ class DomainPicker():
         self.marker_locs = {}
         self._update_domain_render()
 
-    def _print_domain(self, *args, **kwargs):
-        print(self.domain_coords)
+    def _save_domain(self, *args, **kwargs):
+        fn = "{}.domain.yaml".format(self.name_textfield.value)
+        with open(fn, 'w') as fh:
+            yaml.dump(self.domain_coords, fh, default_flow_style=False)
+        print("Domain points written to `{}`".format(fn))
