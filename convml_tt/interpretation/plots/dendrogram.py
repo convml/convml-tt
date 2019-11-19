@@ -8,7 +8,7 @@ import sklearn.decomposition
 from sklearn.preprocessing import StandardScaler
 from scipy.cluster import hierarchy as hc
 
-from ...utils import get_triplets_from_encodings
+from ...utils import get_triplets_from_embeddings
 
 
 # In[13]:
@@ -41,14 +41,14 @@ def dendrogram(encodings, n_clusters_max=14, debug=False, ax=None,
     Additional kwargs will be passed to scipy.cluster.hierarchy.dendrogram
     """
 
-    triplets = get_triplets_from_encodings(encodings)
+    triplets = get_triplets_from_embeddings(embeddings)
 
     if ax is None:
         fig, ax = plt.subplots(figsize=(14,3))
     else:
         fig = ax.figure
 
-    Z = hc.linkage(y=encodings, method='ward',)
+    Z = hc.linkage(y=embeddings, method='ward',)
 
     if color is not None:
         kwargs['link_color_func'] = lambda k: color
@@ -129,7 +129,7 @@ def dendrogram(encodings, n_clusters_max=14, debug=False, ax=None,
         y_offset += 0.2
 
     for lid, leaf_id in enumerate(ddata['leaves']):
-        img_idxs_in_cluster = encodings.tile_id.values[leaf_mapping == leaf_id].astype(int)
+        img_idxs_in_cluster = embeddings.tile_id.values[leaf_mapping == leaf_id].astype(int)
         try:
             img_idxs = np.random.choice(img_idxs_in_cluster, size=n_samples, replace=False)
         except ValueError:

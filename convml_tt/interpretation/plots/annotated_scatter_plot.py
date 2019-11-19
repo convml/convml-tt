@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import mpl_toolkits.axes_grid1.inset_locator as il
 import xarray as xr
 
-from ...utils import get_triplets_from_encodings
+from ...utils import get_triplets_from_embeddings
 
 from .mpl_autopos_annotation import calc_offset_points
 from .mpl_autopos_annotation.convex_hull import calc_point_offsets as calc_offset_points_ch
@@ -59,7 +59,7 @@ def scatter_annotated(x, y, points, ax=None, size=0.1, autopos_method='forces',
     else:
         fig = ax.figure
 
-    triplets = get_triplets_from_encodings(x)
+    triplets = get_triplets_from_embeddings(x)
 
     _is_array = lambda v: isinstance(v, np.ndarray)
 
