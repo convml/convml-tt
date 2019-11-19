@@ -8,7 +8,7 @@ import sklearn.decomposition
 from sklearn.preprocessing import StandardScaler
 from scipy.cluster import hierarchy as hc
 
-from ...utils import get_triplets_from_encodings
+from ...utils import get_triplets_from_embeddings
 
 
 # In[13]:
@@ -34,21 +34,22 @@ def _fix_labels(ax, leaf_mapping, label_clusters=False):
 
     return new_labels
 
-def dendrogram(encodings, n_clusters_max=14, debug=False, ax=None,
+def dendrogram(embeddings, n_clusters_max=14, debug=False, ax=None,
     n_samples=10, show_legend=False, label_clusters=False,
-    return_clusters=False, color=None, **kwargs):
+    return_clusters=False, color=None, sampling_method='random',
+    linkage_method='ward', **kwargs):
     """
     Additional kwargs will be passed to scipy.cluster.hierarchy.dendrogram
     """
 
-    triplets = get_triplets_from_encodings(encodings)
+    triplets = get_triplets_from_embeddings(embeddings)
 
     if ax is None:
         fig, ax = plt.subplots(figsize=(14,3))
     else:
         fig = ax.figure
 
-    Z = hc.linkage(y=encodings, method='ward',)
+    Z = hc.linkage(y=embeddings, method=linkage_method,)
 
     if color is not None:
         kwargs['link_color_func'] = lambda k: color
@@ -129,9 +130,18 @@ def dendrogram(encodings, n_clusters_max=14, debug=False, ax=None,
         y_offset += 0.2
 
     for lid, leaf_id in enumerate(ddata['leaves']):
-        img_idxs_in_cluster = encodings.tile_id.values[leaf_mapping == leaf_id].astype(int)
+        img_idxs_in_cluster = embeddings.tile_id.values[leaf_mapping == leaf_id].astype(int)
         try:
-            img_idxs = np.random.choice(img_idxs_in_cluster, size=n_samples, replace=False)
+            if sampling_method == 'random':
+                img_idxs = np.random.choice(img_idxs_in_cluster, size=n_samples, replace=False)
+            elif sampling_method == 'center_dist':
+                emb_in_cluster = embeddings.sel(tile_id=img_idxs_in_cluster)
+                d_emb = emb_in_cluster.mean(dim='tile_id') - emb_in_cluster
+                center_dist = np.sqrt(d_emb**2.).sum(dim='emb_dim')
+                emb_in_cluster['dist_to_center'] = center_dist
+                img_idxs = emb_in_cluster.sortby('dist_to_center').tile_id.values[:n_samples]
+            else:
+                raise NotImplementedError(sampling_method)
         except ValueError:
             img_idxs = img_idxs_in_cluster
 

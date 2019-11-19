@@ -141,7 +141,8 @@ def load_data_for_rgb(datasets_filenames, cli, bbox_extent, path_composites,
 TRIPLET_FN_FORMAT = "{:05d}_{}.png"
 
 def generate_tile_triplets(scenes, tiling_bbox, tile_N, tile_size, output_dir,
-                           N_triplets, max_workers=4, neighbor_distant_frac=0.8):
+                           N_triplets, max_workers=4, neighbor_distant_frac=0.8,
+                           N_start=0):
     if len(scenes) < 2:
         raise Exception("Need at least two scenes")
 
@@ -149,7 +150,7 @@ def generate_tile_triplets(scenes, tiling_bbox, tile_N, tile_size, output_dir,
     print("Generating tiles")
 
 
-    for triplet_n in tqdm(range(N_triplets)):
+    for triplet_n in tqdm(range(N_triplets)[N_start:]):
         # sample different datasets
         tn_target, tn_dist = random.sample(range(len(scenes)), 2)
         da_target_scene = scenes[tn_target]

@@ -64,5 +64,5 @@ class ImageLoader:
         img_path = self.path/"{:05d}_anchor.png".format(n)
         return Image.open(img_path)
 
-def get_triplets_from_encodings(encodings):
-    return ImageLoader(encodings.source_path)
+def get_triplets_from_embeddings(embeddings):
+    return ImageLoader(embeddings.source_path)
