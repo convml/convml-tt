@@ -12,10 +12,17 @@ from tqdm import tqdm
 import numpy as np
 import xarray as xr
 from scipy.constants import pi
+from pathlib import Path
 
 from ..data.sources import satdata
 from ..architectures.triplet_trainer import TileType
 from ..data.triplets import load_tile_definitions
+
+from PIL import Image as Image_PIL
+from fastai.vision.image import Image as Image_fastai, image2np
+
+import convorg
+
 
 
 def _get_storage_keys_for_channel(tiles, channel, cli, dt_max):
@@ -121,3 +128,46 @@ def scale_to_approximate_flux(da_rad):
     da_flux_approx.name = 'F_approx'
 
     return da_flux_approx
+
+def calc_conv_org_coeffs(img, greyscale_threshold=120.):
+    if isinstance(img, Image_fastai):
+        # https://stackoverflow.com/a/12201744
+        img_data = np.transpose(img.data, (2, 1, 0))
+        da_img_gs = xr.DataArray(
+            np.dot(img_data, [0.2989, 0.5870, 0.1140])
+        )*255.
+    else:
+        da_img_gs = xr.DataArray(np.array(img.convert('LA'))[...,0])
+    da_mask = da_img_gs > greyscale_threshold
+
+    try:
+        iorg_val = convorg.iorg(da_mask.values)
+    except:
+        iorg_val = np.nan
+
+    try:
+        scai_val = convorg.scai(da_mask.values)
+    except:
+        scai_val = np.nan
+
+    ds = xr.merge([
+        xr.DataArray(iorg_val, name='iorg'),
+        xr.DataArray(scai_val, name='scai'),
+    ])
+    ds.attrs['greyscale_threshold'] = greyscale_threshold
+    return ds
+
+def aggregate_fn_over_tiles(triplets, method, tile_type=TileType.ANCHOR, 
+                            method_kwargs={}):
+    fn_aggregated = 'tiles_agg__{}.nc'.format(method)
+
+    if not Path(fn_aggregated).exists():
+        tiles = load_tile_definitions(triplets, )
+        fn = globals()['calc_' + method]
+        ds = xr.concat([
+            fn(tile.rgb_img, **method_kwargs) for tile in tqdm(tiles)
+        ], dim='tile_id')
+        ds.to_netcdf(fn_aggregated)
+    else:
+        ds = xr.open_dataset(fn_aggregated)
+    return ds
