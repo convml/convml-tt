@@ -16,7 +16,6 @@ from pathlib import Path
 
 from ..data.sources import satdata
 from ..architectures.triplet_trainer import TileType
-from ..data.triplets import load_tile_definitions
 
 from PIL import Image as Image_PIL
 from fastai.vision.image import Image as Image_fastai, image2np
@@ -129,7 +128,7 @@ def scale_to_approximate_flux(da_rad):
 
     return da_flux_approx
 
-def calc_conv_org_coeffs(img, greyscale_threshold=120.):
+def calc_conv_org_metrics(img, greyscale_threshold=120., plot_mask=False):
     if isinstance(img, Image_fastai):
         # https://stackoverflow.com/a/12201744
         img_data = np.transpose(img.data, (2, 1, 0))
@@ -139,6 +138,9 @@ def calc_conv_org_coeffs(img, greyscale_threshold=120.):
     else:
         da_img_gs = xr.DataArray(np.array(img.convert('LA'))[...,0])
     da_mask = da_img_gs > greyscale_threshold
+
+    if plot_mask:
+        da_mask.plot()
 
     try:
         iorg_val = convorg.iorg(da_mask.values)
@@ -150,9 +152,15 @@ def calc_conv_org_coeffs(img, greyscale_threshold=120.):
     except:
         scai_val = np.nan
 
+    try:
+        hausdorff_val = convorg.hausdorff_dimension(da_mask.values)
+    except:
+        hausdorff_val = np.nan
+
     ds = xr.merge([
         xr.DataArray(iorg_val, name='iorg'),
         xr.DataArray(scai_val, name='scai'),
+        xr.DataArray(hausdorff_val, name='hausdorff_dimension'),
     ])
     ds.attrs['greyscale_threshold'] = greyscale_threshold
     return ds
@@ -162,10 +170,10 @@ def aggregate_fn_over_tiles(triplets, method, tile_type=TileType.ANCHOR,
     fn_aggregated = 'tiles_agg__{}.nc'.format(method)
 
     if not Path(fn_aggregated).exists():
-        tiles = load_tile_definitions(triplets, )
         fn = globals()['calc_' + method]
         ds = xr.concat([
-            fn(tile.rgb_img, **method_kwargs) for tile in tqdm(tiles)
+            fn(triplet[tile_type.value], **method_kwargs)
+            for triplet in tqdm(triplets)
         ], dim='tile_id')
         ds.to_netcdf(fn_aggregated)
     else:
