@@ -35,7 +35,7 @@ def find_nearest_tile(x_sample, y_sample, x, y, dim='tile_id', scaling=1.0):
 
 
 def scatter_annotated(x, y, points, ax=None, size=0.1, autopos_method='forces',
-                      use_closest_point=True, annotation_dist=1.0):
+                      use_closest_point=True, annotation_dist=1.0, hue=None):
     """
     create scatter plot from values in `x` and `y` picking out points to
     highlight with a tile-graphic annotation based on what is passed in as
@@ -92,7 +92,6 @@ def scatter_annotated(x, y, points, ax=None, size=0.1, autopos_method='forces',
     else:
         raise NotImplementedError(type(points))
 
-    ax.scatter(x, y, marker='.', alpha=0.2, color='grey')
 
     ax.set_xlabel(x._title_for_slice() + '\n' + xr.plot.utils.label_from_attrs(x))
     ax.set_ylabel(y._title_for_slice() + '\n' + xr.plot.utils.label_from_attrs(y))
@@ -122,11 +121,19 @@ def scatter_annotated(x, y, points, ax=None, size=0.1, autopos_method='forces',
 
     lines = []
 
+    if hue is not None:
+        color_palette_name = "hls"
+        colors = sns.color_palette(color_palette_name, n_colors=len(tile_ids))
+    else:
+        color = 'grey'
+
     for n, tile_id in enumerate(tile_ids):
         x_, y_ = pts_offset[n]
 
         pts_connector = np.c_[pts_offset[n], pts[n]]
-        line, = ax.plot(*pts_connector, linestyle='--', alpha=0.5, marker='.')
+        if hue is not None:
+            color = colors[n]
+        line, = ax.plot(*pts_connector, linestyle='--', alpha=0.5, marker='.', color=color)
 
         if x_c is not None and y_c is not None:
             if x_err is not None and y_err is not None:
@@ -155,5 +162,13 @@ def scatter_annotated(x, y, points, ax=None, size=0.1, autopos_method='forces',
     # calculated the offset for the annotations
     ax.set_xlim(xlim)
     ax.set_ylim(ylim)
+
+    if hue is not None:
+        sns.scatterplot(x, y, hue=x['cluster'], ax=ax, alpha=0.4, palette=color_palette_name)
+    else:
+        ax.scatter(x, y, marker='.', alpha=0.2, color='grey')
+
+    ax.set_xlabel(xr.plot.utils.label_from_attrs(x))
+    ax.set_ylabel(xr.plot.utils.label_from_attrs(y))
 
     return lines, pts
