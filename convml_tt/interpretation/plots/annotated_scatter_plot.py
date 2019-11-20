@@ -29,7 +29,9 @@ def find_nearest_tile(x_sample, y_sample, x, y, dim='tile_id', scaling=1.0):
 
     dl = np.sqrt(dx*dx + dy*dy)
 
-    return dl.argmin(dim=dim)
+    # can't simply use `argmin` here on `dl` since that would return the index
+    # in dl, not the `tile_id`
+    return dl.isel(**{dim:dl.argmin(dim=dim)})[dim]
 
 
 def scatter_annotated(x, y, points, ax=None, size=0.1, autopos_method='forces',
