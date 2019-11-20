@@ -131,19 +131,19 @@ def dendrogram(embeddings, n_clusters_max=14, debug=False, ax=None,
 
     for lid, leaf_id in enumerate(ddata['leaves']):
         img_idxs_in_cluster = embeddings.tile_id.values[leaf_mapping == leaf_id].astype(int)
-        try:
-            if sampling_method == 'random':
+        if sampling_method == 'random':
+            try:
                 img_idxs = np.random.choice(img_idxs_in_cluster, size=n_samples, replace=False)
-            elif sampling_method == 'center_dist':
-                emb_in_cluster = embeddings.sel(tile_id=img_idxs_in_cluster)
-                d_emb = emb_in_cluster.mean(dim='tile_id') - emb_in_cluster
-                center_dist = np.sqrt(d_emb**2.).sum(dim='emb_dim')
-                emb_in_cluster['dist_to_center'] = center_dist
-                img_idxs = emb_in_cluster.sortby('dist_to_center').tile_id.values[:n_samples]
-            else:
-                raise NotImplementedError(sampling_method)
-        except ValueError:
-            img_idxs = img_idxs_in_cluster
+            except ValueError:
+                img_idxs = img_idxs_in_cluster
+        elif sampling_method == 'center_dist':
+            emb_in_cluster = embeddings.sel(tile_id=img_idxs_in_cluster)
+            d_emb = emb_in_cluster.mean(dim='tile_id') - emb_in_cluster
+            center_dist = np.sqrt(d_emb**2.).sum(dim='emb_dim')
+            emb_in_cluster['dist_to_center'] = center_dist
+            img_idxs = emb_in_cluster.sortby('dist_to_center').tile_id.values[:n_samples]
+        else:
+            raise NotImplementedError(sampling_method)
 
         def transform(coord):
             axis_to_data = fig.transFigure + ax.transData.inverted()
