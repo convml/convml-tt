@@ -44,6 +44,10 @@ def calc_point_offsets(points, scale=0.2, show_plot=False):
 
     x_h, y_h = _filter_close_points(x_h, y_h)
 
+    # again we have to ensure that the path is cyclic
+    x_h = np.insert(x_h, 0, x_h[-1])
+    y_h = np.insert(y_h, 0, y_h[-1])
+
     t = make_t(x_h, y_h)
     Nt = 100
     nt = np.linspace(0, 1, Nt)
