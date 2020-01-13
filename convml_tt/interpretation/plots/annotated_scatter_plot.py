@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import mpl_toolkits.axes_grid1.inset_locator as il
 import xarray as xr
+import seaborn as sns
 
 from ...utils import get_triplets_from_embeddings
 
@@ -35,7 +36,8 @@ def find_nearest_tile(x_sample, y_sample, x, y, dim='tile_id', scaling=1.0):
 
 
 def scatter_annotated(x, y, points, ax=None, size=0.1, autopos_method='forces',
-                      use_closest_point=True, annotation_dist=1.0, hue=None):
+                      use_closest_point=True, annotation_dist=1.0, hue=None,
+                      hue_palette="hls"):
     """
     create scatter plot from values in `x` and `y` picking out points to
     highlight with a tile-graphic annotation based on what is passed in as
@@ -83,7 +85,11 @@ def scatter_annotated(x, y, points, ax=None, size=0.1, autopos_method='forces',
                 (x_c, x_err), (y_c, y_err) = points
         except Exception as e:
             raise NotImplementedError(type(points), e)
-        tile_ids = find_nearest_tile(x_sample=x_c, y_sample=y_c, x=x, y=y)
+        xl = x.max() - x.min()
+        yl = y.max() - y.min()
+        s = xl/yl
+        tile_ids = find_nearest_tile(x_sample=x_c, y_sample=y_c, x=x, y=y,
+                                     scaling=s)
 
         # For the annotations we want to draw a line to where these tiles
         # actually exist
@@ -122,7 +128,7 @@ def scatter_annotated(x, y, points, ax=None, size=0.1, autopos_method='forces',
     lines = []
 
     if hue is not None:
-        color_palette_name = "hls"
+        color_palette_name = hue_palette
         colors = sns.color_palette(color_palette_name, n_colors=len(tile_ids))
     else:
         color = 'grey'
@@ -133,7 +139,7 @@ def scatter_annotated(x, y, points, ax=None, size=0.1, autopos_method='forces',
         pts_connector = np.c_[pts_offset[n], pts[n]]
         if hue is not None:
             color = colors[n]
-        line, = ax.plot(*pts_connector, linestyle='--', alpha=0.5, marker='.', color=color)
+        line, = ax.plot(*pts_connector, linestyle='--', marker='.', color=color)
 
         if x_c is not None and y_c is not None:
             if x_err is not None and y_err is not None:
@@ -152,6 +158,11 @@ def scatter_annotated(x, y, points, ax=None, size=0.1, autopos_method='forces',
         ax1.set_aspect(1)
         ax1.axison = False
 
+        if hue is not None:
+            label_text = np.unique(x[hue])[n]
+            ax1.text(0.1, 0.15, label_text, transform=ax1.transAxes,
+                     bbox={'facecolor': 'white', 'alpha': 0.6, 'pad': 2})
+
         img_idx = int(tile_id.values)
         img = triplets[img_idx]
 
@@ -164,7 +175,7 @@ def scatter_annotated(x, y, points, ax=None, size=0.1, autopos_method='forces',
     ax.set_ylim(ylim)
 
     if hue is not None:
-        sns.scatterplot(x, y, hue=x['cluster'], ax=ax, alpha=0.4, palette=color_palette_name)
+        sns.scatterplot(x, y, hue=x[hue], ax=ax, alpha=0.4, palette=color_palette_name)
     else:
         ax.scatter(x, y, marker='.', alpha=0.2, color='grey')
 

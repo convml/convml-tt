@@ -29,7 +29,7 @@ def load_tile_definitions(triplets, tile_type=TileType.ANCHOR):
         # will be handy for plotting later
         rgb_img = triplet[tile_type.value]
 
-        meta = yaml.load(open(path_triplet_meta))
+        meta = yaml.load(open(path_triplet_meta), Loader=yaml.SafeLoader)
         if tile_type in [TileType.ANCHOR, TileType.NEIGHBOR]:
             meta_group = meta['target']
             tile_meta = meta_group[tile_type.name.lower()]
