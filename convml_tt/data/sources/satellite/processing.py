@@ -11,7 +11,7 @@ import time
 import yaml
 
 from . import tiler
-from .aws_goes import Goes16AWS
+import satdata
 
 try:
     from . import satpy_rgb
@@ -40,11 +40,12 @@ def find_datasets_keys(times, dt_max, cli, channels=[1,2,3], debug=False):
 import random
 
 def pick_one_time_per_date_for_study(datasets_filenames,
+                                     datasource_cli,
                                      ensure_each_day_has_training_data=False):
     dataset_files_by_date = {}
 
     for fns in datasets_filenames:
-        date = Goes16AWS.parse_key(str(fns[0]), parse_times=True)['start_time'].date()
+        date = datasource_cli.parse_key(str(fns[0]), parse_times=True)['start_time'].date()
         dataset_files_by_date.setdefault(date, []).append(fns)
 
     def _split_date(datasets_filenames):

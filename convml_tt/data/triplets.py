@@ -4,8 +4,8 @@ Utility class for loading tile definitions from existing datasets
 
 import yaml
 from tqdm import tqdm
+import satdata
 
-from ..data.sources import satdata
 from ..architectures.triplet_trainer import TileType
 
 

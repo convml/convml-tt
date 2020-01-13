@@ -13,8 +13,8 @@ import numpy as np
 import xarray as xr
 from scipy.constants import pi
 from pathlib import Path
+import satdata
 
-from ..data.sources import satdata
 from ..architectures.triplet_trainer import TileType
 
 from PIL import Image as Image_PIL
