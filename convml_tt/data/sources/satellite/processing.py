@@ -109,7 +109,7 @@ def _load_channels_old(fns, cli):
 
 
 def load_data_for_rgb(datasets_filenames, cli, bbox_extent, path_composites,
-                      use_old=True):
+                      use_old=False):
     REQUIRED_CHANNELS = [1,2,3]
     def fn_is_required(fn):
         return int(cli.parse_key(fn)['channel']) in REQUIRED_CHANNELS

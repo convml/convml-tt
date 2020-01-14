@@ -1,8 +1,10 @@
 import datetime
+import yaml
 
 import satdata
 
 from ...dataset import TripletDataset
+from . import processing
 
 
 class SatelliteTripletDataset(TripletDataset):
@@ -18,7 +20,6 @@ class SatelliteTripletDataset(TripletDataset):
         self.tile_N = tile_N
         self.channels = channels
 
-
 class FixedTimeRangeSatelliteTripletDataset(SatelliteTripletDataset):
     def __init__(self, t_start, N_days, N_hours_from_zenith,
                  **kwargs):
@@ -32,3 +33,76 @@ class FixedTimeRangeSatelliteTripletDataset(SatelliteTripletDataset):
         self._dt_max = datetime.timedelta(hours=N_hours_from_zenith)
         t_zenith = satdata.calc_nearest_zenith_time_at_loc(lon_zenith, t_ref=t_start) 
         self._times = [t_zenith + datetime.timedelta(days=n) for n in range(1, N_days)]
+
+    def _get_tiles_base_path(self):
+        return self.data_path/self.name
+
+    def generate(self, data_path, offline_cli):
+        local_storage_dir = data_path/"sources"/"goes16"
+        path_composites = data_path/"composites"
+
+        cli = satdata.Goes16AWS(
+            offline=offline_cli,
+            local_storage_dir=local_storage_dir
+        )
+
+        path_tiles_meta = self._get_tiles_base_path()/"training_study_split.yaml"
+
+        if path_tiles_meta.exists():
+            print("Definition for test vs study split was found in `{}`, "
+                  "assuming that all necessary data has already been downloaded"
+                  "".format(path_tiles_meta))
+            with open(path_tiles_meta) as fh:
+                datasets_filenames_split = yaml.load(fh)
+        else:
+            # get tuples of channel "keys" (storage ids) for all the valid times queried
+            datasets_keys = satdata.processing.find_datasets_keys(
+                times=self._times, dt_max=self._dt_max, channels=self.channels,
+                cli=cli,
+            )
+
+            if len(datasets_keys) == 0:
+                raise Exception("Couldn't find any data matching the provided query")
+
+            # download all the files using the cli (flatting list first...)
+            print("Downloading channel files...")
+            keys = [fn for fns in datasets_keys for fn in fns]
+            fns = cli.download(keys)
+
+            # now we know where each key was stored, so we can map the dataset keys to
+            # the filenames they were stored into
+            kfmap = dict(zip(keys, fns))
+            datasets_filenames_all = [
+                [kfmap[k] for k in dataset_keys]
+                for dataset_keys in datasets_keys
+            ]
+
+            datasets_filenames_split = (
+                satdata.processing.pick_one_time_per_date_for_study(datasets_filenames_all)
+            )
+
+            with open(path_tiles_meta, "w") as fh:
+                yaml.dump(datasets_filenames_split, fh, default_flow_style=False)
+
+        for identifier, datasets_filenames in datasets_filenames_split.items():
+            print("Creating tiles for `{}`".format(identifier))
+
+            # load "scenes", either a dataarray containing all channels for a given
+            # time or a satpy channel (which is primed to create a RGB composite)
+            print("Reading in files")
+            scenes = processing.load_data_for_rgb(
+                datasets_filenames=datasets_filenames, cli=cli,
+                bbox_extent=self.domain_bbox, path_composites=path_composites
+            )
+
+            tile_path = tile_path_base/identifier
+            tile_path.mkdir(exist_ok=True)
+
+            processing.generate_tile_triplets(
+                scenes=scenes, tiling_bbox=TILING_BBOX_EXTENT,
+                tile_size=tile_size,
+                tile_N=tile_N,
+                N_triplets=N_triplets[identifier],
+                output_dir=tile_path,
+                max_workers=max_workers
+            )
