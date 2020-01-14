@@ -8,6 +8,7 @@ import numpy as np
 from scipy.constants import pi
 import shapely.geometry as geom
 from pathlib import Path
+import matplotlib.pyplot as plt
 
 import itertools
 import warnings
@@ -252,13 +253,22 @@ class Tile():
 
             return satpy_rgb.rgb_da_to_img(da_tile_rgb)
 
-
     def serialize_props(self):
         return dict(
             lon=float(self.lon0),
             lat=float(self.lat0),
             size=float(self.size),
         )
+
+    def plot_outline(self, ax=None, alpha=0.6, **kwargs):
+        if ax is None:
+            crs = ccrs.PlateCarree()
+            fig, ax = plt.subplots(subplot_kw=dict(projection=crs), figsize=(10, 6))
+            gl = ax.gridlines(linestyle='--', draw_labels=False)
+            ax.coastlines(resolution='10m', color='grey')
+
+        ax.add_geometries([self.get_outline_shape(),], crs=ccrs.PlateCarree(), alpha=alpha, **kwargs)
+        return ax
 
 def triplet_generator(da_target_scene, tile_size, tiling_bbox, tile_N,
                       da_distant_scene=None, neigh_dist_scaling=1.0,
