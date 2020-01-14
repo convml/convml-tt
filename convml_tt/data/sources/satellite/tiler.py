@@ -67,14 +67,15 @@ def crop_field_to_latlon_box(da, box, pad_pct=0.1):
     return da.sel(x=x_slice, y=y_slice)
 
 
-class Tile():
+class RectTile():
     class TileBoundsOutsideOfInputException(Exception):
         pass
 
-    def __init__(self, lat0, lon0, size):
+    def __init__(self, lat0, lon0, l_meridional, l_zonal):
         self.lat0 = lat0
         self.lon0 = lon0
-        self.size = size
+        self.l_meridional = l_meridional
+        self.l_zonal = l_zonal
 
         regridder_basedir = Path('/nfs/a289/earlcd/tmp/regridding')
         if not regridder_basedir.exists():
@@ -88,12 +89,15 @@ class Tile():
         lat/lon distance as if the tile was centered on the equator and then
         uses a rotated pole projection to move the title
         """
-        ddeg = self._get_approximate_equator_latlon_dist()
+        ldeg_lon = self._get_approximate_equator_deg_dist(l=self.l_zonal)
+        ldeg_lat = self._get_approximate_equator_deg_dist(l=self.l_meridional)
 
         corners_dir = list(itertools.product([1,-1], [1,-1]))
         corners_dir.insert(0, corners_dir.pop(2))
 
-        corners = ddeg*np.array(corners_dir)
+        corners = np.array([ldeg_lon/2., ldeg_lat/2.])*np.array(corners_dir)
+
+        print(corners.shape)
 
         return self._transform_from_equator(lon=corners[:,0], lat=corners[:,1])
 
@@ -106,35 +110,42 @@ class Tile():
 
         return ccrs.PlateCarree().transform_points(p, lon, lat)[...,:2]
 
-    def _get_approximate_equator_latlon_dist(self):
+    @staticmethod
+    def _get_approximate_equator_deg_dist(l):
         # approximate lat/lon distance
         r = 6371e3 # [m]
-        return np.arcsin(self.size/2./r)*180./3.14
+        return np.arcsin(l/r)*180./3.14
 
     def get_outline_shape(self):
         """return a shapely shape valid for plotting"""
 
         return geom.Polygon(self.get_bounds())
 
-    def get_grid(self, N):
+    def get_grid(self, dx):
         """
         Get an xarray Dataset containing the new lat/lon grid points with their
         position in meters
         """
-        ddeg = self._get_approximate_equator_latlon_dist()
+        N_zonal = int(self.l_zonal/dx)
+        N_meridional = int(self.l_meridional/dx)
+        ldeg_lon = self._get_approximate_equator_deg_dist(l=self.l_zonal)
+        ldeg_lat = self._get_approximate_equator_deg_dist(l=self.l_meridional)
 
-        lat_eq_ = lon_eq_ = np.linspace(-ddeg, ddeg, N)
-        lon_eq, lat_eq = np.meshgrid(lon_eq_, lat_eq_)
+        lon_eq_ = np.linspace(-ldeg_lon/2., ldeg_lon/2., N_zonal)
+        lat_eq_ = np.linspace(-ldeg_lat/2., ldeg_lat/2., N_meridional)
+        lon_eq, lat_eq = np.meshgrid(lon_eq_, lat_eq_, indexing='ij')
 
         pts = self._transform_from_equator(lon=lon_eq, lat=lat_eq)
 
+        print(N_zonal, N_meridional, lon_eq_.shape, lat_eq_.shape, lon_eq.shape, pts.shape)
+
         x = xr.DataArray(
-            np.arange(-self.size/2., self.size/2, self.size/N),
+            np.arange(-self.l_zonal/2., self.l_zonal/2, dx),
             attrs=dict(longname='distance', units='m'),
             dims=('x',)
         )
         y = xr.DataArray(
-            np.arange(-self.size/2., self.size/2, self.size/N),
+            np.arange(-self.l_meridional/2., self.l_meridional/2, dx),
             attrs=dict(longname='distance', units='m'),
             dims=('y',)
         )
@@ -264,11 +275,21 @@ class Tile():
         if ax is None:
             crs = ccrs.PlateCarree()
             fig, ax = plt.subplots(subplot_kw=dict(projection=crs), figsize=(10, 6))
-            gl = ax.gridlines(linestyle='--', draw_labels=False)
+            gl = ax.gridlines(linestyle='--', draw_labels=True)
             ax.coastlines(resolution='10m', color='grey')
 
         ax.add_geometries([self.get_outline_shape(),], crs=ccrs.PlateCarree(), alpha=alpha, **kwargs)
         return ax
+
+
+class Tile(RectTile):
+    def __init__(self, lat0, lon0, size):
+        self.size = size
+        super().__init__(lat0=lat0, lon0=lon0, l_meridional=size, l_zonal=size)
+
+    def get_grid(self, N):
+        dx = self.size/N
+        return super().get_grid(dx=dx)
 
 def triplet_generator(da_target_scene, tile_size, tiling_bbox, tile_N,
                       da_distant_scene=None, neigh_dist_scaling=1.0,
