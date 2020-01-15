@@ -97,8 +97,6 @@ class RectTile():
 
         corners = np.array([ldeg_lon/2., ldeg_lat/2.])*np.array(corners_dir)
 
-        print(corners.shape)
-
         return self._transform_from_equator(lon=corners[:,0], lat=corners[:,1])
 
     def _transform_from_equator(self, lon, lat):
@@ -137,8 +135,6 @@ class RectTile():
 
         pts = self._transform_from_equator(lon=lon_eq, lat=lat_eq)
 
-        print(N_zonal, N_meridional, lon_eq_.shape, lat_eq_.shape, lon_eq.shape, pts.shape)
-
         x = xr.DataArray(
             np.arange(-self.l_zonal/2., self.l_zonal/2, dx),
             attrs=dict(longname='distance', units='m'),
@@ -162,7 +158,7 @@ class RectTile():
             da=da, box=self.get_bounds().T, pad_pct=pad_pct
         )
 
-    def resample(self, da, N, method='bilinear', crop_pad_pct=0.1,
+    def resample(self, da, dx, method='bilinear', crop_pad_pct=0.1,
                  keep_attrs=False):
         """
         Resample a xarray DataArray onto this tile with grid made of NxN points
@@ -186,10 +182,10 @@ class RectTile():
         old_grid['lat'] = (('y', 'x'), latlon_old[...,1])
         old_grid['lon'] = (('y', 'x'), latlon_old[...,0])
 
-        new_grid = self.get_grid(N=N)
+        new_grid = self.get_grid(dx=dx)
 
         Nx_in, Ny_in = da_cropped.x.shape[0], da_cropped.y.shape[0]
-        Nx_out, Ny_out = N, N
+        Nx_out, Ny_out = int(new_grid.x.count()), int(new_grid.y.count())
 
         regridder_weights_fn = "{method}_{Ny_in}x{Nx_in}_{Ny_out}x{Nx_out}"\
                                "__{lat0}_{lon0}.nc".format(
@@ -203,7 +199,7 @@ class RectTile():
             warnings.simplefilter("ignore")
             try:
                 regridder = SilentRegridder(filename=regridder_weights_fn,
-                    reuse_weights=False, ds_in=old_grid, ds_out=new_grid,
+                    reuse_weights=True, ds_in=old_grid, ds_out=new_grid,
                     method=method,
                 )
             except ValueError:
@@ -248,10 +244,10 @@ class RectTile():
 
         return area_def
 
-    def create_true_color_img(self, da_scene, resampling_N):
+    def create_true_color_img(self, da_scene, resampling_dx):
         if isinstance(da_scene, list):
             das_channels_resampled = [
-                self.resample(da, N=resampling_N) for da in da_scene
+                self.resample(da, dx=resampling_dx) for da in da_scene
             ]
             return create_true_color_img(das_channels=das_channels_resampled)
         else:
@@ -259,7 +255,7 @@ class RectTile():
                 raise Exception("Must have satpy installed to be able to "
                                 "RGB composites with satpy")
 
-            da_tile_rgb = self.resample(da=da_scene, N=resampling_N,
+            da_tile_rgb = self.resample(da=da_scene, dx=resampling_dx,
                                         keep_attrs=True)
 
             return satpy_rgb.rgb_da_to_img(da_tile_rgb)
