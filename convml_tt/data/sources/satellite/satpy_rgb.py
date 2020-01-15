@@ -4,7 +4,8 @@ import cartopy.crs as ccrs
 import xarray as xr
 import numpy as np
 
-from . import tiler, Goes16AWS, bbox
+from satdata import Goes16AWS
+from . import tiler, bbox
 
 
 def _cleanup_composite_da_attrs(da_composite):
@@ -20,6 +21,7 @@ def _cleanup_composite_da_attrs(da_composite):
             ('area', lambda v: None),
             ('prerequisites', lambda v: None),
             ('crs', lambda v: str(v)),
+            ('orbital_parameters', lambda v: None),
         ]
 
         for v, fn in fns:
