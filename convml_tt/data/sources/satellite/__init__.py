@@ -1,10 +1,12 @@
 import datetime
 import yaml
+from pathlib import Path
 
 import satdata
 
 from ...dataset import TripletDataset
 from . import processing
+from .bbox import LatLonBox
 
 
 class SatelliteTripletDataset(TripletDataset):
@@ -37,15 +39,7 @@ class FixedTimeRangeSatelliteTripletDataset(SatelliteTripletDataset):
     def _get_tiles_base_path(self):
         return self.data_path/self.name
 
-    def generate(self, data_path, offline_cli):
-        local_storage_dir = data_path/"sources"/"goes16"
-        path_composites = data_path/"composites"
-
-        cli = satdata.Goes16AWS(
-            offline=offline_cli,
-            local_storage_dir=local_storage_dir
-        )
-
+    def _get_dataset_train_study_split(self):
         path_tiles_meta = self._get_tiles_base_path()/"training_study_split.yaml"
 
         if path_tiles_meta.exists():
@@ -83,6 +77,48 @@ class FixedTimeRangeSatelliteTripletDataset(SatelliteTripletDataset):
 
             with open(path_tiles_meta, "w") as fh:
                 yaml.dump(datasets_filenames_split, fh, default_flow_style=False)
+
+        return datasets_filenames_split
+
+    def get_dataset_scene(self, data_path, scene_num, offline_cli=True, for_training=True):
+        datasets_filenames_split = self._get_dataset_train_study_split()
+        if for_training:
+            datasets_filenames = datasets_filenames_split['train']
+        else:
+            datasets_filenames = datasets_filenames_split['study']
+
+        local_storage_dir = Path(data_path).expanduser()/"sources"/"goes16"
+        path_composites = Path(data_path).expanduser()/"composites"
+        cli = satdata.Goes16AWS(
+            offline=offline_cli,
+            local_storage_dir=local_storage_dir
+        )
+
+        scenes = processing.load_data_for_rgb(
+            datasets_filenames=[datasets_filenames[scene_num],], cli=cli,
+            bbox_extent=self.domain_bbox, path_composites=path_composites
+        )
+        return scenes[0]
+
+    def generate(self, data_path, offline_cli):
+        datasets_filenames_split = self._get_dataset_train_study_split()
+        self._generate(
+            data_path=data_path,
+            offline_clie=offline_cli,
+            datasets_filenames_split=datasets_filenames_split
+        )
+
+    def get_domain(self):
+        return LatLonBox(self.domain_bbox)
+
+    def _generate(self, data_path, offline_cli, datasets_filenames_split):
+        local_storage_dir = data_path/"sources"/"goes16"
+        path_composites = data_path/"composites"
+
+        cli = satdata.Goes16AWS(
+            offline=offline_cli,
+            local_storage_dir=local_storage_dir
+        )
 
         for identifier, datasets_filenames in datasets_filenames_split.items():
             print("Creating tiles for `{}`".format(identifier))
