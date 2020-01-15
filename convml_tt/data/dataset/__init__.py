@@ -41,7 +41,7 @@ class TripletDataset:
 
     @staticmethod
     def load(path):
-        path_abs = Path(path).absolute()
+        path_abs = Path(path).expanduser().absolute()
         p = path_abs/"meta.yaml"
         name = p.parent.name
         with open(str(p)) as fh:
