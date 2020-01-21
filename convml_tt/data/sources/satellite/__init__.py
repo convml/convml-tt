@@ -39,7 +39,7 @@ class FixedTimeRangeSatelliteTripletDataset(SatelliteTripletDataset):
     def _get_tiles_base_path(self):
         return self.data_path/self.name
 
-    def _get_dataset_train_study_split(self):
+    def _get_dataset_train_study_split(self, cli):
         path_tiles_meta = self._get_tiles_base_path()/"training_study_split.yaml"
 
         if path_tiles_meta.exists():
@@ -50,7 +50,7 @@ class FixedTimeRangeSatelliteTripletDataset(SatelliteTripletDataset):
                 datasets_filenames_split = yaml.load(fh)
         else:
             # get tuples of channel "keys" (storage ids) for all the valid times queried
-            datasets_keys = satdata.processing.find_datasets_keys(
+            datasets_keys = processing.find_datasets_keys(
                 times=self._times, dt_max=self._dt_max, channels=self.channels,
                 cli=cli,
             )
@@ -72,7 +72,7 @@ class FixedTimeRangeSatelliteTripletDataset(SatelliteTripletDataset):
             ]
 
             datasets_filenames_split = (
-                satdata.processing.pick_one_time_per_date_for_study(datasets_filenames_all)
+                processing.pick_one_time_per_date_for_study(datasets_filenames_all)
             )
 
             with open(path_tiles_meta, "w") as fh:
@@ -81,11 +81,6 @@ class FixedTimeRangeSatelliteTripletDataset(SatelliteTripletDataset):
         return datasets_filenames_split
 
     def get_dataset_scene(self, data_path, scene_num, offline_cli=True, for_training=True):
-        datasets_filenames_split = self._get_dataset_train_study_split()
-        if for_training:
-            datasets_filenames = datasets_filenames_split['train']
-        else:
-            datasets_filenames = datasets_filenames_split['study']
 
         local_storage_dir = Path(data_path).expanduser()/"sources"/"goes16"
         path_composites = Path(data_path).expanduser()/"composites"
@@ -94,6 +89,12 @@ class FixedTimeRangeSatelliteTripletDataset(SatelliteTripletDataset):
             local_storage_dir=local_storage_dir
         )
 
+        datasets_filenames_split = self._get_dataset_train_study_split(cli=cli)
+        if for_training:
+            datasets_filenames = datasets_filenames_split['train']
+        else:
+            datasets_filenames = datasets_filenames_split['study']
+
         scenes = processing.load_data_for_rgb(
             datasets_filenames=[datasets_filenames[scene_num],], cli=cli,
             bbox_extent=self.domain_bbox, path_composites=path_composites
@@ -101,7 +102,15 @@ class FixedTimeRangeSatelliteTripletDataset(SatelliteTripletDataset):
         return scenes[0]
 
     def generate(self, data_path, offline_cli):
-        datasets_filenames_split = self._get_dataset_train_study_split()
+        local_storage_dir = data_path/"sources"/"goes16"
+        path_composites = data_path/"composites"
+
+        cli = satdata.Goes16AWS(
+            offline=offline_cli,
+            local_storage_dir=local_storage_dir
+        )
+
+        datasets_filenames_split = self._get_dataset_train_study_split(cli=cli)
         self._generate(
             data_path=data_path,
             offline_clie=offline_cli,
