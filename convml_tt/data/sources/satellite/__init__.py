@@ -3,9 +3,10 @@ import yaml
 from pathlib import Path
 
 import satdata
+import luigi
 
 from ...dataset import TripletDataset
-from . import processing
+from . import processing, pipeline
 from .bbox import LatLonBox
 
 
@@ -34,7 +35,7 @@ class FixedTimeRangeSatelliteTripletDataset(SatelliteTripletDataset):
 
         self._dt_max = datetime.timedelta(hours=N_hours_from_zenith)
         t_zenith = satdata.calc_nearest_zenith_time_at_loc(lon_zenith, t_ref=t_start) 
-        self._times = [t_zenith + datetime.timedelta(days=n) for n in range(1, N_days)]
+        self._times = [t_zenith + datetime.timedelta(days=n) for n in range(1, N_days+1)]
 
     def _get_tiles_base_path(self):
         return self.data_path/self.name
@@ -82,13 +83,6 @@ class FixedTimeRangeSatelliteTripletDataset(SatelliteTripletDataset):
 
     def get_dataset_scene(self, data_path, scene_num, offline_cli=True, for_training=True):
 
-        local_storage_dir = Path(data_path).expanduser()/"sources"/"goes16"
-        path_composites = Path(data_path).expanduser()/"composites"
-        cli = satdata.Goes16AWS(
-            offline=offline_cli,
-            local_storage_dir=local_storage_dir
-        )
-
         datasets_filenames_split = self._get_dataset_train_study_split(cli=cli)
         if for_training:
             datasets_filenames = datasets_filenames_split['train']
@@ -102,20 +96,30 @@ class FixedTimeRangeSatelliteTripletDataset(SatelliteTripletDataset):
         return scenes[0]
 
     def generate(self, data_path, offline_cli):
-        local_storage_dir = data_path/"sources"/"goes16"
-        path_composites = data_path/"composites"
+        luigi.build([
+            pipeline.GOES16Fetch(
+                dt_max=self._dt_max,
+                channels=[1,2,3],
+                times=self._times,
+                data_path=self.data_path
+            )
+        ], local_scheduler=True)
 
-        cli = satdata.Goes16AWS(
-            offline=offline_cli,
-            local_storage_dir=local_storage_dir
-        )
+    # def generate(self, data_path, offline_cli):
+        # local_storage_dir = data_path/"sources"/"goes16"
+        # path_composites = data_path/"composites"
 
-        datasets_filenames_split = self._get_dataset_train_study_split(cli=cli)
-        self._generate(
-            data_path=data_path,
-            offline_clie=offline_cli,
-            datasets_filenames_split=datasets_filenames_split
-        )
+        # cli = satdata.Goes16AWS(
+            # offline=offline_cli,
+            # local_storage_dir=local_storage_dir
+        # )
+
+        # datasets_filenames_split = self._get_dataset_train_study_split(cli=cli)
+        # self._generate(
+            # data_path=data_path,
+            # offline_clie=offline_cli,
+            # datasets_filenames_split=datasets_filenames_split
+        # )
 
     def get_domain(self):
         return LatLonBox(self.domain_bbox)
