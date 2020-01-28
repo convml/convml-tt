@@ -98,7 +98,8 @@ def _load_rgb_files_and_get_composite_da(scene_fns):
     # get out a dask-backed DataArray for the composite
     da_truecolor = new_scn['true_color']
 
-    da_truecolor = da_truecolor.drop('crs')
+    if 'crs' in da_truecolor:
+        da_truecolor = da_truecolor.drop('crs')
 
     # to be able to crop the DataArray to the bounding box we need to set the
     # projection attribute
