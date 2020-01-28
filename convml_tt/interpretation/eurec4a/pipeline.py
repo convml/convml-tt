@@ -17,7 +17,7 @@ FILE_FORMAT = "{platform_name}_{instrument}_{variable}_{date}_{time}.png"
 DATE_FORMAT = "%Y%m%d"
 TIME_FORMAT = "%H%M%S"
 
-PATH_FORMAT = "%Y/%_%m_%d"
+PATH_FORMAT = "%Y/%Y_%m_%d"
 
 DX = 200e3/256
 
@@ -62,6 +62,7 @@ class MakeRectRGBImage(luigi.Task):
         return t
 
     def run(self):
+        self.output().fn.parent.mkdir(exist_ok=True, parents=True)
         da_scene = self.input().open()
         img = DOMAIN_RECT.create_true_color_img(da_scene, resampling_dx=DX)
         img_pil = img.pil_image()
