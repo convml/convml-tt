@@ -5,6 +5,9 @@ import luigi
 import yaml
 import dateutil.parser
 
+from . import processing
+
+SOURCE_DIR = Path("sources")/"goes16"
 
 class YAMLTarget(luigi.LocalTarget):
     def write(self, obj):
@@ -74,8 +77,7 @@ class GOES16Fetch(luigi.Task):
             raise Exception("There are a different number of files for the"
                             " channels requested")
 
-        local_storage_dir = Path(self.data_path).expanduser()/"sources"/"goes16"
-        path_composites = Path(self.data_path).expanduser()/"composites"
+        local_storage_dir = Path(self.data_path).expanduser()/SOURCE_DIR
         cli = satdata.Goes16AWS(
             offline=self.offline_cli,
             local_storage_dir=local_storage_dir
@@ -95,14 +97,46 @@ class GOES16Fetch(luigi.Task):
 class StudyTrainSplit(luigi.Task):
     dt_max = luigi.FloatParameter()
     channels = luigi.ListParameter()
-    times = luigi.ListParameter()
+    times = DatetimeListParameter()
+    data_path = luigi.Parameter()
 
     def requires(self):
         return GOES16Fetch(
             dt_max=self.dt_max,
             channels=self.channels,
-            times=self.times
+            times=self.times,
+            data_path=self.data_path,
         )
 
     def run(self):
-        pass
+        datasets_filenames_all = self.input().read()
+        datasets_filenames_split = (
+            processing.pick_one_time_per_date_for_study(
+                datasets_filenames_all,
+                datasource_cli=satdata.Goes16AWS
+            )
+        )
+        self.output().write(datasets_filenames_split)
+
+    def output(self):
+        return YAMLTarget("training_study_split.yaml")
+
+class GenerateTriplets(luigi.Task):
+    dt_max = luigi.FloatParameter()
+    channels = luigi.ListParameter()
+    times = DatetimeListParameter()
+    data_path = luigi.Parameter()
+
+    def requires(self):
+        return StudyTrainSplit(
+            dt_max=self.dt_max,
+            channels=self.channels,
+            times=self.times,
+            data_path=self.data_path,
+        )
+
+    def run(self):
+        datasets_filenames_split = self.input().read()
+
+    def output(self):
+        return YAMLTarget("training_study_split.yaml")
