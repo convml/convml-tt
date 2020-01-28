@@ -9,6 +9,11 @@ from ...dataset import TripletDataset
 from . import processing, pipeline
 from .bbox import LatLonBox
 
+def _ensure_task_run(t):
+    if not t.output().exists():
+        luigi.build([t, ], local_scheduler=True)
+    if not t.output().exists():
+        raise Exception("Task didn't complete")
 
 class SatelliteTripletDataset(TripletDataset):
     def __init__(self, domain_bbox, tile_size, tile_N, channels=[1,2,3],
@@ -40,7 +45,16 @@ class FixedTimeRangeSatelliteTripletDataset(SatelliteTripletDataset):
     def _get_tiles_base_path(self):
         return self.data_path/self.name
 
-    def _get_dataset_train_study_split(self, cli):
+    def _get_dataset_train_study_split(self):
+        t = pipeline.StudyTrainSplit(
+                dt_max=self._dt_max,
+                channels=[1,2,3],
+                times=self._times,
+                data_path=self.data_path
+            )
+        _ensure_task_run(t)
+        return t.output().read()
+
         path_tiles_meta = self._get_tiles_base_path()/"training_study_split.yaml"
 
         if path_tiles_meta.exists():
@@ -95,52 +109,36 @@ class FixedTimeRangeSatelliteTripletDataset(SatelliteTripletDataset):
         )
         return scenes[0]
 
-    def generate(self, data_path, offline_cli):
-        luigi.build([
-            pipeline.GOES16Fetch(
+    def fetch_source_data(self, source_data_path, offline_cli):
+        t = pipeline.GOES16Fetch(
                 dt_max=self._dt_max,
                 channels=[1,2,3],
                 times=self._times,
-                data_path=self.data_path
+                data_path=source_data_path
             )
-        ], local_scheduler=True)
+        _ensure_task_run(t)
+        return t.output().read()
 
-    # def generate(self, data_path, offline_cli):
-        # local_storage_dir = data_path/"sources"/"goes16"
-        # path_composites = data_path/"composites"
+    def generate(self, source_data_path, offline_cli):
+        datasets_filenames_split = self._get_dataset_train_study_split()
 
-        # cli = satdata.Goes16AWS(
-            # offline=offline_cli,
-            # local_storage_dir=local_storage_dir
-        # )
-
-        # datasets_filenames_split = self._get_dataset_train_study_split(cli=cli)
-        # self._generate(
-            # data_path=data_path,
-            # offline_clie=offline_cli,
-            # datasets_filenames_split=datasets_filenames_split
-        # )
-
-    def get_domain(self):
-        return LatLonBox(self.domain_bbox)
-
-    def _generate(self, data_path, offline_cli, datasets_filenames_split):
-        local_storage_dir = data_path/"sources"/"goes16"
-        path_composites = data_path/"composites"
-
-        cli = satdata.Goes16AWS(
-            offline=offline_cli,
-            local_storage_dir=local_storage_dir
-        )
+        local_storage_dir = source_data_path/"sources"/"goes16"
+        path_composites = source_data_path/"composites"
 
         for identifier, datasets_filenames in datasets_filenames_split.items():
             print("Creating tiles for `{}`".format(identifier))
+
+            datasets_fullpaths = [
+                [str(local_storage_dir/fn) for fn in dataset]
+                for dataset in datasets_filenames
+            ]
 
             # load "scenes", either a dataarray containing all channels for a given
             # time or a satpy channel (which is primed to create a RGB composite)
             print("Reading in files")
             scenes = processing.load_data_for_rgb(
-                datasets_filenames=datasets_filenames, cli=cli,
+                datasets_filenames=datasets_fullpaths,
+                datasource_cli=satdata.Goes16AWS,
                 bbox_extent=self.domain_bbox, path_composites=path_composites
             )
 
@@ -155,3 +153,6 @@ class FixedTimeRangeSatelliteTripletDataset(SatelliteTripletDataset):
                 output_dir=tile_path,
                 max_workers=max_workers
             )
+
+    def get_domain(self):
+        return LatLonBox(self.domain_bbox)

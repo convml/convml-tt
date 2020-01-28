@@ -98,6 +98,8 @@ def _load_rgb_files_and_get_composite_da(scene_fns):
     # get out a dask-backed DataArray for the composite
     da_truecolor = new_scn['true_color']
 
+    da_truecolor = da_truecolor.drop('crs')
+
     # to be able to crop the DataArray to the bounding box we need to set the
     # projection attribute
     da_truecolor.attrs['crs'] = scene.max_area().to_cartopy_crs()
@@ -131,6 +133,8 @@ def get_rgb_composite_in_bbox(scene_fns, data_path, bbox_extent,
     path_nc = data_path/fn_nc
     path_meta = data_path/fn_nc.replace('.nc', '.meta.yaml')
 
+    data_path.mkdir(exist_ok=True, parents=True)
+
     bbox_domain = bbox.LatLonBox(bbox_extent)
 
     if not path_nc.exists():
@@ -148,7 +152,11 @@ def get_rgb_composite_in_bbox(scene_fns, data_path, bbox_extent,
         meta = _save_projection_info_to_yaml(channel_fn=scene_fns[0],
                                              fn_meta=path_meta)
 
-    da = xr.open_dataarray(path_nc)
+    try:
+        da = xr.open_dataarray(path_nc)
+    except:
+        print("Error opening `{}`".format(path_nc))
+        raise
     da.attrs['crs'] = _create_ccrs_from_yaml(fn_meta=path_meta)
 
     if not 'source_files' in da.attrs:
