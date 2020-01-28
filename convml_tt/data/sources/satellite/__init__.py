@@ -142,16 +142,16 @@ class FixedTimeRangeSatelliteTripletDataset(SatelliteTripletDataset):
                 bbox_extent=self.domain_bbox, path_composites=path_composites
             )
 
+            tile_path_base = self._get_tiles_base_path()
             tile_path = tile_path_base/identifier
             tile_path.mkdir(exist_ok=True)
 
             processing.generate_tile_triplets(
-                scenes=scenes, tiling_bbox=TILING_BBOX_EXTENT,
-                tile_size=tile_size,
-                tile_N=tile_N,
-                N_triplets=N_triplets[identifier],
+                scenes=scenes, tiling_bbox=self.domain_bbox,
+                tile_size=self.tile_size,
+                tile_N=self.tile_N,
+                N_triplets=self.N_triplets[identifier],
                 output_dir=tile_path,
-                max_workers=max_workers
             )
 
     def get_domain(self):
