@@ -4,8 +4,10 @@ import satdata
 import luigi
 import yaml
 import dateutil.parser
+import xarray as xr
+import numpy as np
 
-from . import processing
+from . import processing, satpy_rgb, tiler, bbox
 
 SOURCE_DIR = Path("sources")/"goes16"
 
@@ -120,6 +122,60 @@ class StudyTrainSplit(luigi.Task):
 
     def output(self):
         return YAMLTarget("training_study_split.yaml")
+
+class RGBCompositeNetCDFFile(luigi.LocalTarget):
+    def save(self, da_truecolor, source_fns):
+        Path(self.fn).parent.mkdir(exist_ok=True, parents=True)
+        satpy_rgb.save_scene_meta(source_fns=source_fns, fn_meta=self.path_meta)
+        da_truecolor.to_netcdf(self.fn)
+
+    @property
+    def path_meta(self):
+        return self.fn.replace('.nc', '.meta.yaml')
+
+    def open(self):
+        try:
+            da = xr.open_dataarray(self.fn)
+        except:
+            print("Error opening `{}`".format(self.fn))
+            raise
+        meta_info = satpy_rgb.load_scene_meta(fn_meta=self.path_meta)
+        da.attrs.update(meta_info)
+
+        return da
+
+class CreateRGBScene(luigi.Task):
+    """
+    Create RGB composite scene from GOES-16 radiance files
+    """
+    source_fns = luigi.ListParameter()
+    domain_bbox = luigi.ListParameter()
+    domain_bbox_pad_frac = luigi.FloatParameter(default=0.05)
+    data_path = luigi.Parameter()
+
+    def run(self):
+        da_truecolor = satpy_rgb.load_rgb_files_and_get_composite_da(
+            scene_fns=self.source_fns
+        )
+
+        bbox_domain = bbox.LatLonBox(self.domain_bbox)
+
+        da_truecolor_domain = tiler.crop_field_to_latlon_box(
+            da=da_truecolor, box=np.array(bbox_domain.get_bounds()).T,
+            pad_pct=self.domain_bbox_pad_frac
+        )
+        da_truecolor_domain = None
+
+        self.output().save(da_truecolor=da_truecolor_domain,
+                           source_fns=self.source_fns)
+
+    def output(self):
+        fn_da = satpy_rgb.make_composite_filename(
+            scene_fns=self.source_fns, bbox_extent=self.domain_bbox
+        )
+        p = Path(self.data_path)/"composites"/fn_da
+        t = RGBCompositeNetCDFFile(str(p))
+        return t
 
 class GenerateTriplets(luigi.Task):
     dt_max = luigi.FloatParameter()
