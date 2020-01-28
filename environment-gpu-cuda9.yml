@@ -16,7 +16,7 @@ dependencies:
   - tqdm
   - xarray
   - scikit-learn
-  - pytorch
+  - pytorch=1.0.1
   - torchvision
   - cudatoolkit=9.0
   - Pillow=6.1

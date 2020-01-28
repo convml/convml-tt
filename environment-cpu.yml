@@ -16,7 +16,7 @@ dependencies:
   - tqdm
   - xarray
   - scikit-learn
-  - pytorch-cpu
+  - pytorch-cpu=1.0.1
   - torchvision-cpu
   - Pillow=6.1
   # dependencies below are necessary for the `satdata` code which will
