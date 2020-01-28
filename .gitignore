@@ -2,3 +2,4 @@
 *.pyc
 .*.sw*
 .ipynb_checkpoints/
+notebooks/
