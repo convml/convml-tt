@@ -18,6 +18,7 @@ dependencies:
   - scikit-learn
   - pytorch-cpu
   - torchvision-cpu
+  - Pillow=6.1
   # dependencies below are necessary for the `satdata` code which will
   # eventually be forked from `convml_tt`
   - esmpy
@@ -28,3 +29,4 @@ dependencies:
     - esmpy
     - progressbar
     - fastai==1.0.53
+    - seaborn
