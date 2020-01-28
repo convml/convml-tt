@@ -64,9 +64,8 @@ class MakeRectRGBImage(luigi.Task):
     def run(self):
         da_scene = self.input().open()
         img = DOMAIN_RECT.create_true_color_img(da_scene, resampling_dx=DX)
-        img_pil = img.pil_image()
         Path(self.output().path).parent.mkdir(exist_ok=True, parents=True)
-        img_pil.save(str(self.output().fn))
+        img.save(str(self.output().fn))
 
     def output(self):
         da_scene = self.input().open()
