@@ -96,7 +96,6 @@ class FixedTimeRangeSatelliteTripletDataset(SatelliteTripletDataset):
         return datasets_filenames_split
 
     def get_dataset_scene(self, data_path, scene_num, offline_cli=True, for_training=True):
-
         datasets_filenames_split = self._get_dataset_train_study_split(cli=cli)
         if for_training:
             datasets_filenames = datasets_filenames_split['train']
@@ -109,7 +108,7 @@ class FixedTimeRangeSatelliteTripletDataset(SatelliteTripletDataset):
         )
         return scenes[0]
 
-    def fetch_source_data(self, source_data_path, offline_cli):
+    def fetch_source_data(self, source_data_path):
         t = pipeline.GOES16Fetch(
                 dt_max=self._dt_max,
                 channels=[1,2,3],
