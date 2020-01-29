@@ -163,4 +163,7 @@ def get_rgb_composite_in_bbox(scene_fns, data_path, bbox_extent,
 
 
 def rgb_da_to_img(da):
-    return satpy.writers.get_enhanced_image(da)
+    # need to sort by y otherize resulting image is flipped... there must be a
+    # better way
+    da_ = da.sortby('y', ascending=False)
+    return satpy.writers.get_enhanced_image(da_)
