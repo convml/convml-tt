@@ -31,3 +31,4 @@ dependencies:
     - progressbar
     - fastai==1.0.53
     - seaborn
+    - "git+https://github.com/leifdenby/satdata@v0.1.3#egg=satdata"
