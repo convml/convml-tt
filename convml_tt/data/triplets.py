@@ -7,7 +7,7 @@ from tqdm import tqdm
 import satdata
 
 from ..architectures.triplet_trainer import TileType
-from ..data.sources.satellite.tiles import Tile
+from .sources.satellite.tiler import Tile
 
 
 class TripletTile(Tile):
