@@ -13,6 +13,8 @@ from convml_tt.interpretation import tile_aggregation
 
 import convml_tt.data.triplets
 
+import platform
+
 
 def test_getting_embeddings():
     data_path = untar_data(ExampleData.TINY10)
@@ -28,9 +30,15 @@ def test_getting_embeddings():
            .label_empty(embedding_length=100)
            )
 
+    # fix for not working multi-process training on MacOS
+    # https://github.com/fastai/fastai/issues/1492
+    db_kwargs = {}
+    if platform.system() == "Darwin":
+        db_kwargs['num_workers'] = 0
+
     data = (src
             .transform(fastai.vision.get_transforms(flip_vert=True,))
-            .databunch(bs=3)
+            .databunch(bs=3, **db_kwargs)
             .normalize(fastai.vision.imagenet_stats)
             )
 
