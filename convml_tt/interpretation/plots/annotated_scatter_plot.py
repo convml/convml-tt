@@ -4,6 +4,8 @@ import mpl_toolkits.axes_grid1.inset_locator as il
 import xarray as xr
 import seaborn as sns
 
+from collections import OrderedDict
+
 from ...utils import get_triplets_from_embeddings
 
 from .mpl_autopos_annotation import calc_offset_points
@@ -125,8 +127,15 @@ def scatter_annotated(x, y, points, ax=None, size=0.1, autopos_method='forces',
     lines = []
 
     if hue is not None:
+        if not isinstance(hue, xr.DataArray) or not 'tile_id' in hue.dims:
+            raise Exception("`hue` should be a data-array with a label for"
+                            " for each tile in `x` and `y` (i.e. have the "
+                            " the same `tile_id`s)")
+
         color_palette_name = hue_palette
-        colors = sns.color_palette(color_palette_name, n_colors=len(tile_ids))
+        hue_unique = np.sort(np.unique(hue))
+        color_palette = sns.color_palette(color_palette_name, n_colors=len(hue_unique))
+        colormap = OrderedDict(zip(hue_unique, color_palette))
     else:
         color = 'grey'
 
@@ -135,7 +144,7 @@ def scatter_annotated(x, y, points, ax=None, size=0.1, autopos_method='forces',
 
         pts_connector = np.c_[pts_offset[n], pts[n]]
         if hue is not None:
-            color = colors[n]
+            color = colormap[hue.sel(tile_id=tile_id).item()]
         line, = ax.plot(*pts_connector, linestyle='--', marker='.', color=color)
 
         if x_c is not None and y_c is not None:
@@ -156,7 +165,9 @@ def scatter_annotated(x, y, points, ax=None, size=0.1, autopos_method='forces',
         ax1.axison = False
 
         if hue is not None:
-            label_text = np.unique(x[hue])[n]
+            label_text = hue.sel(tile_id=tile_id).item()
+            if isinstance(label_text, xr.DataArray):
+                label_text = label_text.values
             ax1.text(0.1, 0.15, label_text, transform=ax1.transAxes,
                      bbox={'facecolor': 'white', 'alpha': 0.6, 'pad': 2})
 
@@ -172,7 +183,8 @@ def scatter_annotated(x, y, points, ax=None, size=0.1, autopos_method='forces',
     ax.set_ylim(ylim)
 
     if hue is not None:
-        sns.scatterplot(x, y, hue=x[hue], ax=ax, alpha=0.4, palette=color_palette_name)
+        sns.scatterplot(x, y, hue=hue.values, ax=ax, alpha=0.4, palette=color_palette,
+                        hue_order=colormap.keys())
     else:
         ax.scatter(x, y, marker='.', alpha=0.2, color='grey')
 
