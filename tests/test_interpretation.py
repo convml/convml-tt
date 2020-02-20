@@ -51,8 +51,8 @@ def test_getting_embeddings():
 
 
     items_study = item_list[:2]
-    embs_anchor = get_embeddings(triplets=items_study, model=learn)
-    embs_all = get_embeddings(triplets=items_study, model=learn, tile_type=None)
+    embs_anchor = get_embeddings(triplets_or_tilelist=items_study, model=learn)
+    embs_all = get_embeddings(triplets_or_tilelist=items_study, model=learn, tile_type=None)
 
     assert len(items_study) == embs_all.tile_id.count()
 
@@ -67,8 +67,7 @@ def test_tile_loading():
     tile_path = data_path/"train"
     triplets = NPMultiImageItemList.from_folder(path=tile_path)
 
-    print(triplets)
-
     for tile_type in TileType:
         convml_tt.data.triplets.load_tile_definitions(triplets=triplets,
                                                       tile_type=tile_type)
+

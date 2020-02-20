@@ -4,9 +4,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from ...architectures.triplet_trainer import TileType
+from ...data.sources.imagelist import SingleTileImageList
 
 
-def grid_overview(triplets, points, tile=TileType.ANCHOR,
+def grid_overview(triplets_or_tilelist, points, tile=TileType.ANCHOR,
                   figwidth=16, ncols=10, label='tile_id'):
     """
     Plot a grid overview of the chosen tile at the selected `points`. If
@@ -27,6 +28,15 @@ def grid_overview(triplets, points, tile=TileType.ANCHOR,
     figheight = float(figwidth)/ncols*nrows
     figsize = (figwidth, figheight)
 
+    if isinstance(triplets_or_tilelist, SingleTileImageList):
+        if tile != TileType.ANCHOR:
+            raise Exception("Only ANCHOR tiles are assumed to be in"
+                            " SingleTileImageList objects, load triplets"
+                            " if you need them")
+        get_tile = lambda n: triplets_or_tilelist[n]
+    else:
+        get_tile = lambda n: triplets_or_tilelist[n][tile.value]
+
     lspace = 0.05
     fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=figsize,
                              gridspec_kw=dict(hspace=lspace, wspace=lspace))
@@ -34,7 +44,7 @@ def grid_overview(triplets, points, tile=TileType.ANCHOR,
     for n, i in enumerate(idxs):
         ax = axes.flatten()[n]
         ax.axison = False
-        tile = triplets[i][0]
+        tile = get_tile(i)
         tile.show(ax=ax)
         ax.set_aspect('equal')
         ax.set_xticklabels([])
