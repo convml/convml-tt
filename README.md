@@ -1,7 +1,9 @@
 # Studying convective organisation with neural networks
 
-This repository contains code to generate training data, train a neural network
-model and interprete this model. 
+This repository contains code to generate training data, train and interprete
+the neural network used in [L. Denby
+(2020)](https://agupubs.onlinelibrary.wiley.com/doi/10.1029/2019GL085190)
+collected in a python module called `convml_tt`.
 
 ## Getting started
 
