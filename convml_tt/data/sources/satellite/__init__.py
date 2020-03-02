@@ -55,73 +55,35 @@ class FixedTimeRangeSatelliteTripletDataset(SatelliteTripletDataset):
         _ensure_task_run(t)
         return t.output().read()
 
-        path_tiles_meta = self._get_tiles_base_path()/"training_study_split.yaml"
-
-        if path_tiles_meta.exists():
-            print("Definition for test vs study split was found in `{}`, "
-                  "assuming that all necessary data has already been downloaded"
-                  "".format(path_tiles_meta))
-            with open(path_tiles_meta) as fh:
-                datasets_filenames_split = yaml.load(fh)
-        else:
-            # get tuples of channel "keys" (storage ids) for all the valid times queried
-            datasets_keys = processing.find_datasets_keys(
-                times=self._times, dt_max=self._dt_max, channels=self.channels,
-                cli=cli,
-            )
-
-            if len(datasets_keys) == 0:
-                raise Exception("Couldn't find any data matching the provided query")
-
-            # download all the files using the cli (flatting list first...)
-            print("Downloading channel files...")
-            keys = [fn for fns in datasets_keys for fn in fns]
-            fns = cli.download(keys)
-
-            # now we know where each key was stored, so we can map the dataset keys to
-            # the filenames they were stored into
-            kfmap = dict(zip(keys, fns))
-            datasets_filenames_all = [
-                [kfmap[k] for k in dataset_keys]
-                for dataset_keys in datasets_keys
-            ]
-
-            datasets_filenames_split = (
-                processing.pick_one_time_per_date_for_study(datasets_filenames_all)
-            )
-
-            with open(path_tiles_meta, "w") as fh:
-                yaml.dump(datasets_filenames_split, fh, default_flow_style=False)
-
-        return datasets_filenames_split
-
-    def get_dataset_scene(self, data_path, scene_num, offline_cli=True, for_training=True):
-        datasets_filenames_split = self._get_dataset_train_study_split(cli=cli)
+    def get_scene(self, scene_num, for_training=True):
+        datasets_filenames_split = self._get_dataset_train_study_split()
         if for_training:
             datasets_filenames = datasets_filenames_split['train']
         else:
             datasets_filenames = datasets_filenames_split['study']
 
-        scenes = processing.load_data_for_rgb(
-            datasets_filenames=[datasets_filenames[scene_num],], cli=cli,
-            bbox_extent=self.domain_bbox, path_composites=path_composites
+        t = pipeline.CreateRGBScene(
+            source_fns=datasets_filenames[scene_num],
+            domain_bbox=self.domain_bbox,
+            data_path=self.data_path,
         )
-        return scenes[0]
+        _ensure_task_run(t)
+        return t.output().open()
 
-    def fetch_source_data(self, source_data_path):
+    def fetch_source_data(self):
         t = pipeline.GOES16Fetch(
                 dt_max=self._dt_max,
                 channels=[1,2,3],
                 times=self._times,
-                data_path=source_data_path
+                data_path=self.data_path
             )
         _ensure_task_run(t)
         return t.output().read()
 
-    def generate(self, source_data_path, offline_cli):
+    def generate(self):
         datasets_filenames_split = self._get_dataset_train_study_split()
 
-        local_storage_dir = source_data_path/"sources"/"goes16"
+        local_storage_dir = source_data_path/"source_data"/"goes16"
         path_composites = source_data_path/"composites"
 
         for identifier, datasets_filenames in datasets_filenames_split.items():

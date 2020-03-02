@@ -47,7 +47,7 @@ class TripletDataset:
         with open(str(p)) as fh:
             data = yaml.load(fh.read())
         data['name'] = name
-        data['data_path'] = path_abs.parent
+        data['data_path'] = path_abs
         class_fqn = data.pop('type')
         i = class_fqn.rfind('.')
         module_name, class_name = class_fqn[:i], class_fqn[i+1:]

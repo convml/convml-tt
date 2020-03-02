@@ -7,6 +7,10 @@ import numpy as np
 from satdata import Goes16AWS
 from . import tiler, bbox
 
+import satpy.composites.viirs
+import satpy.composites.abi
+import satpy.composites.cloud_products
+
 
 def _cleanup_composite_da_attrs(da_composite):
     """

@@ -9,7 +9,7 @@ import numpy as np
 
 from . import processing, satpy_rgb, tiler, bbox
 
-SOURCE_DIR = Path("sources")/"goes16"
+SOURCE_DIR = Path("source_data")/"goes16"
 
 class YAMLTarget(luigi.LocalTarget):
     def write(self, obj):
@@ -39,10 +39,11 @@ class GOES16Query(luigi.Task):
         filenames = cli.query(time=self.time, region='F', debug=self.debug,
                               channel=self.channel, dt_max=self.dt_max)
 
+        Path(self.output().fn).parent.mkdir(exist_ok=True)
         self.output().write(filenames)
 
     def output(self):
-        return YAMLTarget('source_data_keys_ch{}_{}.yaml'.format(
+        return YAMLTarget('source_data/ch{}_keys_{}.yaml'.format(
                           self.channel, self.time.isoformat()))
 
 class GOES16Fetch(luigi.Task):
@@ -91,10 +92,11 @@ class GOES16Fetch(luigi.Task):
         fns = cli.download(all_files)
 
         file_sets = [list(a) for a in zip(*files_per_channel.values())]
+        Path(self.output().fn).parent.mkdir(exist_ok=True)
         self.output().write(file_sets)
 
     def output(self):
-        return YAMLTarget('source_data.yaml')
+        return YAMLTarget('source_data/all_files.yaml')
 
 class StudyTrainSplit(luigi.Task):
     dt_max = luigi.FloatParameter()
@@ -118,10 +120,11 @@ class StudyTrainSplit(luigi.Task):
                 datasource_cli=satdata.Goes16AWS
             )
         )
+        Path(self.output().fn).parent.mkdir(exist_ok=True)
         self.output().write(datasets_filenames_split)
 
     def output(self):
-        return YAMLTarget("training_study_split.yaml")
+        return YAMLTarget("source_data/training_study_split.yaml")
 
 class RGBCompositeNetCDFFile(luigi.LocalTarget):
     def save(self, da_truecolor, source_fns):
@@ -154,8 +157,11 @@ class CreateRGBScene(luigi.Task):
     data_path = luigi.Parameter()
 
     def run(self):
+        scene_fns = [
+            Path(self.data_path)/SOURCE_DIR/fn for fn in self.source_fns
+        ]
         da_truecolor = satpy_rgb.load_rgb_files_and_get_composite_da(
-            scene_fns=self.source_fns
+            scene_fns=scene_fns
         )
 
         bbox_domain = bbox.LatLonBox(self.domain_bbox)
@@ -164,10 +170,11 @@ class CreateRGBScene(luigi.Task):
             da=da_truecolor, box=np.array(bbox_domain.get_bounds()).T,
             pad_pct=self.domain_bbox_pad_frac
         )
-        da_truecolor_domain = None
+
+        da_truecolor_domain = satpy_rgb._cleanup_composite_da_attrs(da_truecolor_domain)
 
         self.output().save(da_truecolor=da_truecolor_domain,
-                           source_fns=self.source_fns)
+                           source_fns=scene_fns)
 
     def output(self):
         fn_da = satpy_rgb.make_composite_filename(
