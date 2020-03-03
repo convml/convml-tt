@@ -158,7 +158,7 @@ class CreateRGBScene(luigi.Task):
 
     def run(self):
         scene_fns = [
-            Path(self.data_path)/SOURCE_DIR/fn for fn in self.source_fns
+            str(Path(self.data_path)/SOURCE_DIR/fn) for fn in self.source_fns
         ]
         da_truecolor = satpy_rgb.load_rgb_files_and_get_composite_da(
             scene_fns=scene_fns
