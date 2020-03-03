@@ -36,7 +36,7 @@ def _fix_labels(ax, leaf_mapping, label_clusters=False):
 
 def dendrogram(embeddings, n_clusters_max=14, debug=False, ax=None,
     n_samples=10, show_legend=False, label_clusters=False,
-    return_clusters=False, color=None, sampling_method='random',
+    return_clusters=False, color='black', sampling_method='random',
     linkage_method='ward', **kwargs):
     """
     Additional kwargs will be passed to scipy.cluster.hierarchy.dendrogram

@@ -161,7 +161,10 @@ class NPMultiImageList(ImageList):
                 tile_type=tt.name.lower(), triplet_id=0
             )
             fn_tiletype = fn_tiletype.replace('00000', '*')
-            files_by_type.append(list(path.glob(fn_tiletype)))
+            # `glob` doesn't sort by default, so make sure we do it here so
+            # that we can match with the embeddings we produce later
+            files = sorted(list(path.glob(fn_tiletype)))
+            files_by_type.append(files)
 
         num_files_by_type = [len(files) for files in files_by_type]
         if len(set(num_files_by_type)) != 1:

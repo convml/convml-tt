@@ -13,6 +13,8 @@ from convml_tt.interpretation import tile_aggregation
 
 import convml_tt.data.triplets
 
+import platform
+
 
 def test_getting_embeddings():
     data_path = untar_data(ExampleData.TINY10)
@@ -28,9 +30,15 @@ def test_getting_embeddings():
            .label_empty(embedding_length=100)
            )
 
+    # fix for not working multi-process training on MacOS
+    # https://github.com/fastai/fastai/issues/1492
+    db_kwargs = {}
+    if platform.system() == "Darwin":
+        db_kwargs['num_workers'] = 0
+
     data = (src
             .transform(fastai.vision.get_transforms(flip_vert=True,))
-            .databunch(bs=3)
+            .databunch(bs=3, **db_kwargs)
             .normalize(fastai.vision.imagenet_stats)
             )
 
@@ -43,8 +51,8 @@ def test_getting_embeddings():
 
 
     items_study = item_list[:2]
-    embs_anchor = get_embeddings(triplets=items_study, model=learn)
-    embs_all = get_embeddings(triplets=items_study, model=learn, tile_type=None)
+    embs_anchor = get_embeddings(triplets_or_tilelist=items_study, model=learn)
+    embs_all = get_embeddings(triplets_or_tilelist=items_study, model=learn, tile_type=None)
 
     assert len(items_study) == embs_all.tile_id.count()
 
@@ -59,8 +67,7 @@ def test_tile_loading():
     tile_path = data_path/"train"
     triplets = NPMultiImageItemList.from_folder(path=tile_path)
 
-    print(triplets)
-
     for tile_type in TileType:
         convml_tt.data.triplets.load_tile_definitions(triplets=triplets,
                                                       tile_type=tile_type)
+

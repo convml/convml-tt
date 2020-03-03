@@ -7,9 +7,10 @@ from tqdm import tqdm
 import satdata
 
 from ..architectures.triplet_trainer import TileType
+from .sources.satellite.tiler import Tile
 
 
-class TripletTile(satdata.Tile):
+class TripletTile(Tile):
     def __init__(self, rgb_img, meta, tile_id, data_path, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
