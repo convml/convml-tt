@@ -21,6 +21,7 @@ from xesmf.backend import (esmf_grid, add_corner,
                            esmf_regrid_build, esmf_regrid_finalize)
 
 import tempfile
+import math
 
 try:
     from . import satpy_rgb
@@ -124,8 +125,8 @@ class RectTile():
         Get an xarray Dataset containing the new lat/lon grid points with their
         position in meters
         """
-        N_zonal = int(self.l_zonal/dx)
-        N_meridional = int(self.l_meridional/dx)
+        N_zonal = math.ceil(self.l_zonal/dx)
+        N_meridional = math.ceil(self.l_meridional/dx)
         ldeg_lon = self._get_approximate_equator_deg_dist(l=self.l_zonal)
         ldeg_lat = self._get_approximate_equator_deg_dist(l=self.l_meridional)
 

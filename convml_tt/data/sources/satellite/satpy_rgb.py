@@ -92,7 +92,6 @@ def load_scene_meta(fn_meta):
     del(meta_info['projection'])
     return meta_info
 
-
 def load_rgb_files_and_get_composite_da(scene_fns):
     scene = satpy.Scene(reader='abi_l1b', filenames=scene_fns)
 
@@ -167,4 +166,7 @@ def get_rgb_composite_in_bbox(scene_fns, data_path, bbox_extent,
 
 
 def rgb_da_to_img(da):
-    return satpy.writers.get_enhanced_image(da)
+    # need to sort by y otherize resulting image is flipped... there must be a
+    # better way
+    da_ = da.sortby('y', ascending=False)
+    return satpy.writers.get_enhanced_image(da_)
