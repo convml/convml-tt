@@ -6,7 +6,7 @@ import yaml
 
 
 class TripletDataset:
-    def __init__(self, N_triplets, data_path, name):
+    def __init__(self, N_triplets, data_path, name, extra={}):
         """
         N_triplets can be an integer (interpreted as no study data being
         requested) or a dictionary with {'train': N_train, 'study': N_study}
@@ -14,6 +14,7 @@ class TripletDataset:
         self.N_triplets = N_triplets
         self.data_path = data_path
         self.name = name
+        self.extra = extra
 
     def save(self):
         tile_path_base = self._get_bae_path()

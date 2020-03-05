@@ -32,6 +32,7 @@ class GOES16Query(luigi.Task):
     channel = luigi.ListParameter()
     time = luigi.DateMinuteParameter()
     debug = luigi.BoolParameter(default=False)
+    data_path = luigi.Parameter()
 
     def run(self):
         cli = satdata.Goes16AWS(offline=False)
@@ -43,8 +44,10 @@ class GOES16Query(luigi.Task):
         self.output().write(filenames)
 
     def output(self):
-        return YAMLTarget('source_data/ch{}_keys_{}.yaml'.format(
-                          self.channel, self.time.isoformat()))
+        fn = 'source_data/ch{}_keys_{}.yaml'.format(
+                          self.channel, self.time.isoformat())
+        p = Path(self.data_path)/fn
+        return YAMLTarget(str(p))
 
 class GOES16Fetch(luigi.Task):
     dt_max = luigi.FloatParameter()
@@ -96,7 +99,9 @@ class GOES16Fetch(luigi.Task):
         self.output().write(file_sets)
 
     def output(self):
-        return YAMLTarget('source_data/all_files.yaml')
+        fn = 'source_data/all_files.yaml'
+        p = Path(self.data_path)/fn
+        return YAMLTarget(str(p))
 
 class StudyTrainSplit(luigi.Task):
     dt_max = luigi.FloatParameter()
@@ -124,7 +129,9 @@ class StudyTrainSplit(luigi.Task):
         self.output().write(datasets_filenames_split)
 
     def output(self):
-        return YAMLTarget("source_data/training_study_split.yaml")
+        fn = "source_data/training_study_split.yaml"
+        p = Path(self.data_path)/fn
+        return YAMLTarget(str(p))
 
 class RGBCompositeNetCDFFile(luigi.LocalTarget):
     def save(self, da_truecolor, source_fns):
