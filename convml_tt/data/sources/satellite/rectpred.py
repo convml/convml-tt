@@ -1,7 +1,6 @@
 # coding: utf-8
-from convml_tt.data.sources.satellite import tiler, FixedTimeRangeSatelliteTripletDataset
-import convml_tt.data.sources.satellite.satpy_rgb as satpy_rgb
-import convml_tt.data.sources.satellite.pipeline as sat_pipeline
+from . import tiler, FixedTimeRangeSatelliteTripletDataset
+from . import satpy_rgb, pipeline as sat_pipeline
 
 from pathlib import Path
 import dateutil
@@ -18,7 +17,6 @@ TIME_FORMAT = "%H%M%S"
 
 PATH_FORMAT = "%Y/%Y_%m_%d"
 
-DOMAIN_RECT = tiler.RectTile(lat0=14, lon0=-48, l_zonal=3000e3, l_meridional=1000e3)
 
 class XArrayTarget(luigi.target.FileSystemTarget):
     fs = luigi.local_target.LocalFileSystem()
@@ -43,29 +41,19 @@ class XArrayTarget(luigi.target.FileSystemTarget):
     def fn(self):
         return self.path
 
-def _plot_scene(da_scene, dataset):
-    fig, ax = plt.subplots(subplot_kw=dict(projection=da_scene.crs), figsize=(12,6))
-    da_scene.coarsen(x=20, y=20, boundary="trim").mean().sel(bands="B").plot(transform=da_scene.crs, ax=ax)
-    ax.gridlines()
-    ax.coastlines()
-
-    rect.plot_outline(ax=ax)
-    dataset.get_domain().plot_outline(ax=ax, color='red', alpha=0.3)
-
-def _plot_rect_grid(rect):
-    ax = rect.plot_outline()
-    grid = rect.get_grid(dx=100e3)
-    ax.scatter(grid.lon, grid.lat, transform=ccrs.PlateCarree())
-    plt.margins(0.5)
-
 class MakeRectRGBDataArray(luigi.Task):
     source_data_path = luigi.Parameter()
     dataset_path = luigi.Parameter()
     scene_num = luigi.IntParameter()
-    dx = luigi.FloatParameter()
+
+    def _get_dataset(self):
+        return FixedTimeRangeSatelliteTripletDataset.load(self.dataset_path)
 
     def requires(self):
-        dataset = FixedTimeRangeSatelliteTripletDataset.load(self.dataset_path)
+        dataset = self._get_dataset()
+        if not 'rectpred' in dataset.extra:
+            raise Exception("Please define a `rectpred` setup in your"
+                            " meta.yaml file")
 
         source_data_path = Path(self.source_data_path).expanduser()
         scenes_source_fns = dataset.fetch_source_data(
@@ -83,8 +71,14 @@ class MakeRectRGBDataArray(luigi.Task):
         return t
 
     def run(self):
+        dataset = self._get_dataset()
         da_scene = self.input().open()
-        da_rect = DOMAIN_RECT.resample(da=da_scene, dx=self.dx, keep_attrs=True)
+        domain_rect = tiler.RectTile(dataset.extra['rectpred']['domain'])
+        da_rect = domain_rect.resample(
+            da=da_scene,
+            dx=dataset.extra['rectpred']['resolution'],
+            keep_attrs=True
+        )
         if 'crs' in da_rect.attrs:
             del(da_rect.attrs['crs'])
         Path(self.output().fn).parent.mkdir(exist_ok=True, parents=True)
@@ -143,3 +137,18 @@ class MakeRectRGBImage(luigi.Task):
 
         p_out = Path(t.strftime(PATH_FORMAT))/fn
         return luigi.LocalTarget(str(p_out))
+
+def _plot_scene(da_scene, dataset):
+    fig, ax = plt.subplots(subplot_kw=dict(projection=da_scene.crs), figsize=(12,6))
+    da_scene.coarsen(x=20, y=20, boundary="trim").mean().sel(bands="B").plot(transform=da_scene.crs, ax=ax)
+    ax.gridlines()
+    ax.coastlines()
+
+    rect.plot_outline(ax=ax)
+    dataset.get_domain().plot_outline(ax=ax, color='red', alpha=0.3)
+
+def _plot_rect_grid(rect):
+    ax = rect.plot_outline()
+    grid = rect.get_grid(dx=100e3)
+    ax.scatter(grid.lon, grid.lat, transform=ccrs.PlateCarree())
+    plt.margins(0.5)
