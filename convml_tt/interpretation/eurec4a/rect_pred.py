@@ -148,6 +148,36 @@ class CreateAllPredictionMapsData(luigi.Task):
         return XArrayTarget(str(p))
 
 
+class EmbeddingTransform(luigi.Task):
+    input_path = luigi.Parameter()
+    transform_type = luigi.Parameter()
+    n_clusters = luigi.IntParameter(default=4)
+
+    def run(self):
+        da_emb = xr.open_dataarray(self.input_path)
+        if self.transform_type == 'kmeans':
+            fn_transform = sklearn.cluster.KMeans(n_clusters=self.n_clusters).fit_predict
+        elif self.transform_type == 'pca':
+            fn_transform = sklearn.decomposition.PCA(n_components=self.n_clusters).fit_transform
+        else:
+            raise NotImplementedError(self.transform_type)
+        da_cluster = _apply_transform(da=da_emb, fn=fn_transform,
+            transform_name=self.transform_type
+        )
+
+        da_cluster.to_netcdf(self.output().fn)
+
+    def output(self):
+        src_fullpath = Path(self.input_path)
+        src_path, src_fn = src_fullpath.parent, src_fullpath.name
+
+        fn_out = src_fn.replace('.nc',
+            '.{}_transform.{}_clusters.nc'.format(
+                self.transform_type, self.n_clusters
+            )
+        )
+        return XArrayTarget(str(src_path/fn_out))
+
 def _annotation_plot(img, da_):
     img_kws = {}
     aug_kws = dict(add_colorbar=False, y='y')
@@ -194,7 +224,10 @@ def _annotation_plot(img, da_):
     return fig
 
 def _apply_transform(da, fn, transform_name):
-    da_stacked = da.stack(dict(n=('x','y')))
+    # stack all other dims apparent from the `emb_dim`
+    dims = list(da.dims)
+    dims.remove('emb_dim')
+    da_stacked = da.stack(dict(n=dims))
     arr = fn(X=da_stacked.T)
     if len(arr.shape) == 2:
         dims = ('n', '{}_dim'.format(transform_name))
