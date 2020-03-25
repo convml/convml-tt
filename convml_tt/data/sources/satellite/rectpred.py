@@ -57,10 +57,11 @@ class MakeRectRGBDataArray(luigi.Task):
         return dataset.fetch_source_data()
 
     def run(self):
-        da_scene = xr.open_dataarray(self.scene_path)
+        # need to use this to include the projection meta information
+        da_scene = sat_pipeline.RGBCompositeNetCDFFile(self.scene_path).open()
 
         dataset = self._get_dataset()
-        domain_rect = tiler.RectTile(dataset.extra['rectpred']['domain'])
+        domain_rect = tiler.RectTile(**dataset.extra['rectpred']['domain'])
         da_rect = domain_rect.resample(
             da=da_scene,
             dx=dataset.extra['rectpred']['resolution'],
@@ -89,14 +90,11 @@ class MakeRectRGBDataArray(luigi.Task):
 class MakeRectRGBImage(luigi.Task):
     dataset_path = luigi.Parameter()
     scene_path = luigi.Parameter()
-    dx = luigi.FloatParameter(default=200.0e3/256)
 
     def requires(self):
         return MakeRectRGBDataArray(
             scene_path=self.scene_path,
             dataset_path=self.dataset_path,
-            scene_num=self.scene_num,
-            dx=self.dx
         )
 
     def run(self):
@@ -150,19 +148,24 @@ class MakeAllRectRGBDataArrays(luigi.Task):
         else:
             raise NotImplementedError(self.output_type)
 
+        scene_tasks = []
         for source_fns in scene_source_fns:
             # first we need to create RGB scene file, this will be in the
             # original resolution of the input
-            t_scene = yield sat_pipeline.CreateRGBScene(
+            t_scene = sat_pipeline.CreateRGBScene(
                 source_fns=source_fns,
                 domain_bbox=dataset.domain_bbox,
                 data_path=self.dataset_path
             )
+            scene_tasks.append(t_scene)
 
-            # and then we created the resampled image (or just the source array)
+        scene_outputs = yield scene_tasks
+
+        for t_output in scene_outputs:
+            # and then we create the resampled image (or just the source array)
             yield TaskClass(
                 dataset_path=self.dataset_path,
-                scene_path=t_scene.output().fn
+                scene_path=t_output.fn
             )
 
 def _plot_scene(da_scene, dataset):
