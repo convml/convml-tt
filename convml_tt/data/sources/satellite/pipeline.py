@@ -178,7 +178,7 @@ class CreateRGBScene(luigi.Task):
         fn_da = satpy_rgb.make_composite_filename(
             scene_fns=self.source_fns, bbox_extent=self.domain_bbox
         )
-        p = Path(self.data_path)/"composites"/fn_da
+        p = Path(self.data_path)/"composites"/"original_cropped"/fn_da
         t = RGBCompositeNetCDFFile(str(p))
         return t
 

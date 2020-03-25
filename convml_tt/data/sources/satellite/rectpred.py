@@ -97,7 +97,7 @@ class MakeRectRGBImage(luigi.Task):
             ext='png'
         )
 
-        p_out = Path(t.strftime(PATH_FORMAT))/fn
+        p_out = Path(self.dataset_path)/"composites"/"rect"/t.strftime(PATH_FORMAT)/fn
         return luigi.LocalTarget(str(p_out))
 
 class MakeAllRectRGBDataArrays(luigi.Task):
@@ -148,7 +148,7 @@ class MakeAllRectRGBDataArrays(luigi.Task):
 
     def output(self):
         fn = "all_scenes.yaml"
-        p = Path(self.dataset_path)/"composites"/fn
+        p = Path(self.dataset_path)/"composites"/"rect"/fn
         return YAMLTarget(str(p))
 
 def _plot_scene(da_scene, dataset):

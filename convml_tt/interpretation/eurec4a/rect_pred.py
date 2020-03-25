@@ -143,8 +143,8 @@ class CreateAllPredictionMapsData(luigi.Task):
 
     def output(self):
         model_name = Path(self.model_path).name.replace('.pkl', '')
-        fn = "all_embeddings.{}_step..nc".format(self.step_size)
-        p = Path("output")/"rectpred"/model_name/fn
+        fn = "all_embeddings.{}_step.nc".format(self.step_size)
+        p = Path("embeddings")/"rect"/model_name/fn
         return XArrayTarget(str(p))
 
 
