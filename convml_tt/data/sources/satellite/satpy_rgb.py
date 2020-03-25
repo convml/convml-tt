@@ -10,6 +10,7 @@ from . import tiler, bbox
 import satpy.composites.viirs
 import satpy.composites.abi
 import satpy.composites.cloud_products
+import satpy.enhancements
 
 
 def _cleanup_composite_da_attrs(da_composite):
