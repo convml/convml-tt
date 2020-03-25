@@ -141,9 +141,8 @@ class MakeAllRectRGBDataArrays(luigi.Task):
         image_outputs = yield image_tasks
 
         self.output().write([
-            [scene_output.fn, image_output.fn]
-            for (scene_output, image_output)
-            in zip(scene_outputs, image_outputs)
+            [image_output.fn.replace('.png', '.nc'), image_output.fn]
+            for image_output in image_outputs
         ])
 
     def output(self):

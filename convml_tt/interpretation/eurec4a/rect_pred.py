@@ -93,6 +93,10 @@ class CreateSingleImagePredictionMapData(luigi.Task):
 
         da_pred = da_pred.swap_dims(dict(i0='x', j0='y'))
 
+        da_pred.attrs['model_path'] = self.model_path
+        da_pred.attrs['image_path'] = self.image_path
+        da_pred.attrs['src_data_path'] = self.src_data_path
+
         da_pred.to_netcdf(self.output().fn)
 
     def output(self):
@@ -133,11 +137,19 @@ class CreateAllPredictionMapsData(luigi.Task):
         das = []
         for output in prediction_outputs:
             da = output.open()
-            da['fn'] = str(output.fn)
+            src = None
+            if da.src_data_path is not None:
+                src = da.src_data_path
+            else:
+                src = da.iamge_path
+            da['src'] = src
             das.append(da)
 
-        da_all = xr.concat(das, dim='fn')
+        da_all = xr.concat(das, dim='src')
         da_all.name = 'emb'
+        da_all.attrs['step_size'] = self.step_size
+        da_all.attrs['model_path'] = self.model_path
+
         Path(self.output().fn).parent.mkdir(exist_ok=True, parents=True)
         da_all.to_netcdf(self.output().fn)
 
