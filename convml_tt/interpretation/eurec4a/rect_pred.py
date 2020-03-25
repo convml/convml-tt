@@ -54,7 +54,17 @@ def rect_predict(model, img, step=(10, 10)):
 
     result = np.stack(model.predict(il)[1]).reshape((len(i_), len(j_), -1))
 
-    return result
+    # for some reason it appears that the y-coordinate gets reversed...
+    result = result[:,::-1]
+
+    da = xr.DataArray(
+        result,
+        dims=('i0', 'j0', 'emb_dim'),
+        coords=dict(i0=i_, j0=j_),
+        attrs=dict(xstep=step[0], ystep=step[1])
+    )
+
+    return da
 
 class CreateSingleImagePredictionMapData(luigi.Task):
     model_path = luigi.Parameter()
@@ -68,24 +78,18 @@ class CreateSingleImagePredictionMapData(luigi.Task):
         model = load_learner(model_path, model_fn)
         img = open_image(self.image_path)
 
-        pred = rect_predict(model=model, img=img,
+        da_pred = rect_predict(model=model, img=img,
             step=(self.step_size, self.step_size)
         )
 
-        import ipdb
-        with ipdb.launch_ipdb_on_exception():
-            kws = {}
-            if self.src_data_path is not None:
-                da_source = xr.open_dataarray(self.src_data_path)
-                s = slice(self.step_size//2, None, self.step_size)
-                nx_p, ny_p, _ = pred.shape
-                x_ = da_source.x[s][:nx_p]
-                y_ = da_source.y[s][:ny_p]
-                kws['coords'] = dict(x=x_, y=y_)
+        if self.src_data_path:
+            da_src = xr.open_dataarray(self.src_data_path)
 
-            da_pred = xr.DataArray(
-                pred, dims=('x', 'y', 'emb_dim'), **kws
-            )
+            da_pred['x'] = da_src.x[da_pred.i0 + da_pred.xstep//2]
+            da_pred['y'] = da_src.y[da_pred.j0 + da_pred.ystep//2]
+
+        da_pred = da_pred.swap_dims(dict(i0='x', j0='y'))
+
         da_pred.to_netcdf(self.output().fn)
 
     def output(self):
@@ -93,7 +97,7 @@ class CreateSingleImagePredictionMapData(luigi.Task):
         image_path, image_fn = image_fullpath.parent, image_fullpath.name
 
         fn_out = image_fn.replace('.png', '.embeddings.{}_step.nc'.format(self.step_size))
-        return luigi.LocalTarget(fn_out)
+        return XArrayTarget(str(image_path/fn_out))
 
 def _annotation_plot(img, da_):
     img_kws = {}
@@ -140,11 +144,11 @@ def _annotation_plot(img, da_):
 
     return fig
 
-def _apply_transform(da, fn):
+def _apply_transform(da, fn, transform_name):
     da_stacked = da.stack(dict(n=('x','y')))
     arr = fn(X=da_stacked.T)
     if len(arr.shape) == 2:
-        dims = ('n', 'tsne_dim')
+        dims = ('n', '{}_dim'.format(transform_name))
     else:
         dims = ('n',)
     return xr.DataArray(
@@ -153,14 +157,39 @@ def _apply_transform(da, fn):
         coords=dict(n=da_stacked.n)
     ).unstack('n')
 
-class AnnotationMapImage(luigi.Task):
+class XArrayTarget(luigi.target.FileSystemTarget):
+    fs = luigi.local_target.LocalFileSystem()
+
+    def __init__(self, path, *args, **kwargs):
+        super(XArrayTarget, self).__init__(path, *args, **kwargs)
+        self.path = path
+
+    def open(self, *args, **kwargs):
+        # ds = xr.open_dataset(self.path, engine='h5netcdf', *args, **kwargs)
+        ds = xr.open_dataset(self.path, *args, **kwargs)
+
+        if len(ds.data_vars) == 1:
+            name = list(ds.data_vars)[0]
+            da = ds[name]
+            da.name = name
+            return da
+        else:
+            return ds
+
+    @property
+    def fn(self):
+        return self.path
+
+class TransformedMapPrediction(luigi.Task):
     model_path = luigi.Parameter()
     image_path = luigi.Parameter()
     src_data_path = luigi.Parameter(default=None)
     step_size = luigi.IntParameter(default=10)
     n_clusters = luigi.IntParameter(default=4)
+    transform_type = luigi.Parameter(default='tsne')
 
     def requires(self):
+        assert self.transform_type in ["kmeans", "pca"]
         return CreateSingleImagePredictionMapData(
             model_path=self.model_path,
             image_path=self.image_path,
@@ -171,8 +200,49 @@ class AnnotationMapImage(luigi.Task):
     def run(self):
         img = mpimg.imread(self.image_path)
         da_emb = xr.open_dataarray(self.input().fn)
-        fn_transform = sklearn.cluster.KMeans(n_clusters=self.n_clusters).fit_predict
-        da_cluster = _apply_transform(da=da_emb, fn=fn_transform)
+        if self.transform_type == 'kmeans':
+            fn_transform = sklearn.cluster.KMeans(n_clusters=self.n_clusters).fit_predict
+        elif self.transform_type == 'pca':
+            fn_transform = sklearn.decomposition.PCA(n_components=self.n_clusters).fit_transform
+        else:
+            raise NotImplementedError(self.transform_type)
+        da_cluster = _apply_transform(da=da_emb, fn=fn_transform,
+            transform_name=self.transform_type
+        )
+
+        da_cluster.to_netcdf(self.output().fn)
+
+    def output(self):
+        image_fullpath = Path(self.image_path)
+        image_path, image_fn = image_fullpath.parent, image_fullpath.name
+
+        fn_out = image_fn.replace('.png', 
+            '.embedding_map.{}_step.{}_transform.{}_clusters.nc'.format(
+                self.step_size, self.transform_type, self.n_clusters
+                )
+            )
+        return XArrayTarget(str(image_path/fn_out))
+
+class AnnotationMapImage(luigi.Task):
+    model_path = luigi.Parameter()
+    image_path = luigi.Parameter()
+    src_data_path = luigi.Parameter(default=None)
+    step_size = luigi.IntParameter(default=10)
+    n_clusters = luigi.IntParameter(default=4)
+    transform_type = luigi.Parameter(default='tsne')
+
+    def requires(self):
+        return TransformedMapPrediction(
+            model_path=self.model_path,
+            image_path=self.image_path,
+            src_data_path=self.src_data_path,
+            step_size=self.step_size,
+            n_clusters=self.n_clusters,
+            transform_type=self.transform_type
+        )
+
+    def run(self):
+        da_cluster = self.input().open()
         fig = _annotation_plot(img, da_cluster)
         plt.savefig(self.output().fn)
 
@@ -181,8 +251,8 @@ class AnnotationMapImage(luigi.Task):
         image_path, image_fn = image_fullpath.parent, image_fullpath.name
 
         fn_out = image_fn.replace('.png', 
-            '.embedding_map.{}_step.{}_clusters.png'.format(
-                self.step_size, self.n_clusters
+            '.embedding_map.{}_step.{}_transform.{}_clusters.png'.format(
+                self.step_size, self.transform_type, self.n_clusters
                 )
             )
         return luigi.LocalTarget(fn_out)
