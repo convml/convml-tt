@@ -42,9 +42,8 @@ class XArrayTarget(luigi.target.FileSystemTarget):
         return self.path
 
 class MakeRectRGBDataArray(luigi.Task):
-    source_data_path = luigi.Parameter()
     dataset_path = luigi.Parameter()
-    scene_num = luigi.IntParameter()
+    scene_path = luigi.Parameter()
 
     def _get_dataset(self):
         return FixedTimeRangeSatelliteTripletDataset.load(self.dataset_path)
@@ -55,24 +54,12 @@ class MakeRectRGBDataArray(luigi.Task):
             raise Exception("Please define a `rectpred` setup in your"
                             " meta.yaml file")
 
-        source_data_path = Path(self.source_data_path).expanduser()
-        scenes_source_fns = dataset.fetch_source_data(
-            source_data_path=source_data_path
-        )
-
-        source_fns = scenes_source_fns[self.scene_num]
-        source_fns = [
-            str(self.source_data_path/sat_pipeline.SOURCE_DIR/fn) for fn in source_fns
-        ]
-        t = sat_pipeline.CreateRGBScene(
-            source_fns=source_fns, domain_bbox=dataset.domain_bbox,
-            data_path=self.source_data_path,
-        )
-        return t
+        return dataset.fetch_source_data()
 
     def run(self):
+        da_scene = xr.open_dataarray(self.scene_path)
+
         dataset = self._get_dataset()
-        da_scene = self.input().open()
         domain_rect = tiler.RectTile(dataset.extra['rectpred']['domain'])
         da_rect = domain_rect.resample(
             da=da_scene,
@@ -85,7 +72,7 @@ class MakeRectRGBDataArray(luigi.Task):
         da_rect.to_netcdf(self.output().fn)
 
     def output(self):
-        da_scene = self.input().open()
+        da_scene = xr.open_dataarray(self.scene_path)
         t = dateutil.parser.parse(da_scene.start_time)
         fn = FILE_FORMAT.format(
             platform_name="CONV-ORG",
@@ -100,14 +87,13 @@ class MakeRectRGBDataArray(luigi.Task):
         return XArrayTarget(str(p_out))
 
 class MakeRectRGBImage(luigi.Task):
-    source_data_path = luigi.Parameter()
     dataset_path = luigi.Parameter()
-    scene_num = luigi.IntParameter()
+    scene_path = luigi.Parameter()
     dx = luigi.FloatParameter(default=200.0e3/256)
 
     def requires(self):
         return MakeRectRGBDataArray(
-            source_data_path=self.source_data_path,
+            scene_path=self.scene_path,
             dataset_path=self.dataset_path,
             scene_num=self.scene_num,
             dx=self.dx
@@ -121,10 +107,10 @@ class MakeRectRGBImage(luigi.Task):
         img.save(str(self.output().fn))
 
     def output(self):
-        if not self.input().exists():
-            return luigi.LocalTarget('fakefile.png')
+        if not Path(self.scene_path).exists():
+            return None
 
-        da_scene = self.input().open()
+        da_scene = xr.open_dataarray(self.scene_path)
         t = dateutil.parser.parse(da_scene.start_time)
         fn = FILE_FORMAT.format(
             platform_name="CONV-ORG",
@@ -137,6 +123,47 @@ class MakeRectRGBImage(luigi.Task):
 
         p_out = Path(t.strftime(PATH_FORMAT))/fn
         return luigi.LocalTarget(str(p_out))
+
+class MakeAllRectRGBDataArrays(luigi.Task):
+    dataset_path = luigi.Parameter()
+    output_type = luigi.Parameter(default='image')
+
+    def _get_dataset(self):
+        return FixedTimeRangeSatelliteTripletDataset.load(self.dataset_path)
+
+    def requires(self):
+        dataset = self._get_dataset()
+        if not 'rectpred' in dataset.extra:
+            raise Exception("Please define a `rectpred` setup in your"
+                            " meta.yaml file")
+
+        return dataset.fetch_source_data()
+
+    def run(self):
+        dataset = self._get_dataset()
+        scene_source_fns = self.input().read()
+
+        if self.output_type == 'image':
+            TaskClass = MakeRectRGBImage
+        elif self.output_type == 'array':
+            TaskClass = MakeRectRGBDataArray
+        else:
+            raise NotImplementedError(self.output_type)
+
+        for source_fns in scene_source_fns:
+            # first we need to create RGB scene file, this will be in the
+            # original resolution of the input
+            t_scene = yield sat_pipeline.CreateRGBScene(
+                source_fns=source_fns,
+                domain_bbox=dataset.domain_bbox,
+                data_path=self.dataset_path
+            )
+
+            # and then we created the resampled image (or just the source array)
+            yield TaskClass(
+                dataset_path=self.dataset_path,
+                scene_path=t_scene.output().fn
+            )
 
 def _plot_scene(da_scene, dataset):
     fig, ax = plt.subplots(subplot_kw=dict(projection=da_scene.crs), figsize=(12,6))

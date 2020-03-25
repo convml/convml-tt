@@ -46,14 +46,24 @@ class FixedTimeRangeSatelliteTripletDataset(SatelliteTripletDataset):
         return self.data_path/self.name
 
     def _get_dataset_train_study_split(self):
-        t = pipeline.StudyTrainSplit(
+        return pipeline.StudyTrainSplit(
                 dt_max=self._dt_max,
                 channels=[1,2,3],
                 times=self._times,
                 data_path=self.data_path
-            )
+        )
+
+    def get_num_scenes(self, for_training=True):
+        t = self._get_dataset_train_study_split()
         _ensure_task_run(t)
-        return t.output().read()
+        datasets_filenames_split = t.output().read()
+
+        if for_training:
+            datasets_filenames = datasets_filenames_split['train']
+        else:
+            datasets_filenames = datasets_filenames_split['study']
+
+        return len(datasets_filenames)
 
     def get_scene(self, scene_num, for_training=True):
         datasets_filenames_split = self._get_dataset_train_study_split()
@@ -62,23 +72,19 @@ class FixedTimeRangeSatelliteTripletDataset(SatelliteTripletDataset):
         else:
             datasets_filenames = datasets_filenames_split['study']
 
-        t = pipeline.CreateRGBScene(
+        return pipeline.CreateRGBScene(
             source_fns=datasets_filenames[scene_num],
             domain_bbox=self.domain_bbox,
             data_path=self.data_path,
         )
-        _ensure_task_run(t)
-        return t.output().open()
 
     def fetch_source_data(self):
-        t = pipeline.GOES16Fetch(
+        return pipeline.GOES16Fetch(
                 dt_max=self._dt_max,
                 channels=[1,2,3],
                 times=self._times,
                 data_path=self.data_path
             )
-        _ensure_task_run(t)
-        return t.output().read()
 
     def generate(self):
         datasets_filenames_split = self._get_dataset_train_study_split()
