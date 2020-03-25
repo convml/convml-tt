@@ -161,12 +161,15 @@ class MakeAllRectRGBDataArrays(luigi.Task):
 
         scene_outputs = yield scene_tasks
 
+        image_tasks = []
         for t_output in scene_outputs:
             # and then we create the resampled image (or just the source array)
-            yield TaskClass(
+            t = TaskClass(
                 dataset_path=self.dataset_path,
                 scene_path=t_output.fn
             )
+            image_tasks.append(t)
+        yield image_tasks
 
 def _plot_scene(da_scene, dataset):
     fig, ax = plt.subplots(subplot_kw=dict(projection=da_scene.crs), figsize=(12,6))
