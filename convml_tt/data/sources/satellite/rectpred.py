@@ -1,6 +1,7 @@
 # coding: utf-8
 from . import tiler, FixedTimeRangeSatelliteTripletDataset
 from . import satpy_rgb, pipeline as sat_pipeline
+from ....pipeline import XArrayTarget, YAMLTarget
 
 from pathlib import Path
 import dateutil
@@ -17,29 +18,6 @@ TIME_FORMAT = "%H%M%S"
 
 PATH_FORMAT = "%Y/%Y_%m_%d"
 
-
-class XArrayTarget(luigi.target.FileSystemTarget):
-    fs = luigi.local_target.LocalFileSystem()
-
-    def __init__(self, path, *args, **kwargs):
-        super(XArrayTarget, self).__init__(path, *args, **kwargs)
-        self.path = path
-
-    def open(self, *args, **kwargs):
-        # ds = xr.open_dataset(self.path, engine='h5netcdf', *args, **kwargs)
-        ds = xr.open_dataset(self.path, *args, **kwargs)
-
-        if len(ds.data_vars) == 1:
-            name = list(ds.data_vars)[0]
-            da = ds[name]
-            da.name = name
-            return da
-        else:
-            return ds
-
-    @property
-    def fn(self):
-        return self.path
 
 class MakeRectRGBDataArray(luigi.Task):
     dataset_path = luigi.Parameter()
@@ -124,7 +102,6 @@ class MakeRectRGBImage(luigi.Task):
 
 class MakeAllRectRGBDataArrays(luigi.Task):
     dataset_path = luigi.Parameter()
-    output_type = luigi.Parameter(default='image')
 
     def _get_dataset(self):
         return FixedTimeRangeSatelliteTripletDataset.load(self.dataset_path)
@@ -141,13 +118,6 @@ class MakeAllRectRGBDataArrays(luigi.Task):
         dataset = self._get_dataset()
         scene_source_fns = self.input().read()
 
-        if self.output_type == 'image':
-            TaskClass = MakeRectRGBImage
-        elif self.output_type == 'array':
-            TaskClass = MakeRectRGBDataArray
-        else:
-            raise NotImplementedError(self.output_type)
-
         scene_tasks = []
         for source_fns in scene_source_fns:
             # first we need to create RGB scene file, this will be in the
@@ -158,18 +128,28 @@ class MakeAllRectRGBDataArrays(luigi.Task):
                 data_path=self.dataset_path
             )
             scene_tasks.append(t_scene)
-
         scene_outputs = yield scene_tasks
 
         image_tasks = []
         for t_output in scene_outputs:
             # and then we create the resampled image (or just the source array)
-            t = TaskClass(
+            t = MakeRectRGBImage(
                 dataset_path=self.dataset_path,
                 scene_path=t_output.fn
             )
             image_tasks.append(t)
-        yield image_tasks
+        image_outputs = yield image_tasks
+
+        self.output().write([
+            [scene_output.fn, image_output.fn]
+            for (scene_output, image_output)
+            in zip(scene_outputs, image_outputs)
+        ])
+
+    def output(self):
+        fn = "all_scenes.yaml"
+        p = Path(self.dataset_path)/"composites"/fn
+        return YAMLTarget(str(p))
 
 def _plot_scene(da_scene, dataset):
     fig, ax = plt.subplots(subplot_kw=dict(projection=da_scene.crs), figsize=(12,6))

@@ -2,23 +2,14 @@ from pathlib import Path
 
 import satdata
 import luigi
-import yaml
 import dateutil.parser
 import xarray as xr
 import numpy as np
 
 from . import processing, satpy_rgb, tiler, bbox
+from ....pipeline import YAMLTarget
 
 SOURCE_DIR = Path("source_data")/"goes16"
-
-class YAMLTarget(luigi.LocalTarget):
-    def write(self, obj):
-        with self.open('w') as fh:
-            yaml.dump(obj, fh)
-
-    def read(self):
-        with self.open() as fh:
-            return yaml.load(fh)
 
 class DatetimeListParameter(luigi.Parameter):
     def parse(self, x):

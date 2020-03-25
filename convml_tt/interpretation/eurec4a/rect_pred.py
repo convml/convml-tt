@@ -14,6 +14,9 @@ from fastai.vision import open_image
 from convml_tt.architectures.triplet_trainer import monkey_patch_fastai
 monkey_patch_fastai()
 
+from convml_tt.data.sources.satellite.rectpred import MakeAllRectRGBDataArrays
+
+
 
 def crop_fastai_im(img, i, j, nx=256, ny=256):
     img_copy = img.__class__(img._px[:,j:j+ny,i:i+nx])
@@ -98,6 +101,52 @@ class CreateSingleImagePredictionMapData(luigi.Task):
 
         fn_out = image_fn.replace('.png', '.embeddings.{}_step.nc'.format(self.step_size))
         return XArrayTarget(str(image_path/fn_out))
+
+class CreateAllPredictionMapsData(luigi.Task):
+    dataset_path = luigi.Parameter()
+    model_path = luigi.Parameter()
+    step_size = luigi.Parameter()
+
+    def _get_dataset(self):
+        return FixedTimeRangeSatelliteTripletDataset.load(self.dataset_path)
+
+    def requires(self):
+        return MakeAllRectRGBDataArrays(
+            dataset_path=self.dataset_path,
+        )
+
+    def run(self):
+        filenames_all_scenes = self.input().read()
+
+        prediction_tasks = []
+        for (scene_da_fn, scene_image_fn) in filenames_all_scenes:
+            t = CreateSingleImagePredictionMapData(
+                model_path=self.model_path,
+                image_path=scene_image_fn,
+                src_data_path=scene_da_fn,
+                step_size=self.step_size
+            )
+            prediction_tasks.append(t)
+
+        prediction_outputs = yield prediction_tasks
+
+        das = []
+        for output in prediction_outputs:
+            da = output.open()
+            da['fn'] = str(output.fn)
+            das.append(da)
+
+        da_all = xr.concat(das, dim='fn')
+        da_all.name = 'emb'
+        Path(self.output().fn).parent.mkdir(exist_ok=True, parents=True)
+        da_all.to_netcdf(self.output().fn)
+
+    def output(self):
+        model_name = Path(self.model_path).name.replace('.pkl', '')
+        fn = "all_embeddings.{}_step..nc".format(self.step_size)
+        p = Path("output")/"rectpred"/model_name/fn
+        return XArrayTarget(str(p))
+
 
 def _annotation_plot(img, da_):
     img_kws = {}
