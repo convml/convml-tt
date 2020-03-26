@@ -62,7 +62,7 @@ class MakeRectRGBDataArray(luigi.Task):
             ext='nc'
         )
 
-        p_out = Path(t.strftime(PATH_FORMAT))/fn
+        p_out = Path(self.dataset_path)/"composites"/"rect"/t.strftime(PATH_FORMAT)/fn
         return XArrayTarget(str(p_out))
 
 class MakeRectRGBImage(luigi.Task):
