@@ -167,19 +167,29 @@ class EmbeddingTransform(luigi.Task):
 
     def run(self):
         da_emb = xr.open_dataarray(self.input_path)
+
+        add_meta = None
         if self.transform_type == 'kmeans':
             fn_transform = sklearn.cluster.KMeans(n_clusters=self.n_clusters).fit_predict
-        elif self.transform_type == 'pca':
-            fn_transform = sklearn.decomposition.PCA(n_components=self.n_clusters).fit_transform
-        elif self.transform_type == 'pca_clipped':
-            fn_transform = sklearn.decomposition.PCA(n_components=self.n_clusters).fit_transform
-            da_emb = da_emb.isel(x=slice(1, -1), y=slice(1, -1))
+        elif self.transform_type in ['pca', 'pca_clipped']:
+            model = sklearn.decomposition.PCA(n_components=self.n_clusters)
+            fn_transform = model.fit_transform
+            def add_meta(da):
+                da['explained_variance'] = (
+                    '{}_dim'.format(self.transform_type),
+                    model.explained_variance_ratio_
+                )
+            if self.transform_type == 'pca_clipped':
+                da_emb = da_emb.isel(x=slice(1, -1), y=slice(1, -1))
         else:
             raise NotImplementedError(self.transform_type)
 
         da_cluster = _apply_transform(da=da_emb, fn=fn_transform,
             transform_name=self.transform_type
         )
+
+        if add_meta is not None:
+            add_meta(da_cluster)
 
         da_cluster.to_netcdf(self.output().fn)
 
@@ -240,7 +250,7 @@ def _annotation_plot(img, da_):
     return fig
 
 def _apply_transform(da, fn, transform_name):
-    # stack all other dims apparent from the `emb_dim`
+    # stack all other dims apart from the `emb_dim`
     dims = list(da.dims)
     dims.remove('emb_dim')
     da_stacked = da.stack(dict(n=dims))
