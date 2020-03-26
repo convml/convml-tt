@@ -171,8 +171,12 @@ class EmbeddingTransform(luigi.Task):
             fn_transform = sklearn.cluster.KMeans(n_clusters=self.n_clusters).fit_predict
         elif self.transform_type == 'pca':
             fn_transform = sklearn.decomposition.PCA(n_components=self.n_clusters).fit_transform
+        elif self.transform_type == 'pca_clipped':
+            fn_transform = sklearn.decomposition.PCA(n_components=self.n_clusters).fit_transform
+            da_emb = da_emb.isel(x=slice(1, -1), y=slice(1, -1))
         else:
             raise NotImplementedError(self.transform_type)
+
         da_cluster = _apply_transform(da=da_emb, fn=fn_transform,
             transform_name=self.transform_type
         )
