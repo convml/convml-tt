@@ -12,5 +12,5 @@ if __name__ == "__main__":
 
     args = argparser.parse_args()
 
-    dataset = TripletDataset.load(args.path)
+    dataset = TripletDataset.load(args.dataset_path)
     dataset.fetch_source_data()
