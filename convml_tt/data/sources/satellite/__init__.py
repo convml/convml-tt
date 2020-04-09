@@ -4,6 +4,8 @@ from matplotlib.lines import Line2D
 import cartopy.crs as ccrs
 import satdata
 import luigi
+import xarray as xr
+import numpy as np
 
 from ...dataset import TripletDataset
 from . import processing, pipeline
@@ -141,6 +143,27 @@ class FixedTimeRangeSatelliteTripletDataset(SatelliteTripletDataset):
     def get_domain(self):
         return LatLonBox(self.domain_bbox)
 
+    def _plot_scene_outline(self, ax, scene_num=0, color='orange'):
+        da_scene = None
+        task_scene = self.get_scene(scene_num=scene_num)
+        if task_scene.output().exists():
+            da_scene = task_scene.output().open()  # noqa
+
+        x_all, y_all = xr.broadcast(da_scene.x, da_scene.y)
+
+        def border_elems(a, W):
+            n1 = a.shape[0]
+            r1 = np.minimum(np.arange(n1)[::-1], np.arange(n1))
+            n2 = a.shape[1]
+            r2 = np.minimum(np.arange(n2)[::-1], np.arange(n2))
+            return a[np.minimum(r1[:, None], r2) < W]
+
+        x_edge = border_elems(x_all.values, 1).flatten()
+        y_edge = border_elems(y_all.values, 1).flatten()
+
+        return ax.scatter(x_edge, y_edge, transform=da_scene.crs, s=1,
+                          color=color, label='source data')
+
     def plot_domain(self, ax, **kwargs):
         try:
             ax.gridlines(linestyle='--', draw_labels=True)
@@ -171,6 +194,12 @@ class FixedTimeRangeSatelliteTripletDataset(SatelliteTripletDataset):
             bbox_shape = domain_rect.get_outline_shape()
             draw_box(bbox_shape, color='green', face_alpha=0.2,
                      label="rect domain")
+
+        try:
+            s = self._plot_scene_outline(ax=ax)
+            lines.append(s)
+        except self.SourceDataNotDownloaded:
+            pass
 
         # [x0, x1, y0, y1]
         ax.set_extent(domain_bbox.get_extent(pad=0.8), crs=ccrs.PlateCarree())
