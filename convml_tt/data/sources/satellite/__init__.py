@@ -40,6 +40,14 @@ class FixedTimeRangeSatelliteTripletDataset(SatelliteTripletDataset):
 
     def __init__(self, t_start, N_days, N_hours_from_zenith,
                  **kwargs):
+        if 'domain_bbox' not in kwargs and 'domain' in kwargs:
+            domain_rect = RectTile(**kwargs['domain'])
+            domain_bounds = domain_rect.get_bounds()
+            kwargs['domain_bbox'] = [
+                [domain_bounds[:,0].min(), domain_bounds[:,1].min()], # noqa
+                [domain_bounds[:,0].max(), domain_bounds[:,1].max()], # noqa
+            ]
+            kwargs['extra']['rectpred']['domain'] = kwargs.pop('domain')
         super().__init__(**kwargs)
         self.t_start = t_start
         self.N_days = N_days
