@@ -87,10 +87,12 @@ class FixedTimeRangeSatelliteTripletDataset(SatelliteTripletDataset):
             )
 
     def generate(self):
-        datasets_filenames_split = self._get_dataset_train_study_split()
+        t = self._get_dataset_train_study_split()
+        luigi.build([t], local_worker=True)
+        datasets_filenames_split = t.output().read()
 
-        local_storage_dir = source_data_path/"source_data"/"goes16"
-        path_composites = source_data_path/"composites"
+        local_storage_dir = self.data_path/"source_data"/"goes16"
+        path_composites = self.data_path/"composites"
 
         for identifier, datasets_filenames in datasets_filenames_split.items():
             print("Creating tiles for `{}`".format(identifier))
