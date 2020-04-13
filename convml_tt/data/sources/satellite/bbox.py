@@ -6,17 +6,31 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 class LatLonBox():
-    def __init__(self, extent):
+    def __init__(self, bounds):
         """
-        extent: [(lon_min, lat_min), (lon_max, lat_max)]
+        bounds: [(lon_min, lat_min), (lon_max, lat_max)]
         """
-        self.extent = extent
+        self.bounds = bounds
+
+    def get_extent(self, pad=0):
+        """
+        Return extent compatible with matplotlib.imshow
+        [x0 ,x1, y0, y1]
+        """
+        if pad > 1:
+            x_pad = y_pad = pad
+        elif pad != 0:
+            x_pad = pad*(self.bounds[1][0] - self.bounds[0][0])
+            y_pad = pad*(self.bounds[1][1] - self.bounds[0][1])
+
+        return [self.bounds[0][0]-x_pad, self.bounds[1][0]+x_pad,
+                self.bounds[0][1]-y_pad, self.bounds[1][1]+y_pad]
 
     def get_bounds(self):
         """
-        From the extent compute the four corners of the bounding box
+        From the bounds compute the four corners of the bounding box
         """
-        corners = list(itertools.product(*np.array(self.extent).T))
+        corners = list(itertools.product(*np.array(self.bounds).T))
         corners.insert(0, corners.pop(2))
 
         return corners

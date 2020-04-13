@@ -54,7 +54,10 @@ class GOES16Fetch(luigi.Task):
         reqs = {}
         for c in self.channels:
             reqs[c] = [
-                GOES16Query(dt_max=self.dt_max, channel=c, time=t)
+                GOES16Query(
+                    dt_max=self.dt_max, channel=c, time=t,
+                    data_path=self.data_path
+                )
                 for t in self.times
             ]
         return reqs

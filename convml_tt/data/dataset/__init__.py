@@ -60,3 +60,6 @@ class TripletDataset:
 
     def generate(self):
         raise NotImplementedError
+
+    def plot_domain(self, ax, **kwargs):
+        raise NotImplementedError
