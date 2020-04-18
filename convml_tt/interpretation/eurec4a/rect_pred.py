@@ -6,6 +6,7 @@ import xarray as xr
 import matplotlib.pyplot as plt
 import seaborn as sns
 import sklearn.cluster
+import matplotlib.image as mpimg
 
 from fastai.basic_train import load_learner
 from fastai.vision import open_image
@@ -197,10 +198,15 @@ class EmbeddingTransform(luigi.Task):
             da=da_emb, fn=fn_transform, transform_name=self.transform_type
         )
 
+        da_cluster.attrs.update(da_emb.attrs)
+
         if add_meta is not None:
             add_meta(da_cluster)
 
         da_cluster.attrs.update(da_emb.attrs)
+        da_cluster.name = 'emb'
+        da_cluster['i0'] = da_emb.i0
+        da_cluster['j0'] = da_emb.j0
 
         da_cluster.to_netcdf(self.output().fn)
 
@@ -214,6 +220,23 @@ class EmbeddingTransform(luigi.Task):
             )
         )
         return XArrayTarget(str(src_path/fn_out))
+
+class CreateAllPredictionMapsDataTransformed(EmbeddingTransform):
+    dataset_path = luigi.Parameter()
+    model_path = luigi.Parameter()
+    step_size = luigi.Parameter()
+
+    def requires(self):
+        return CreateAllPredictionMapsData(
+            dataset_path=self.dataset_path,
+            model_path=self.model_path,
+            step_size=self.step_size
+        )
+
+    @property
+    def input_path(self):
+        return self.input().fn
+
 
 def _annotation_plot(img, da_):
     img_kws = {}
@@ -298,92 +321,208 @@ class XArrayTarget(luigi.target.FileSystemTarget):
     def fn(self):
         return self.path
 
-class TransformedMapPrediction(luigi.Task):
-    model_path = luigi.Parameter()
-    image_path = luigi.Parameter()
-    src_data_path = luigi.Parameter(default=None)
-    step_size = luigi.IntParameter(default=10)
-    n_clusters = luigi.IntParameter(default=4)
-    transform_type = luigi.Parameter(default='tsne')
+def _get_img_with_extent(da_emb, data_path):
+    """
+    Using the `src` attribute on the the `da` data array load up the image
+    that the rectpred arrays was made from, clip the image and return the
+    image extent (xy-extent if the source data coordinates are available)
+    """
+    src_fn = str(da_emb.src.item())
 
-    def requires(self):
-        assert self.transform_type in ["kmeans", "pca"]
-        return CreateSingleImagePredictionMapData(
-            model_path=self.model_path,
-            image_path=self.image_path,
-            src_data_path=self.src_data_path,
-            step_size=self.step_size
-        )
+    if src_fn.endswith('.nc'):
+        src_fn = src_fn.replace('.nc', '.png')
 
-    def run(self):
-        da_emb = xr.open_dataarray(self.input().fn)
-        if self.transform_type == 'kmeans':
-            fn_transform = sklearn.cluster.KMeans(
-                n_clusters=self.n_clusters
-            ).fit_predict
-        elif self.transform_type == 'pca':
-            fn_transform = sklearn.decomposition.PCA(
-                n_components=self.n_clusters
-            ).fit_transform
+    img_fn = str(data_path/src_fn)
+    img = mpimg.imread(img_fn)
+
+    i_ = da_emb.i0.values
+    # NB: j-values might be decreasing in number if we're using a
+    # y-coordinate with increasing values from bottom left, so we
+    # sort first
+    j_ = np.sort(da_emb.j0.values)
+
+    def get_spacing(v):
+        dv_all = np.diff(v)
+        assert np.all(dv_all[0] == dv_all)
+        return dv_all[0]
+
+    i_step = get_spacing(i_)
+    j_step = get_spacing(j_)
+
+    ilim = (i_.min()-i_step//2, i_.max()+i_step//2)
+    jlim = (j_.min()-j_step//2, j_.max()+j_step//2)
+
+    img = img[slice(*jlim),slice(*ilim)]
+
+    if 'x' in da_emb.coords and 'y' in da_emb.coords:
+        # get x,y and indexing (i,j) extent from data array so
+        # so we can clip and plot the image correctly
+        x_min = da_emb.x.min()
+        y_min = da_emb.y.min()
+        x_max = da_emb.x.max()
+        y_max = da_emb.y.max()
+
+        dx = get_spacing(da_emb.x.values)
+        dy = get_spacing(da_emb.y.values)
+        xlim = (x_min-dx//2, x_max+dx//2)
+        ylim = (y_min-dy//2, y_max+dy//2)
+
+        extent = [*xlim, *ylim]
+
+    return img, extent
+
+def _make_rgb(da, dims, alpha=0.5):
+    def scale_zero_one(v):
+        return (v-v.min())/(v.max() - v.min())
+    scale = scale_zero_one
+
+    d0, d1, d2 = da.dims
+    assert d1 == 'x' and d2 == 'y'
+
+    da_rgba = xr.DataArray(
+        np.zeros((4, len(da.x), len(da.y))),
+        dims=('rgba', 'x', 'y'),
+        coords=dict(rgba=np.arange(4), x=da.x, y=da.y)
+    )
+
+    def _make_component(da_):
+        if da_.rgba == 3:
+            return alpha*np.ones_like(da_)
         else:
-            raise NotImplementedError(self.transform_type)
-        da_cluster = _apply_transform(
-            da=da_emb, fn=fn_transform, transform_name=self.transform_type
-        )
+            return scale(da.sel({d0: dims[da_.rgba.item()]}).values)
 
-        da_cluster.to_netcdf(self.output().fn)
+    da_rgba = da_rgba.groupby('rgba').apply(_make_component)
 
-    def output(self):
-        image_fullpath = Path(self.image_path)
-        image_path, image_fn = image_fullpath.parent, image_fullpath.name
-
-        fn_out = image_fn.replace(
-            '.png',
-            '.embedding_map.{}_step.{}_transform.{}_clusters.nc'.format(
-                self.step_size, self.transform_type, self.n_clusters
-            )
-        )
-        return XArrayTarget(str(image_path/fn_out))
+    return da_rgba
 
 
-class AnnotationMapImage(luigi.Task):
-    model_path = luigi.Parameter()
-    image_path = luigi.Parameter()
-    src_data_path = luigi.Parameter(default=None)
-    step_size = luigi.IntParameter(default=10)
-    n_clusters = luigi.IntParameter(default=4)
-    transform_type = luigi.Parameter(default='tsne')
-
-    def requires(self):
-        return TransformedMapPrediction(
-            model_path=self.model_path,
-            image_path=self.image_path,
-            src_data_path=self.src_data_path,
-            step_size=self.step_size,
-            n_clusters=self.n_clusters,
-            transform_type=self.transform_type
-        )
+class RGBAnnotationMapImage(luigi.Task):
+    input_path = luigi.Parameter()
+    src_index = luigi.IntParameter()
+    rgb_components = luigi.ListParameter(default=[0,1,2])
+    src_data_path = luigi.Parameter()
 
     def run(self):
-        da_cluster = self.input().open()
-        fig = _annotation_plot(img, da_cluster)  # noqa
+        da_emb = xr.open_dataarray(self.input_path).isel(src=self.src_index)
+
+        # ensure non-xy dim is first
+        d_not_xy = next(filter(lambda d: d not in ['x', 'y'], da_emb.dims))
+        da_emb = da_emb.transpose(d_not_xy, 'x', 'y')
+
+        import ipdb
+        with ipdb.launch_ipdb_on_exception():
+            da_rgba = _make_rgb(da=da_emb, dims=self.rgb_components, alpha=0.5)
+
+        fig, axes = plt.subplots(figsize=(10, 4*3), nrows=3,
+                                 subplot_kw=dict(aspect=1), sharex=True)
+
+        img, img_extent = _get_img_with_extent(
+            da_emb, Path(self.src_data_path)
+        )
+
+        ax = axes[0]
+        ax.imshow(img, extent=img_extent)
+
+        ax = axes[1]
+        ax.imshow(img, extent=img_extent)
+        da_rgba.plot.imshow(ax=ax, rgb='rgba', y='y')
+
+        ax = axes[2]
+        da_rgba[3] = 1.0
+        da_rgba.plot.imshow(ax=ax, rgb='rgba', y='y')
+
         plt.savefig(self.output().fn)
 
     def output(self):
-        image_fullpath = Path(self.image_path)
-        _, image_fn = image_fullpath.parent, image_fullpath.name
+        image_fullpath = Path(self.input_path)
+        src_path, src_fn = image_fullpath.parent, image_fullpath.name
 
-        fn_out = image_fn.replace(
-            '.png',
-            '.embedding_map.{}_step.{}_transform.{}_clusters.png'.format(
-                self.step_size, self.transform_type, self.n_clusters
+        fn_out = src_fn.replace(
+            '.nc',
+            '.src_{}.rgb_map.{}__comp.png'.format(
+                self.src_index, "_".join([str(v) for v in self.rgb_components])
             )
         )
-        return luigi.LocalTarget(fn_out)
+
+        p = Path(src_path)/fn_out
+
+        return luigi.LocalTarget(str(p))
 
 
-class CreatePredictionMap(luigi.Task):
-    source_data_path = luigi.Parameter()
+class DatasetRGBAnnotationMapImage(RGBAnnotationMapImage):
     dataset_path = luigi.Parameter()
-    scene_num = luigi.IntParameter()
-    dx = luigi.FloatParameter(default=200.0e3/256)
+    model_path = luigi.Parameter()
+    step_size = luigi.Parameter()
+    transform_type = luigi.Parameter(default=None)
+    rgb_components = luigi.Parameter(default=[0,1,2])
+
+    src_index = luigi.IntParameter()
+
+    def requires(self):
+        if self.transform_type is None:
+            return CreateAllPredictionMapsData(
+                dataset_path=self.dataset_path,
+                model_path=self.model_path,
+                step_size=self.step_size
+            )
+        else:
+            return CreateAllPredictionMapsDataTransformed(
+                dataset_path=self.dataset_path,
+                model_path=self.model_path,
+                step_size=self.step_size,
+                transform_type=self.transform_type,
+                n_clusters=max(self.rgb_components)+1,
+            )
+
+    @property
+    def input_path(self):
+        return self.input().fn
+
+    @property
+    def src_data_path(self):
+        return self.dataset_path
+
+
+class AllDatasetRGBAnnotationMapImages(luigi.Task):
+    dataset_path = luigi.Parameter()
+    model_path = luigi.Parameter()
+    step_size = luigi.Parameter()
+    transform_type = luigi.Parameter(default=None)
+    rgb_components = luigi.Parameter(default=[0,1,2])
+
+    def requires(self):
+        if self.transform_type is None:
+            return CreateAllPredictionMapsData(
+                dataset_path=self.dataset_path,
+                model_path=self.model_path,
+                step_size=self.step_size
+            )
+        else:
+            return CreateAllPredictionMapsDataTransformed(
+                dataset_path=self.dataset_path,
+                model_path=self.model_path,
+                step_size=self.step_size,
+                transform_type=self.transform_type,
+                n_clusters=max(self.rgb_components)+1,
+            )
+
+    def _get_runtime_tasks(self):
+        da_emb = self.input().open()
+        return [
+            RGBAnnotationMapImage(
+                input_path=self.input().fn,
+                src_index=i,
+                rgb_components=self.rgb_components,
+                src_data_path=self.dataset_path
+            )
+            for i in range(int(da_emb.src.count()))
+        ]
+
+    def run(self):
+        yield self._get_runtime_tasks()
+
+    def output(self):
+        if not self.input().exists():
+            return luigi.LocalTarget('__fake__file__.nc')
+        else:
+            return [t.output() for t in self._get_runtime_tasks()]
