@@ -61,7 +61,7 @@ def rect_predict(model, img, step=(10, 10)):
         result,
         dims=('i0', 'j0', 'emb_dim'),
         coords=dict(i0=i_, j0=j_),
-        attrs=dict(xstep=step[0], ystep=step[1])
+        attrs=dict(i_step=step[0], j_step=step[1])
     )
 
     return da
@@ -85,8 +85,10 @@ class CreateSingleImagePredictionMapData(luigi.Task):
         if self.src_data_path:
             da_src = xr.open_dataarray(self.src_data_path)
 
-            da_pred['x'] = da_src.x[da_pred.i0 + da_pred.xstep//2]
-            da_pred['y'] = da_src.y[da_pred.j0 + da_pred.ystep//2]
+            da_pred['x'] = da_src.x[da_pred.i0 + da_pred.i_step//2]
+            da_pred['y'] = da_src.y[da_pred.j0 + da_pred.j_step//2]
+            da_pred.attr['dx'] = da_pred.x[da_pred.i_step] - da_src.x[0]
+            da_pred.attr['dy'] = da_pred.y[da_pred.j_step] - da_src.y[0]
 
         da_pred = da_pred.swap_dims(dict(i0='x', j0='y'))
 
@@ -153,7 +155,6 @@ class CreateAllPredictionMapsData(luigi.Task):
         fn = "all_embeddings.{}_step.nc".format(self.step_size)
         p = Path("embeddings")/"rect"/model_name/fn
         return XArrayTarget(str(p))
-
 
 class EmbeddingTransform(luigi.Task):
     input_path = luigi.Parameter()
