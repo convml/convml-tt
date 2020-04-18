@@ -37,7 +37,16 @@ class FakeImagesList(list):
             items.append(item.apply_tfms(tfms, **kwargs))
         return items
 
-def rect_predict(model, img, step=(10, 10)):
+def rect_predict(model, img, step=(10, 10), N=(256, 256)):
+    """
+    Produce moving-window prediction array from `img` with `model` with
+    step-size defined by `step` and tile-size `N`.
+
+    NB: j-indexing is from "top_left" i.e. is likely in the opposite order to
+    what would be expected for y-axis of original image (positive being up)
+
+    i0 and j0 coordinates denote center of each prediction tile
+    """
     ny, nx = img.size
     il = FakeImagesList(None, None)
     i_ = np.arange(0, nx, step[0])
@@ -50,18 +59,15 @@ def rect_predict(model, img, step=(10, 10)):
 
     for n in i_:
         for m in j_:
-            il.append(crop_fastai_im(img, n, m))
+            il.append(crop_fastai_im(img, n, m, nx=N[0], ny=N[1]))
 
     result = np.stack(model.predict(il)[1]).reshape((len(i_), len(j_), -1))
-
-    # for some reason it appears that the y-coordinate gets reversed...
-    result = result[:,::-1]
 
     da = xr.DataArray(
         result,
         dims=('i0', 'j0', 'emb_dim'),
-        coords=dict(i0=i_, j0=j_),
-        attrs=dict(i_step=step[0], j_step=step[1])
+        coords=dict(i0=i_ + step[0]//2, j0=j_ + step[1]//2),
+        attrs=dict(tile_nx=N[0], tile_ny=N[1])
     )
 
     return da
@@ -84,13 +90,12 @@ class CreateSingleImagePredictionMapData(luigi.Task):
 
         if self.src_data_path:
             da_src = xr.open_dataarray(self.src_data_path)
-
-            da_pred['x'] = da_src.x[da_pred.i0 + da_pred.i_step//2]
-            da_pred['y'] = da_src.y[da_pred.j0 + da_pred.j_step//2]
-            da_pred.attr['dx'] = da_pred.x[da_pred.i_step] - da_src.x[0]
-            da_pred.attr['dy'] = da_pred.y[da_pred.j_step] - da_src.y[0]
-
-        da_pred = da_pred.swap_dims(dict(i0='x', j0='y'))
+            da_pred['x'] = ('i0',), da_src.x[da_pred.i0]
+            # OBS: j-indexing is positive "down" (from top-left corner) whereas
+            # y-indexing is positive "up", so we have to reverse y here before
+            # slicing
+            da_pred['y'] = ('j0',), da_src.y[::-1][da_pred.j0]
+            da_pred = da_pred.swap_dims(dict(i0='x', j0='y')).sortby(["x", "y"])
 
         da_pred.attrs['model_path'] = self.model_path
         da_pred.attrs['image_path'] = self.image_path
@@ -138,7 +143,7 @@ class CreateAllPredictionMapsData(luigi.Task):
             if da.src_data_path is not None:
                 src = da.src_data_path
             else:
-                src = da.iamge_path
+                src = da.image_path
             da['src'] = src
             das.append(da)
 
@@ -146,6 +151,11 @@ class CreateAllPredictionMapsData(luigi.Task):
         da_all.name = 'emb'
         da_all.attrs['step_size'] = self.step_size
         da_all.attrs['model_path'] = self.model_path
+
+        # remove attributes that only applies to one source image
+        if 'src_data_path' in da_all.attrs:
+            del(da_all.attrs['src_data_path'])
+        del(da_all.attrs['image_path'])
 
         Path(self.output().fn).parent.mkdir(exist_ok=True, parents=True)
         da_all.to_netcdf(self.output().fn)
@@ -189,6 +199,8 @@ class EmbeddingTransform(luigi.Task):
 
         if add_meta is not None:
             add_meta(da_cluster)
+
+        da_cluster.attrs.update(da_emb.attrs)
 
         da_cluster.to_netcdf(self.output().fn)
 
