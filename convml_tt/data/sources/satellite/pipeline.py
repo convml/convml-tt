@@ -74,8 +74,55 @@ class GOES16Fetch(luigi.Task):
             num_files_per_channel[channel] = len(files)
 
         if len(set(num_files_per_channel.values())) != 1:
-            raise Exception("There are a different number of files for the"
-                            " channels requested")
+            # the source data queries have resulted in a different number of
+            # files being returned for the channels selected, probably because
+            # the channels are not recorded at the same time and so one fell
+            # outside the window
+
+            def get_time(fn):
+                attrs = satdata.Goes16AWS.parse_key(fn, parse_times=True)
+                return attrs['start_time']
+
+            def time_diff(i0, i1, fpc):
+                # fpc: new sliced files_per_channel dictionary where each list
+                # now has the same length
+                channels = list(files_per_channel.keys())
+                c1 = channels[i0]
+                c2 = channels[i1]
+                dt = (
+                    get_time(fpc[c1][0])
+                    - get_time(fpc[c2][0])
+                )
+                return abs(dt.total_seconds())
+
+            def timediff_all(fpc):
+                return sum([
+                    time_diff(i0, i1, fpc)
+                    for (i0, i1) in [(0, 1), (0, 2), (1, 2)]
+                ])
+
+            N_max = max(num_files_per_channel.values())
+
+            fpc1 = {
+                c: len(fns) == N_max and fns[1:] or fns
+                for (c, fns) in files_per_channel.items()
+            }
+
+            fpc2 = {
+                c: len(fns) == N_max and fns[:-1] or fns
+                for (c, fns) in files_per_channel.items()
+            }
+
+            if timediff_all(fpc1) < timediff_all(fpc2):
+                files_per_channel = fpc1
+            else:
+                files_per_channel = fpc2
+
+            # now double-check that we've got the right number of files
+            num_files_per_channel = {}
+            for channel, files in files_per_channel.items():
+                num_files_per_channel[channel] = len(files)
+            assert len(set(num_files_per_channel.values())) == 1
 
         local_storage_dir = Path(self.data_path).expanduser()/SOURCE_DIR
         cli = satdata.Goes16AWS(
