@@ -3,7 +3,6 @@ from pathlib import Path
 import luigi
 import numpy as np
 import xarray as xr
-import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 import seaborn as sns
 import sklearn.cluster
@@ -12,16 +11,14 @@ from fastai.basic_train import load_learner
 from fastai.vision import open_image
 
 from convml_tt.architectures.triplet_trainer import monkey_patch_fastai
-monkey_patch_fastai()
+monkey_patch_fastai() # noqa
 
 from convml_tt.data.sources.satellite.rectpred import MakeAllRectRGBDataArrays
-
 
 
 def crop_fastai_im(img, i, j, nx=256, ny=256):
     img_copy = img.__class__(img._px[:,j:j+ny,i:i+nx])
     # From PIL docs: The crop rectangle, as a (left, upper, right, lower)-tuple.
-    #print(i, 0, nx+i, nx)
     return img_copy
 
 class FakeImagesList(list):
@@ -81,8 +78,8 @@ class CreateSingleImagePredictionMapData(luigi.Task):
         model = load_learner(model_path, model_fn)
         img = open_image(self.image_path)
 
-        da_pred = rect_predict(model=model, img=img,
-            step=(self.step_size, self.step_size)
+        da_pred = rect_predict(
+            model=model, img=img, step=(self.step_size, self.step_size)
         )
 
         if self.src_data_path:
@@ -103,16 +100,14 @@ class CreateSingleImagePredictionMapData(luigi.Task):
         image_fullpath = Path(self.image_path)
         image_path, image_fn = image_fullpath.parent, image_fullpath.name
 
-        fn_out = image_fn.replace('.png', '.embeddings.{}_step.nc'.format(self.step_size))
+        fn_out = image_fn.replace(
+            '.png', '.embeddings.{}_step.nc'.format(self.step_size))
         return XArrayTarget(str(image_path/fn_out))
 
 class CreateAllPredictionMapsData(luigi.Task):
     dataset_path = luigi.Parameter()
     model_path = luigi.Parameter()
     step_size = luigi.Parameter()
-
-    def _get_dataset(self):
-        return FixedTimeRangeSatelliteTripletDataset.load(self.dataset_path)
 
     def requires(self):
         return MakeAllRectRGBDataArrays(
@@ -170,10 +165,13 @@ class EmbeddingTransform(luigi.Task):
 
         add_meta = None
         if self.transform_type == 'kmeans':
-            fn_transform = sklearn.cluster.KMeans(n_clusters=self.n_clusters).fit_predict
+            fn_transform = sklearn.cluster.KMeans(
+                n_clusters=self.n_clusters
+            ).fit_predict
         elif self.transform_type in ['pca', 'pca_clipped']:
             model = sklearn.decomposition.PCA(n_components=self.n_clusters)
             fn_transform = model.fit_transform
+
             def add_meta(da):
                 da['explained_variance'] = (
                     '{}_dim'.format(self.transform_type),
@@ -184,8 +182,8 @@ class EmbeddingTransform(luigi.Task):
         else:
             raise NotImplementedError(self.transform_type)
 
-        da_cluster = _apply_transform(da=da_emb, fn=fn_transform,
-            transform_name=self.transform_type
+        da_cluster = _apply_transform(
+            da=da_emb, fn=fn_transform, transform_name=self.transform_type
         )
 
         if add_meta is not None:
@@ -197,8 +195,8 @@ class EmbeddingTransform(luigi.Task):
         src_fullpath = Path(self.input_path)
         src_path, src_fn = src_fullpath.parent, src_fullpath.name
 
-        fn_out = src_fn.replace('.nc',
-            '.{}_transform.{}_clusters.nc'.format(
+        fn_out = src_fn.replace(
+            '.nc', '.{}_transform.{}_clusters.nc'.format(
                 self.transform_type, self.n_clusters
             )
         )
@@ -219,13 +217,12 @@ def _annotation_plot(img, da_):
     ny, nx, _ = img.shape
     r = nx//ny
 
-
     sp_inches = 3
-    fig, axes = plt.subplots(figsize=(r*sp_inches*2, sp_inches*2.4), nrows=2, ncols=2, )
+    fig, axes = plt.subplots(figsize=(r*sp_inches*2, sp_inches*2.4),
+                             nrows=2, ncols=2,)
 
     ax = axes[1,0]
     ax.imshow(img, **img_kws)
-    c_pl = da_.plot(ax=ax, alpha=0.5, **aug_kws)
 
     ax = axes[0,1]
     if np.issubdtype(da_.dtype, np.integer):
@@ -306,16 +303,19 @@ class TransformedMapPrediction(luigi.Task):
         )
 
     def run(self):
-        img = mpimg.imread(self.image_path)
         da_emb = xr.open_dataarray(self.input().fn)
         if self.transform_type == 'kmeans':
-            fn_transform = sklearn.cluster.KMeans(n_clusters=self.n_clusters).fit_predict
+            fn_transform = sklearn.cluster.KMeans(
+                n_clusters=self.n_clusters
+            ).fit_predict
         elif self.transform_type == 'pca':
-            fn_transform = sklearn.decomposition.PCA(n_components=self.n_clusters).fit_transform
+            fn_transform = sklearn.decomposition.PCA(
+                n_components=self.n_clusters
+            ).fit_transform
         else:
             raise NotImplementedError(self.transform_type)
-        da_cluster = _apply_transform(da=da_emb, fn=fn_transform,
-            transform_name=self.transform_type
+        da_cluster = _apply_transform(
+            da=da_emb, fn=fn_transform, transform_name=self.transform_type
         )
 
         da_cluster.to_netcdf(self.output().fn)
@@ -324,12 +324,14 @@ class TransformedMapPrediction(luigi.Task):
         image_fullpath = Path(self.image_path)
         image_path, image_fn = image_fullpath.parent, image_fullpath.name
 
-        fn_out = image_fn.replace('.png', 
+        fn_out = image_fn.replace(
+            '.png',
             '.embedding_map.{}_step.{}_transform.{}_clusters.nc'.format(
                 self.step_size, self.transform_type, self.n_clusters
-                )
             )
+        )
         return XArrayTarget(str(image_path/fn_out))
+
 
 class AnnotationMapImage(luigi.Task):
     model_path = luigi.Parameter()
@@ -351,19 +353,21 @@ class AnnotationMapImage(luigi.Task):
 
     def run(self):
         da_cluster = self.input().open()
-        fig = _annotation_plot(img, da_cluster)
+        fig = _annotation_plot(img, da_cluster)  # noqa
         plt.savefig(self.output().fn)
 
     def output(self):
         image_fullpath = Path(self.image_path)
-        image_path, image_fn = image_fullpath.parent, image_fullpath.name
+        _, image_fn = image_fullpath.parent, image_fullpath.name
 
-        fn_out = image_fn.replace('.png', 
+        fn_out = image_fn.replace(
+            '.png',
             '.embedding_map.{}_step.{}_transform.{}_clusters.png'.format(
                 self.step_size, self.transform_type, self.n_clusters
-                )
             )
+        )
         return luigi.LocalTarget(fn_out)
+
 
 class CreatePredictionMap(luigi.Task):
     source_data_path = luigi.Parameter()
