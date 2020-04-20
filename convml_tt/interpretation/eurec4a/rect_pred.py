@@ -134,7 +134,7 @@ class DatasetImagePredictionMapData(ImagePredictionMapData):
 
     @property
     def src_data_path(self):
-        return self.requires().input().output().fn
+        return self.requires().input().fn
 
     def output(self):
         fn = "{}.embeddings.{}_step.nc".format(
