@@ -15,7 +15,8 @@ from convml_tt.architectures.triplet_trainer import monkey_patch_fastai
 monkey_patch_fastai() # noqa
 
 from convml_tt.data.sources.satellite.rectpred import MakeRectRGBImage
-from convml_tt.data.dataset import SceneBulkProcessingBaseTask
+from ...pipeline import XArrayTarget
+from ...data.dataset import SceneBulkProcessingBaseTask
 
 
 def crop_fastai_im(img, i, j, nx=256, ny=256):
@@ -80,7 +81,7 @@ def rect_predict(model, img, step=(10, 10), N=(256, 256)):
 class ImagePredictionMapData(luigi.Task):
     model_path = luigi.Parameter()
     image_path = luigi.Parameter()
-    src_data_path = luigi.Parameter(default=None)
+    src_data_path = luigi.OptionalParameter()
     step_size = luigi.IntParameter(default=10)
 
     def run(self):
@@ -254,9 +255,13 @@ class EmbeddingTransform(luigi.Task):
 
 
 class DatasetEmbeddingTransform(EmbeddingTransform):
+    """
+    Create a netCDF file for the transformed embeddings of a single scene
+    """
     dataset_path = luigi.Parameter()
     model_path = luigi.Parameter()
     step_size = luigi.Parameter()
+    scene_id = luigi.Parameter()
 
     def requires(self):
         return AggregateFullDatasetImagePredictionMapData(
@@ -264,9 +269,28 @@ class DatasetEmbeddingTransform(EmbeddingTransform):
             step_size=self.step_size,
         )
 
+    def run(self):
+        # ensure that the parent Task has run first
+        output_parent = yield super()
+
+        da_emb_all = output_parent.open()
+        da_emb = da_emb_all.sel(scene_id=self.scene_id)
+        da_emb.to_netcdf(self.output().fn)
+
     @property
     def input_path(self):
         return self.input().fn
+
+    def output(self):
+        model_name = Path(self.model_path).name.replace('.pkl', '')
+
+        fn = "{}.{}_step.{}_transform.{}_clusters.nc".format(
+            self.scene_id,
+            self.step_size, self.transform_type, self.n_clusters
+        )
+
+        p = Path(self.dataset_path)/"embeddings"/"rect"/model_name/fn
+        return XArrayTarget(str(p))
 
 
 class CreateAllPredictionMapsDataTransformed(EmbeddingTransform):
@@ -354,30 +378,6 @@ def _apply_transform(da, fn, transform_name):
         dims=dims,
         coords=dict(n=da_stacked.n)
     ).unstack('n')
-
-
-class XArrayTarget(luigi.target.FileSystemTarget):
-    fs = luigi.local_target.LocalFileSystem()
-
-    def __init__(self, path, *args, **kwargs):
-        super(XArrayTarget, self).__init__(path, *args, **kwargs)
-        self.path = path
-
-    def open(self, *args, **kwargs):
-        # ds = xr.open_dataset(self.path, engine='h5netcdf', *args, **kwargs)
-        ds = xr.open_dataset(self.path, *args, **kwargs)
-
-        if len(ds.data_vars) == 1:
-            name = list(ds.data_vars)[0]
-            da = ds[name]
-            da.name = name
-            return da
-        else:
-            return ds
-
-    @property
-    def fn(self):
-        return self.path
 
 
 def _get_img_with_extent(da_emb, data_path):
@@ -511,23 +511,24 @@ class RGBAnnotationMapImage(luigi.Task):
 
 class DatasetRGBAnnotationMapImage(RGBAnnotationMapImage):
     dataset_path = luigi.Parameter()
-    model_path = luigi.Parameter()
     step_size = luigi.Parameter()
-    transform_type = luigi.Parameter(default=None)
+    model_path = luigi.Parameter()
+    scene_id = luigi.Parameter()
+    transform_type = luigi.OptionalParameter()
     rgb_components = luigi.Parameter(default=[0, 1, 2])
-
-    src_index = luigi.IntParameter()
 
     def requires(self):
         if self.transform_type is None:
-            return CreateAllPredictionMapsData(
+            return DatasetImagePredictionMapData(
                 dataset_path=self.dataset_path,
+                scene_id=self.scene_id,
                 model_path=self.model_path,
                 step_size=self.step_size
             )
         else:
-            return CreateAllPredictionMapsDataTransformed(
+            return DatasetEmbeddingTransform(
                 dataset_path=self.dataset_path,
+                scene_id=self.scene_id,
                 model_path=self.model_path,
                 step_size=self.step_size,
                 transform_type=self.transform_type,
@@ -543,46 +544,18 @@ class DatasetRGBAnnotationMapImage(RGBAnnotationMapImage):
         return self.dataset_path
 
 
-class AllDatasetRGBAnnotationMapImages(luigi.Task):
-    dataset_path = luigi.Parameter()
+class AllDatasetRGBAnnotationMapImages(SceneBulkProcessingBaseTask):
     model_path = luigi.Parameter()
     step_size = luigi.Parameter()
-    transform_type = luigi.Parameter(default=None)
+    transform_type = luigi.OptionalParameter()
     rgb_components = luigi.Parameter(default=[0, 1, 2])
 
-    def requires(self):
-        if self.transform_type is None:
-            return CreateAllPredictionMapsData(
-                dataset_path=self.dataset_path,
-                model_path=self.model_path,
-                step_size=self.step_size
-            )
-        else:
-            return CreateAllPredictionMapsDataTransformed(
-                dataset_path=self.dataset_path,
-                model_path=self.model_path,
-                step_size=self.step_size,
-                transform_type=self.transform_type,
-                n_clusters=max(self.rgb_components)+1,
-            )
+    TaskClass = DatasetRGBAnnotationMapImage
 
-    def _get_runtime_tasks(self):
-        da_emb = self.input().open()
-        return [
-            RGBAnnotationMapImage(
-                input_path=self.input().fn,
-                src_index=i,
-                rgb_components=self.rgb_components,
-                src_data_path=self.dataset_path
-            )
-            for i in range(int(da_emb.src.count()))
-        ]
-
-    def run(self):
-        yield self._get_runtime_tasks()
-
-    def output(self):
-        if not self.input().exists():
-            return luigi.LocalTarget('__fake__file__.nc')
-        else:
-            return [t.output() for t in self._get_runtime_tasks()]
+    def _get_task_class_kwargs(self):
+        return dict(
+            model_path=self.model_path,
+            step_size=self.step_size,
+            transform_type=self.transform_type,
+            rgb_components=self.rgb_components
+        )
