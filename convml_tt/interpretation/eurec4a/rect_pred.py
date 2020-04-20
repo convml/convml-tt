@@ -173,17 +173,12 @@ class AggregateFullDatasetImagePredictionMapData(luigi.Task):
 
     def run(self):
         das = []
-        for input in self.input():
+        for scene_id, input in self.input().items():
             da = input.open()
-            src = None
-            if da.src_data_path is not None:
-                src = da.src_data_path
-            else:
-                src = da.image_path
-            da['src'] = src
+            da['scene_id'] = scene_id
             das.append(da)
 
-        da_all = xr.concat(das, dim='src')
+        da_all = xr.concat(das, dim='scene_id')
         da_all.name = 'emb'
         da_all.attrs['step_size'] = self.step_size
         da_all.attrs['model_path'] = self.model_path
@@ -271,15 +266,21 @@ class DatasetEmbeddingTransform(EmbeddingTransform):
         return AggregateFullDatasetImagePredictionMapData(
             dataset_path=self.dataset_path,
             step_size=self.step_size,
+            model_path=self.model_path,
         )
 
     def run(self):
-        # ensure that the parent Task has run first
-        output_parent = yield super()
+        parent_output = yield EmbeddingTransform(
+            input_path=self.input_path,
+            transform_type=self.transform_type,
+            n_clusters=self.n_clusters,
+        )
 
-        da_emb_all = output_parent.open()
-        da_emb = da_emb_all.sel(scene_id=self.scene_id)
-        da_emb.to_netcdf(self.output().fn)
+        import ipdb
+        with ipdb.launch_ipdb_on_exception():
+            da_emb_all = parent_output.open()
+            da_emb = da_emb_all.sel(scene_id=self.scene_id)
+            da_emb.to_netcdf(self.output().fn)
 
     @property
     def input_path(self):
@@ -384,18 +385,11 @@ def _apply_transform(da, fn, transform_name):
     ).unstack('n')
 
 
-def _get_img_with_extent(da_emb, data_path):
+def _get_img_with_extent(da_emb, img_fn):
     """
-    Using the `src` attribute on the the `da` data array load up the image
-    that the rectpred arrays was made from, clip the image and return the
+    Load the image in `img_fn`, clip the image and return the
     image extent (xy-extent if the source data coordinates are available)
     """
-    src_fn = str(da_emb.src.item())
-
-    if src_fn.endswith('.nc'):
-        src_fn = src_fn.replace('.nc', '.png')
-
-    img_fn = str(data_path/src_fn)
     img = mpimg.imread(img_fn)
 
     i_ = da_emb.i0.values
@@ -480,7 +474,7 @@ class RGBAnnotationMapImage(luigi.Task):
                                  subplot_kw=dict(aspect=1), sharex=True)
 
         img, img_extent = _get_img_with_extent(
-            da_emb, Path(self.src_data_path)
+            da_emb, self.src_image_path
         )
 
         ax = axes[0]
@@ -496,13 +490,21 @@ class RGBAnnotationMapImage(luigi.Task):
 
         plt.savefig(self.output().fn)
 
+    @property
+    def src_image_path(self):
+        raise NotImplementedError
+        src_fn = str(da_emb.src.item())
+
+        if src_fn.endswith('.nc'):
+            src_fn = src_fn.replace('.nc', '.png')
+
     def output(self):
         image_fullpath = Path(self.input_path)
         src_path, src_fn = image_fullpath.parent, image_fullpath.name
 
         fn_out = src_fn.replace(
             '.nc',
-            '.src_{}.rgb_map.{}__comp.png'.format(
+            '.rgb_map.{}__comp.png'.format(
                 self.src_index, "_".join([str(v) for v in self.rgb_components])
             )
         )
@@ -518,7 +520,7 @@ class DatasetRGBAnnotationMapImage(RGBAnnotationMapImage):
     model_path = luigi.Parameter()
     scene_id = luigi.Parameter()
     transform_type = luigi.OptionalParameter()
-    rgb_components = luigi.Parameter(default=[0, 1, 2])
+    rgb_components = luigi.ListParameter(default=[0, 1, 2])
 
     def requires(self):
         if self.transform_type is None:
@@ -545,6 +547,25 @@ class DatasetRGBAnnotationMapImage(RGBAnnotationMapImage):
     @property
     def src_data_path(self):
         return self.dataset_path
+
+    @property
+    def src_image_path(self):
+        return MakeRectRGBImage(
+            dataset_path=self.dataset_path,
+            scene_id=self.scene_id
+        ).output().fn
+
+    def output(self):
+        model_name = Path(self.model_path).name.replace('.pkl', '')
+
+        fn = "{}.{}_step.{}_transform.rgb_map.{}__comp.png".format(
+            self.scene_id,
+            self.step_size, self.transform_type,
+            "_".join([str(v) for v in self.rgb_components])
+        )
+
+        p = Path(self.dataset_path)/"embeddings"/"rect"/model_name/fn
+        return XArrayTarget(str(p))
 
 
 class AllDatasetRGBAnnotationMapImages(SceneBulkProcessingBaseTask):

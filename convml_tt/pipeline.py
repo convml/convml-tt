@@ -2,6 +2,10 @@ import luigi
 import xarray as xr
 import yaml
 
+import coloredlogs
+
+coloredlogs.install()
+
 
 class XArrayTarget(luigi.target.FileSystemTarget):
     fs = luigi.local_target.LocalFileSystem()

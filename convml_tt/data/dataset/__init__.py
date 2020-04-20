@@ -91,14 +91,12 @@ class SceneBulkProcessingBaseTask(luigi.Task):
         all_source_data = self.input().read()
         kwargs = self._get_task_class_kwargs()
 
-        tasks = []
+        tasks = {}
         for scene_id in all_source_data.keys():
-            tasks.append(
-                self.TaskClass(
-                    scene_id=scene_id,
-                    dataset_path=self.dataset_path,
-                    **kwargs
-                )
+            tasks[scene_id] = self.TaskClass(
+                scene_id=scene_id,
+                dataset_path=self.dataset_path,
+                **kwargs
             )
         return tasks
 
@@ -113,4 +111,4 @@ class SceneBulkProcessingBaseTask(luigi.Task):
             return luigi.LocalTarget("__fake_file__.nc")
         else:
             tasks = self._build_runtime_tasks()
-            return [t.output() for t in tasks]
+            return { scene_id: t.output() for scene_id, t in tasks.items() }
