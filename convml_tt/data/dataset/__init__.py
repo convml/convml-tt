@@ -3,6 +3,7 @@ import importlib
 import pprint
 
 import yaml
+import luigi
 
 
 class TripletDataset:
@@ -56,10 +57,60 @@ class TripletDataset:
         return cls(**data)
 
     def __repr__(self):
-        return pprint.pformat({k:v for k,v in vars(self).items() if not k.startswith('_')})
+        return pprint.pformat({
+            k: v for k, v in vars(self).items() if not k.startswith('_')
+        })
 
     def generate(self):
         raise NotImplementedError
 
     def plot_domain(self, ax, **kwargs):
         raise NotImplementedError
+
+
+class SceneBulkProcessingBaseTask(luigi.Task):
+    dataset_path = luigi.Parameter()
+    TaskClass = None
+
+    def requires(self):
+        if self.TaskClass is None:
+            raise Exception("Please set TaskClass to the type you would like"
+                            " to process for every scene"
+                            )
+        return self._load_dataset().fetch_source_data()
+
+    def _get_task_class_kwargs(self):
+        raise NotImplementedError("Please implement `_get_task_class_kwargs`"
+                                  " to provide the necessary kwargs for your"
+                                  " selected task")
+
+    def _load_dataset(self):
+        return TripletDataset.load(self.dataset_path)
+
+    def _build_runtime_tasks(self):
+        all_source_data = self.input().read()
+        kwargs = self._get_task_class_kwargs()
+
+        tasks = []
+        for scene_id in all_source_data.keys():
+            tasks.append(
+                self.TaskClass(
+                    scene_id=scene_id,
+                    dataset_path=self.dataset_path,
+                    **kwargs
+                )
+            )
+        return tasks
+
+    def run(self):
+        yield self._build_runtime_tasks()
+
+    def output(self):
+        if not self.input().exists():
+            # the fetch has not completed yet, so we don't know how many scenes
+            # we will be working on. Therefore we just return a target we know
+            # will newer exist
+            return luigi.LocalTarget("__fake_file__.nc")
+        else:
+            tasks = self._build_runtime_tasks()
+            return [t.output() for t in tasks]

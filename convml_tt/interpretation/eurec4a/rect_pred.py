@@ -14,13 +14,15 @@ from fastai.vision import open_image
 from convml_tt.architectures.triplet_trainer import monkey_patch_fastai
 monkey_patch_fastai() # noqa
 
-from convml_tt.data.sources.satellite.rectpred import MakeAllRectRGBDataArrays
+from convml_tt.data.sources.satellite.rectpred import MakeRectRGBImage
+from convml_tt.data.dataset import SceneBulkProcessingBaseTask
 
 
 def crop_fastai_im(img, i, j, nx=256, ny=256):
-    img_copy = img.__class__(img._px[:,j:j+ny,i:i+nx])
+    img_copy = img.__class__(img._px[:, j:j+ny, i:i+nx])
     # From PIL docs: The crop rectangle, as a (left, upper, right, lower)-tuple.
     return img_copy
+
 
 class FakeImagesList(list):
     def __init__(self, src_path, id, *args, **kwargs):
@@ -37,6 +39,7 @@ class FakeImagesList(list):
         for item in self:
             items.append(item.apply_tfms(tfms, **kwargs))
         return items
+
 
 def rect_predict(model, img, step=(10, 10), N=(256, 256)):
     """
@@ -73,7 +76,8 @@ def rect_predict(model, img, step=(10, 10), N=(256, 256)):
 
     return da
 
-class CreateSingleImagePredictionMapData(luigi.Task):
+
+class ImagePredictionMapData(luigi.Task):
     model_path = luigi.Parameter()
     image_path = luigi.Parameter()
     src_data_path = luigi.Parameter(default=None)
@@ -112,34 +116,60 @@ class CreateSingleImagePredictionMapData(luigi.Task):
             '.png', '.embeddings.{}_step.nc'.format(self.step_size))
         return XArrayTarget(str(image_path/fn_out))
 
-class CreateAllPredictionMapsData(luigi.Task):
+
+class DatasetImagePredictionMapData(ImagePredictionMapData):
+    dataset_path = luigi.Parameter()
+    scene_id = luigi.Parameter()
+
+    def requires(self):
+        return MakeRectRGBImage(
+            dataset_path=self.dataset_path,
+            scene_id=self.scene_id
+        )
+
+    @property
+    def image_path(self):
+        return self.input().fn
+
+    def output(self):
+        fn = "{}.embeddings.{}_step.nc".format(
+            self.scene_id, self.step_size
+        )
+        p_out = (
+            Path(self.dataset_path)/"composites"/"rect"/fn
+        )
+        return XArrayTarget(str(p_out))
+
+
+class FullDatasetImagePredictionMapData(SceneBulkProcessingBaseTask):
+    model_path = luigi.Parameter()
+    step_size = luigi.Parameter()
+
+    TaskClass = DatasetImagePredictionMapData
+
+    def _get_task_class_kwargs(self):
+        return dict(
+            model_path=self.model_path,
+            step_size=self.step_size,
+        )
+
+
+class AggregateFullDatasetImagePredictionMapData(luigi.Task):
     dataset_path = luigi.Parameter()
     model_path = luigi.Parameter()
     step_size = luigi.Parameter()
 
     def requires(self):
-        return MakeAllRectRGBDataArrays(
+        return FullDatasetImagePredictionMapData(
             dataset_path=self.dataset_path,
+            model_path=self.model_path,
+            step_size=self.step_size
         )
 
     def run(self):
-        filenames_all_scenes = self.input().read()
-
-        prediction_tasks = []
-        for (scene_da_fn, scene_image_fn) in filenames_all_scenes:
-            t = CreateSingleImagePredictionMapData(
-                model_path=self.model_path,
-                image_path=scene_image_fn,
-                src_data_path=scene_da_fn,
-                step_size=self.step_size
-            )
-            prediction_tasks.append(t)
-
-        prediction_outputs = yield prediction_tasks
-
         das = []
-        for output in prediction_outputs:
-            da = output.open()
+        for input in self.input():
+            da = input.open()
             src = None
             if da.src_data_path is not None:
                 src = da.src_data_path
@@ -164,8 +194,9 @@ class CreateAllPredictionMapsData(luigi.Task):
     def output(self):
         model_name = Path(self.model_path).name.replace('.pkl', '')
         fn = "all_embeddings.{}_step.nc".format(self.step_size)
-        p = Path("embeddings")/"rect"/model_name/fn
+        p = Path(self.dataset_path)/"embeddings"/"rect"/model_name/fn
         return XArrayTarget(str(p))
+
 
 class EmbeddingTransform(luigi.Task):
     input_path = luigi.Parameter()
@@ -221,13 +252,30 @@ class EmbeddingTransform(luigi.Task):
         )
         return XArrayTarget(str(src_path/fn_out))
 
+
+class DatasetEmbeddingTransform(EmbeddingTransform):
+    dataset_path = luigi.Parameter()
+    model_path = luigi.Parameter()
+    step_size = luigi.Parameter()
+
+    def requires(self):
+        return AggregateFullDatasetImagePredictionMapData(
+            dataset_path=self.dataset_path,
+            step_size=self.step_size,
+        )
+
+    @property
+    def input_path(self):
+        return self.input().fn
+
+
 class CreateAllPredictionMapsDataTransformed(EmbeddingTransform):
     dataset_path = luigi.Parameter()
     model_path = luigi.Parameter()
     step_size = luigi.Parameter()
 
     def requires(self):
-        return CreateAllPredictionMapsData(
+        return AggregateFullDatasetImagePredictionMapData(
             dataset_path=self.dataset_path,
             model_path=self.model_path,
             step_size=self.step_size
@@ -236,6 +284,14 @@ class CreateAllPredictionMapsDataTransformed(EmbeddingTransform):
     @property
     def input_path(self):
         return self.input().fn
+
+    def output(self):
+        model_name = Path(self.model_path).name.replace('.pkl', '')
+        fn = "all_embeddings.{}_step.{}_transform.{}_clusters.nc".format(
+            self.step_size, self.transform_type, self.n_clusters
+        )
+        p = Path(self.dataset_path)/"embeddings"/"rect"/model_name/fn
+        return XArrayTarget(str(p))
 
 
 def _annotation_plot(img, da_):
@@ -257,10 +313,10 @@ def _annotation_plot(img, da_):
     fig, axes = plt.subplots(figsize=(r*sp_inches*2, sp_inches*2.4),
                              nrows=2, ncols=2,)
 
-    ax = axes[1,0]
+    ax = axes[1, 0]
     ax.imshow(img, **img_kws)
 
-    ax = axes[0,1]
+    ax = axes[0, 1]
     if np.issubdtype(da_.dtype, np.integer):
         # use barplot if we have discrete values
         barlist = ax.bar(*np.unique(da_, return_counts=True))
@@ -269,18 +325,19 @@ def _annotation_plot(img, da_):
     else:
         da_.plot.hist(ax=ax)
 
-    ax = axes[0,0]
+    ax = axes[0, 0]
     ax.imshow(img, **img_kws)
 
-    ax = axes[1,1]
+    ax = axes[1, 1]
     da_.plot(ax=ax, **aug_kws)
 
     plt.tight_layout()
 
-    [ax.set_aspect(1) for ax in axes.flatten()[[0,2,3]]]
+    [ax.set_aspect(1) for ax in axes.flatten()[[0, 2, 3]]]
     sns.despine()
 
     return fig
+
 
 def _apply_transform(da, fn, transform_name):
     # stack all other dims apart from the `emb_dim`
@@ -297,6 +354,7 @@ def _apply_transform(da, fn, transform_name):
         dims=dims,
         coords=dict(n=da_stacked.n)
     ).unstack('n')
+
 
 class XArrayTarget(luigi.target.FileSystemTarget):
     fs = luigi.local_target.LocalFileSystem()
@@ -320,6 +378,7 @@ class XArrayTarget(luigi.target.FileSystemTarget):
     @property
     def fn(self):
         return self.path
+
 
 def _get_img_with_extent(da_emb, data_path):
     """
@@ -352,7 +411,7 @@ def _get_img_with_extent(da_emb, data_path):
     ilim = (i_.min()-i_step//2, i_.max()+i_step//2)
     jlim = (j_.min()-j_step//2, j_.max()+j_step//2)
 
-    img = img[slice(*jlim),slice(*ilim)]
+    img = img[slice(*jlim), slice(*ilim)]
 
     if 'x' in da_emb.coords and 'y' in da_emb.coords:
         # get x,y and indexing (i,j) extent from data array so
@@ -370,6 +429,7 @@ def _get_img_with_extent(da_emb, data_path):
         extent = [*xlim, *ylim]
 
     return img, extent
+
 
 def _make_rgb(da, dims, alpha=0.5):
     def scale_zero_one(v):
@@ -399,7 +459,7 @@ def _make_rgb(da, dims, alpha=0.5):
 class RGBAnnotationMapImage(luigi.Task):
     input_path = luigi.Parameter()
     src_index = luigi.IntParameter()
-    rgb_components = luigi.ListParameter(default=[0,1,2])
+    rgb_components = luigi.ListParameter(default=[0, 1, 2])
     src_data_path = luigi.Parameter()
 
     def run(self):
@@ -454,7 +514,7 @@ class DatasetRGBAnnotationMapImage(RGBAnnotationMapImage):
     model_path = luigi.Parameter()
     step_size = luigi.Parameter()
     transform_type = luigi.Parameter(default=None)
-    rgb_components = luigi.Parameter(default=[0,1,2])
+    rgb_components = luigi.Parameter(default=[0, 1, 2])
 
     src_index = luigi.IntParameter()
 
@@ -488,7 +548,7 @@ class AllDatasetRGBAnnotationMapImages(luigi.Task):
     model_path = luigi.Parameter()
     step_size = luigi.Parameter()
     transform_type = luigi.Parameter(default=None)
-    rgb_components = luigi.Parameter(default=[0,1,2])
+    rgb_components = luigi.Parameter(default=[0, 1, 2])
 
     def requires(self):
         if self.transform_type is None:

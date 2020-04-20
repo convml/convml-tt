@@ -1,42 +1,28 @@
 # coding: utf-8
 from . import tiler, FixedTimeRangeSatelliteTripletDataset
 from . import satpy_rgb, pipeline as sat_pipeline
-from ....pipeline import XArrayTarget, YAMLTarget
+from ....pipeline import XArrayTarget
+from ....data.dataset import SceneBulkProcessingBaseTask
 
 from pathlib import Path
-import dateutil
 import luigi
-
-import matplotlib.pyplot as plt
-import cartopy.crs as ccrs
-import xarray as xr
-
-# PlatformName_Instrument_Variable_YYYYMMDD_HHmmSS_SpaceCov_SpaceRes_Level_ForcastNB.ext
-FILE_FORMAT = "{platform_name}_{instrument}_{variable}_{date}_{time}.{ext}"
-DATE_FORMAT = "%Y%m%d"
-TIME_FORMAT = "%H%M%S"
-
-PATH_FORMAT = "%Y/%Y_%m_%d"
 
 
 class MakeRectRGBDataArray(luigi.Task):
     dataset_path = luigi.Parameter()
-    scene_path = luigi.Parameter()
+    scene_id = luigi.Parameter()
 
     def _get_dataset(self):
         return FixedTimeRangeSatelliteTripletDataset.load(self.dataset_path)
 
     def requires(self):
-        dataset = self._get_dataset()
-        if not 'rectpred' in dataset.extra:
-            raise Exception("Please define a `rectpred` setup in your"
-                            " meta.yaml file")
-
-        return dataset.fetch_source_data()
+        return sat_pipeline.CreateRGBScene(
+            scene_id=self.scene_id,
+            dataset_path=self.dataset_path,
+        )
 
     def run(self):
-        # need to use this to include the projection meta information
-        da_scene = sat_pipeline.RGBCompositeNetCDFFile(self.scene_path).open()
+        da_scene = self.input().open()
 
         dataset = self._get_dataset()
         domain_rect = tiler.RectTile(**dataset.extra['rectpred']['domain'])
@@ -51,27 +37,20 @@ class MakeRectRGBDataArray(luigi.Task):
         da_rect.to_netcdf(self.output().fn)
 
     def output(self):
-        da_scene = xr.open_dataarray(self.scene_path)
-        t = dateutil.parser.parse(da_scene.start_time)
-        fn = FILE_FORMAT.format(
-            platform_name="CONV-ORG",
-            instrument="GOES-R",
-            variable="RGB",
-            date=t.strftime(DATE_FORMAT),
-            time=t.strftime(TIME_FORMAT),
-            ext='nc'
+        fn = "{}.nc".format(self.scene_id)
+        p_out = (
+            Path(self.dataset_path)/"composites"/"rect"/fn
         )
-
-        p_out = Path(self.dataset_path)/"composites"/"rect"/t.strftime(PATH_FORMAT)/fn
         return XArrayTarget(str(p_out))
+
 
 class MakeRectRGBImage(luigi.Task):
     dataset_path = luigi.Parameter()
-    scene_path = luigi.Parameter()
+    scene_id = luigi.Parameter()
 
     def requires(self):
         return MakeRectRGBDataArray(
-            scene_path=self.scene_path,
+            scene_id=self.scene_id,
             dataset_path=self.dataset_path,
         )
 
@@ -83,84 +62,15 @@ class MakeRectRGBImage(luigi.Task):
         img.save(str(self.output().fn))
 
     def output(self):
-        if not Path(self.scene_path).exists():
-            return None
-
-        da_scene = xr.open_dataarray(self.scene_path)
-        t = dateutil.parser.parse(da_scene.start_time)
-        fn = FILE_FORMAT.format(
-            platform_name="CONV-ORG",
-            instrument="GOES-R",
-            variable="RGB",
-            date=t.strftime(DATE_FORMAT),
-            time=t.strftime(TIME_FORMAT),
-            ext='png'
+        fn = "{}.png".format(self.scene_id)
+        p_out = (
+            Path(self.dataset_path)/"composites"/"rect"/fn
         )
+        return XArrayTarget(str(p_out))
 
-        p_out = Path(self.dataset_path)/"composites"/"rect"/t.strftime(PATH_FORMAT)/fn
-        return luigi.LocalTarget(str(p_out))
 
-class MakeAllRectRGBDataArrays(luigi.Task):
-    dataset_path = luigi.Parameter()
+class MakeAllRectRGBDataArrays(SceneBulkProcessingBaseTask):
+    TaskClass = MakeRectRGBImage
 
-    def _get_dataset(self):
-        return FixedTimeRangeSatelliteTripletDataset.load(self.dataset_path)
-
-    def requires(self):
-        dataset = self._get_dataset()
-        if not 'rectpred' in dataset.extra:
-            raise Exception("Please define a `rectpred` setup in your"
-                            " meta.yaml file")
-
-        return dataset.fetch_source_data()
-
-    def run(self):
-        dataset = self._get_dataset()
-        scene_source_fns = self.input().read()
-
-        scene_tasks = []
-        for source_fns in scene_source_fns:
-            # first we need to create RGB scene file, this will be in the
-            # original resolution of the input
-            t_scene = sat_pipeline.CreateRGBScene(
-                source_fns=source_fns,
-                domain_bbox=dataset.domain_bbox,
-                data_path=self.dataset_path
-            )
-            scene_tasks.append(t_scene)
-        scene_outputs = yield scene_tasks
-
-        image_tasks = []
-        for t_output in scene_outputs:
-            # and then we create the resampled image (or just the source array)
-            t = MakeRectRGBImage(
-                dataset_path=self.dataset_path,
-                scene_path=t_output.fn
-            )
-            image_tasks.append(t)
-        image_outputs = yield image_tasks
-
-        self.output().write([
-            [image_output.fn.replace('.png', '.nc'), image_output.fn]
-            for image_output in image_outputs
-        ])
-
-    def output(self):
-        fn = "all_scenes.yaml"
-        p = Path(self.dataset_path)/"composites"/"rect"/fn
-        return YAMLTarget(str(p))
-
-def _plot_scene(da_scene, dataset):
-    fig, ax = plt.subplots(subplot_kw=dict(projection=da_scene.crs), figsize=(12,6))
-    da_scene.coarsen(x=20, y=20, boundary="trim").mean().sel(bands="B").plot(transform=da_scene.crs, ax=ax)
-    ax.gridlines()
-    ax.coastlines()
-
-    rect.plot_outline(ax=ax)
-    dataset.get_domain().plot_outline(ax=ax, color='red', alpha=0.3)
-
-def _plot_rect_grid(rect):
-    ax = rect.plot_outline()
-    grid = rect.get_grid(dx=100e3)
-    ax.scatter(grid.lon, grid.lat, transform=ccrs.PlateCarree())
-    plt.margins(0.5)
+    def _get_task_class_kwargs(self):
+        return {}
