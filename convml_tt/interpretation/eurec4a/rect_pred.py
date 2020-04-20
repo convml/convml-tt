@@ -462,12 +462,11 @@ def _make_rgb(da, dims, alpha=0.5):
 
 class RGBAnnotationMapImage(luigi.Task):
     input_path = luigi.Parameter()
-    src_index = luigi.IntParameter()
     rgb_components = luigi.ListParameter(default=[0, 1, 2])
     src_data_path = luigi.Parameter()
 
     def run(self):
-        da_emb = xr.open_dataarray(self.input_path).isel(src=self.src_index)
+        da_emb = xr.open_dataarray(self.input_path)
 
         # ensure non-xy dim is first
         d_not_xy = next(filter(lambda d: d not in ['x', 'y'], da_emb.dims))
