@@ -154,6 +154,16 @@ class RectTile():
 
         return ds
 
+    def get_grid_extent(self):
+        """
+        Return grid extent compatible with matplotlib.imshow
+        [x0 ,x1, y0, y1] in Cartesian coordinates
+        """
+        return [
+            -self.l_zonal/2., self.l_zonal/2.,
+            -self.l_meridional/2., self.l_meridional/2.
+        ]
+
     def crop_field(self, da, pad_pct=0.1):
         return crop_field_to_latlon_box(
             da=da, box=self.get_bounds().T, pad_pct=pad_pct

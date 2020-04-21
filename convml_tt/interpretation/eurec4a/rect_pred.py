@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import sklearn.cluster
 import matplotlib.image as mpimg
+import matplotlib.patches as mpatches
 
 from fastai.basic_train import load_learner
 from fastai.vision import open_image
@@ -16,7 +17,8 @@ monkey_patch_fastai() # noqa
 
 from convml_tt.data.sources.satellite.rectpred import MakeRectRGBImage
 from ...pipeline import XArrayTarget
-from ...data.dataset import SceneBulkProcessingBaseTask
+from ...data.dataset import SceneBulkProcessingBaseTask, TripletDataset
+from ...data.sources.satellite import tiler
 
 
 def crop_fastai_im(img, i, j, nx=256, ny=256):
@@ -42,10 +44,10 @@ class FakeImagesList(list):
         return items
 
 
-def rect_predict(model, img, step=(10, 10), N=(256, 256)):
+def rect_predict(model, img, N_tile, step=(10, 10)):
     """
     Produce moving-window prediction array from `img` with `model` with
-    step-size defined by `step` and tile-size `N`.
+    step-size defined by `step` and tile-size `N_tile`.
 
     NB: j-indexing is from "top_left" i.e. is likely in the opposite order to
     what would be expected for y-axis of original image (positive being up)
@@ -53,26 +55,24 @@ def rect_predict(model, img, step=(10, 10), N=(256, 256)):
     i0 and j0 coordinates denote center of each prediction tile
     """
     ny, nx = img.size
-    il = FakeImagesList(None, None)
-    i_ = np.arange(0, nx, step[0])
-    j_ = np.arange(0, ny, step[1])
+    nxt, nyt = N_tile
+    x_step, y_step = step
 
-    if nx % step[0] != 0:
-        i_ = i_[:-1]
-    if ny % step[1] != 0:
-        j_ = j_[:-1]
+    il = FakeImagesList(None, None)
+    i_ = range(0, nx-nxt+1, x_step)
+    j_ = range(0, ny-nyt+1, y_step)
 
     for n in i_:
         for m in j_:
-            il.append(crop_fastai_im(img, n, m, nx=N[0], ny=N[1]))
+            il.append(crop_fastai_im(img, n, m, nx=nxt, ny=nyt))
 
     result = np.stack(model.predict(il)[1]).reshape((len(i_), len(j_), -1))
 
     da = xr.DataArray(
         result,
         dims=('i0', 'j0', 'emb_dim'),
-        coords=dict(i0=i_ + step[0]//2, j0=j_ + step[1]//2),
-        attrs=dict(tile_nx=N[0], tile_ny=N[1])
+        coords=dict(i0=i_ + x_step//2, j0=j_ + y_step//2),
+        attrs=dict(tile_nx=nxt, tile_ny=nyt)
     )
 
     return da
@@ -90,8 +90,11 @@ class ImagePredictionMapData(luigi.Task):
         model = load_learner(model_path, model_fn)
         img = open_image(self.image_path)
 
+        N_tile = (256, 256)
+
         da_pred = rect_predict(
-            model=model, img=img, step=(self.step_size, self.step_size)
+            model=model, img=img, step=(self.step_size, self.step_size),
+            N_tile=N_tile
         )
 
         if self.src_data_path:
@@ -102,6 +105,8 @@ class ImagePredictionMapData(luigi.Task):
             # slicing
             da_pred['y'] = ('j0',), da_src.y[::-1][da_pred.j0]
             da_pred = da_pred.swap_dims(dict(i0='x', j0='y')).sortby(["x", "y"])
+            da_pred.attrs['lx_tile'] = da_src.x[N_tile[0]]-da_src.x[0]
+            da_pred.attrs['ly_tile'] = da_src.y[N_tile[1]]-da_src.x[0]
 
         da_pred.attrs['model_path'] = self.model_path
         da_pred.attrs['image_path'] = self.image_path
@@ -385,7 +390,7 @@ def _apply_transform(da, fn, transform_name):
     ).unstack('n')
 
 
-def _get_img_with_extent(da_emb, img_fn):
+def _get_img_with_extent_cropped(da_emb, img_fn):
     """
     Load the image in `img_fn`, clip the image and return the
     image extent (xy-extent if the source data coordinates are available)
@@ -429,6 +434,18 @@ def _get_img_with_extent(da_emb, img_fn):
     return img, extent
 
 
+def _get_img_with_extent(da_emb, img_fn, dataset_path):
+    """
+    Load the image in `img_fn` and return the
+    image extent (xy-extent if the source data coordinates are available)
+    """
+    img = mpimg.imread(img_fn)
+
+    dataset = TripletDataset.load(dataset_path)
+    domain_rect = tiler.RectTile(**dataset.extra['rectpred']['domain'])
+    return img, domain_rect.get_grid_extent()
+
+
 def _make_rgb(da, dims, alpha=0.5):
     def scale_zero_one(v):
         return (v-v.min())/(v.max() - v.min())
@@ -458,6 +475,7 @@ class RGBAnnotationMapImage(luigi.Task):
     input_path = luigi.Parameter()
     rgb_components = luigi.ListParameter(default=[0, 1, 2])
     src_data_path = luigi.Parameter()
+    render_tiles = luigi.BoolParameter(default=True)
 
     def run(self):
         da_emb = xr.open_dataarray(self.input_path)
@@ -466,16 +484,14 @@ class RGBAnnotationMapImage(luigi.Task):
         d_not_xy = next(filter(lambda d: d not in ['x', 'y'], da_emb.dims))
         da_emb = da_emb.transpose(d_not_xy, 'x', 'y')
 
-        import ipdb
-        with ipdb.launch_ipdb_on_exception():
-            da_rgba = _make_rgb(da=da_emb, dims=self.rgb_components, alpha=0.5)
+        da_rgba = _make_rgb(da=da_emb, dims=self.rgb_components, alpha=0.5)
 
-        fig, axes = plt.subplots(figsize=(10, 4*3), nrows=3,
+        nrows = self.render_tiles and 4 or 3
+
+        fig, axes = plt.subplots(figsize=(10, 4*nrows), nrows=nrows,
                                  subplot_kw=dict(aspect=1), sharex=True)
 
-        img, img_extent = _get_img_with_extent(
-            da_emb, self.src_image_path
-        )
+        img, img_extent = self.get_image(da_emb=da_emb)
 
         ax = axes[0]
         ax.imshow(img, extent=img_extent)
@@ -488,17 +504,30 @@ class RGBAnnotationMapImage(luigi.Task):
         da_rgba[3] = 1.0
         da_rgba.plot.imshow(ax=ax, rgb='rgba', y='y')
 
+        if self.render_tiles:
+            x_, y_ = xr.broadcast(da_emb.x, da_emb.y)
+            axes[2].scatter(x_, y_, marker='x')
+
+            lx = da_emb.lx_tile
+            ly = da_emb.ly_tile
+            ax = axes[3]
+            for xc, yc in zip(x_.values.flatten(), y_.values.flatten()):
+                rect = mpatches.Rectangle(
+                    (xc-lx/2., yc-ly/2), lx, ly, linewidth=1, edgecolor='r',
+                    facecolor='none'
+                )
+
+                ax.add_patch(rect)
+
+            ax.set_xlim(*img_extent[:2])
+            ax.set_ylim(*img_extent[2:])
+
         [ax.set_aspect(1) for ax in axes]
 
         plt.savefig(self.output().fn)
 
-    @property
-    def src_image_path(self):
+    def get_image(self, da_emb):
         raise NotImplementedError
-        src_fn = str(da_emb.src.item())
-
-        if src_fn.endswith('.nc'):
-            src_fn = src_fn.replace('.nc', '.png')
 
     def output(self):
         image_fullpath = Path(self.input_path)
@@ -523,6 +552,7 @@ class DatasetRGBAnnotationMapImage(RGBAnnotationMapImage):
     scene_id = luigi.Parameter()
     transform_type = luigi.OptionalParameter()
     rgb_components = luigi.ListParameter(default=[0, 1, 2])
+    crop_img = luigi.BoolParameter(default=False)
 
     def requires(self):
         if self.transform_type is None:
@@ -550,12 +580,21 @@ class DatasetRGBAnnotationMapImage(RGBAnnotationMapImage):
     def src_data_path(self):
         return self.dataset_path
 
-    @property
-    def src_image_path(self):
-        return MakeRectRGBImage(
+    def get_image(self, da_emb):
+        img_path = MakeRectRGBImage(
             dataset_path=self.dataset_path,
             scene_id=self.scene_id
         ).output().fn
+
+        if self.crop_img:
+            return _get_img_with_extent_cropped(
+                da_emb, img_path
+            )
+        else:
+            return _get_img_with_extent(
+                da_emb=da_emb, img_fn=img_path,
+                dataset_path=self.dataset_path
+            )
 
     def output(self):
         model_name = Path(self.model_path).name.replace('.pkl', '')
