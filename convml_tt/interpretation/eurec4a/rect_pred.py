@@ -488,6 +488,8 @@ class RGBAnnotationMapImage(luigi.Task):
         da_rgba[3] = 1.0
         da_rgba.plot.imshow(ax=ax, rgb='rgba', y='y')
 
+        [ax.set_aspect(1) for ax in axes]
+
         plt.savefig(self.output().fn)
 
     @property
@@ -572,7 +574,7 @@ class AllDatasetRGBAnnotationMapImages(SceneBulkProcessingBaseTask):
     model_path = luigi.Parameter()
     step_size = luigi.Parameter()
     transform_type = luigi.OptionalParameter()
-    rgb_components = luigi.Parameter(default=[0, 1, 2])
+    rgb_components = luigi.ListParameter(default=[0, 1, 2])
 
     TaskClass = DatasetRGBAnnotationMapImage
 
