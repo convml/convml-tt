@@ -59,8 +59,8 @@ def rect_predict(model, img, N_tile, step=(10, 10)):
     x_step, y_step = step
 
     il = FakeImagesList(None, None)
-    i_ = range(0, nx-nxt+1, x_step)
-    j_ = range(0, ny-nyt+1, y_step)
+    i_ = np.arange(0, nx-nxt+1, x_step)
+    j_ = np.arange(0, ny-nyt+1, y_step)
 
     for n in i_:
         for m in j_:
@@ -105,8 +105,8 @@ class ImagePredictionMapData(luigi.Task):
             # slicing
             da_pred['y'] = ('j0',), da_src.y[::-1][da_pred.j0]
             da_pred = da_pred.swap_dims(dict(i0='x', j0='y')).sortby(["x", "y"])
-            da_pred.attrs['lx_tile'] = da_src.x[N_tile[0]]-da_src.x[0]
-            da_pred.attrs['ly_tile'] = da_src.y[N_tile[1]]-da_src.x[0]
+            da_pred.attrs['lx_tile'] = float(da_src.x[N_tile[0]]-da_src.x[0])
+            da_pred.attrs['ly_tile'] = float(da_src.y[N_tile[1]]-da_src.x[0])
 
         da_pred.attrs['model_path'] = self.model_path
         da_pred.attrs['image_path'] = self.image_path
