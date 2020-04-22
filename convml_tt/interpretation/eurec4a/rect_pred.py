@@ -71,7 +71,7 @@ def rect_predict(model, img, N_tile, step=(10, 10)):
     da = xr.DataArray(
         result,
         dims=('i0', 'j0', 'emb_dim'),
-        coords=dict(i0=i_ + x_step//2, j0=j_ + y_step//2),
+        coords=dict(i0=i_ + nxt//2, j0=j_ + nyt//2),
         attrs=dict(tile_nx=nxt, tile_ny=nyt)
     )
 
@@ -99,14 +99,20 @@ class ImagePredictionMapData(luigi.Task):
 
         if self.src_data_path:
             da_src = xr.open_dataarray(self.src_data_path)
-            da_pred['x'] = ('i0',), da_src.x[da_pred.i0]
+            da_pred['x'] = xr.DataArray(
+                da_src.x[da_pred.i0], dims=('i0',),
+                attrs=dict(units=da_src['x'].units)
+            )
             # OBS: j-indexing is positive "down" (from top-left corner) whereas
             # y-indexing is positive "up", so we have to reverse y here before
             # slicing
-            da_pred['y'] = ('j0',), da_src.y[::-1][da_pred.j0]
+            da_pred['y'] = xr.DataArray(
+                da_src.y[::-1][da_pred.j0], dims=('j0',),
+                attrs=dict(units=da_src['y'].units)
+            )
             da_pred = da_pred.swap_dims(dict(i0='x', j0='y')).sortby(["x", "y"])
             da_pred.attrs['lx_tile'] = float(da_src.x[N_tile[0]]-da_src.x[0])
-            da_pred.attrs['ly_tile'] = float(da_src.y[N_tile[1]]-da_src.x[0])
+            da_pred.attrs['ly_tile'] = float(da_src.y[N_tile[1]]-da_src.y[0])
 
         da_pred.attrs['model_path'] = self.model_path
         da_pred.attrs['image_path'] = self.image_path
@@ -475,14 +481,28 @@ class RGBAnnotationMapImage(luigi.Task):
     input_path = luigi.Parameter()
     rgb_components = luigi.ListParameter(default=[0, 1, 2])
     src_data_path = luigi.Parameter()
-    render_tiles = luigi.BoolParameter(default=True)
+    render_tiles = luigi.BoolParameter(default=False)
 
-    def run(self):
+    def _make_plot(self, title=None):
         da_emb = xr.open_dataarray(self.input_path)
 
         # ensure non-xy dim is first
         d_not_xy = next(filter(lambda d: d not in ['x', 'y'], da_emb.dims))
         da_emb = da_emb.transpose(d_not_xy, 'x', 'y')
+
+        img, img_extent = self.get_image(da_emb=da_emb)
+
+        # scale distances to km
+        if da_emb.x.units == 'm' and da_emb.y.units == 'm':
+            s = 1000.
+            da_emb.x.values /= 1000.
+            da_emb.x.attrs['units'] = 'km'
+            da_emb.y.values /= 1000.
+            da_emb.y.attrs['units'] = 'km'
+
+            img_extent = np.array(img_extent)/1000.
+        else:
+            s = 1.
 
         da_rgba = _make_rgb(da=da_emb, dims=self.rgb_components, alpha=0.5)
 
@@ -490,8 +510,6 @@ class RGBAnnotationMapImage(luigi.Task):
 
         fig, axes = plt.subplots(figsize=(10, 4*nrows), nrows=nrows,
                                  subplot_kw=dict(aspect=1), sharex=True)
-
-        img, img_extent = self.get_image(da_emb=da_emb)
 
         ax = axes[0]
         ax.imshow(img, extent=img_extent)
@@ -508,23 +526,58 @@ class RGBAnnotationMapImage(luigi.Task):
             x_, y_ = xr.broadcast(da_emb.x, da_emb.y)
             axes[2].scatter(x_, y_, marker='x')
 
-            lx = da_emb.lx_tile
-            ly = da_emb.ly_tile
+            lx = da_emb.lx_tile/s
+            ly = da_emb.ly_tile/s
             ax = axes[3]
+            ax.imshow(img, extent=img_extent)
             for xc, yc in zip(x_.values.flatten(), y_.values.flatten()):
+                c = da_rgba.sel(x=xc, y=yc).astype(float)
+                # set alpha so we can see overlapping tiles
+                c[-1] = 0.2
+                c_edge = np.array(c)
+                c_edge[-1] = 0.5
                 rect = mpatches.Rectangle(
-                    (xc-lx/2., yc-ly/2), lx, ly, linewidth=1, edgecolor='r',
-                    facecolor='none'
+                    (xc-lx/2., yc-ly/2), lx, ly, linewidth=1,
+                    edgecolor=c_edge, facecolor=c, linestyle=':'
                 )
+                ax.scatter(xc, yc, color=c[:-1], marker='x')
 
                 ax.add_patch(rect)
 
-            ax.set_xlim(*img_extent[:2])
-            ax.set_ylim(*img_extent[2:])
+            def pad_lims(lim):
+                l = min(lim[1] - lim[0], lim[3] - lim[2])
+                return [
+                    (lim[0]-0.1*l, lim[1] + l*0.1),
+                    (lim[2]-0.1*l, lim[3] + l*0.1),
+                ]
 
+            xlim, ylim = pad_lims(img_extent)
+        else:
+            x0, y0 = da_emb.x.min(), da_emb.y.max()
+            lx = da_emb.lx_tile/s
+            ly = da_emb.ly_tile/s
+            rect = mpatches.Rectangle(
+                (x0-lx/2., y0-ly/2), lx, ly, linewidth=1,
+                edgecolor='grey', facecolor='none', linestyle=':'
+            )
+            ax.add_patch(rect)
+
+            xlim = img_extent[:2]
+            ylim = img_extent[2:]
+
+        [ax.set_xlim(xlim) for ax in axes]
+        [ax.set_ylim(ylim) for ax in axes]
         [ax.set_aspect(1) for ax in axes]
 
-        plt.savefig(self.output().fn)
+        plt.tight_layout()
+
+        if title is not None:
+            fig.suptitle(title, y=1.05)
+
+        plt.savefig(self.output().fn, bbox_inches='tight')
+
+    def run(self):
+        self._make_plot()
 
     def get_image(self, da_emb):
         raise NotImplementedError
@@ -571,6 +624,27 @@ class DatasetRGBAnnotationMapImage(RGBAnnotationMapImage):
                 transform_type=self.transform_type,
                 n_clusters=max(self.rgb_components)+1,
             )
+
+    def run(self):
+        dataset = TripletDataset.load(self.dataset_path)
+        da_emb = xr.open_dataarray(self.input_path)
+
+        N_tile = (256, 256)
+        model_resolution = da_emb.lx_tile/N_tile[0]/1000.
+        domain_rect = dataset.extra['rectpred']['domain']
+        lat0, lon0 = domain_rect['lat0'], domain_rect['lon0']
+        title = "\n".join([
+            self.scene_id,
+            "(lat0, lon0)=({}, {})".format(lat0, lon0),
+            "{} NN model, {} x {} tiles at {:.2f}km resolution".format(
+                self.model_path.replace('.pkl', ''), N_tile[0], N_tile[1],
+                model_resolution)
+            ,
+            "prediction RGB from PCA components [{}]".format(", ".join([
+                str(v) for v in self.rgb_components
+            ]))
+        ])
+        self._make_plot(title=title)
 
     @property
     def input_path(self):
