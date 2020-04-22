@@ -10,7 +10,7 @@ from . import processing, satpy_rgb, tiler, bbox
 from ....pipeline import YAMLTarget
 from ...dataset import TripletDataset
 
-SOURCE_DIR = Path("source_data")/"goes16"
+SOURCE_DIR = Path("source_data")
 
 
 class DatetimeListParameter(luigi.Parameter):
