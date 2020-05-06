@@ -481,33 +481,58 @@ class ComponentsAnnotationMapImage(luigi.Task):
     input_path = luigi.Parameter()
     components = luigi.ListParameter(default=[0, 1, 2])
     src_data_path = luigi.Parameter()
+    col_wrap = luigi.IntParameter(default=2)
 
     def run(self):
         da_emb = xr.open_dataarray(self.input_path)
 
-        # find non-xy dim
-        d_not_xy = next(filter(lambda d: d not in ['x', 'y'], da_emb.dims))
+        da_emb.coords['pca_dim'] = np.arange(da_emb.pca_dim.count())
 
-        nrows = len(self.components) + 1
-
-        fig, axes = plt.subplots(figsize=(10, 4*nrows), nrows=nrows,
-                                 subplot_kw=dict(aspect=1), sharex=True)
+        da_emb = da_emb.assign_coords(
+            x=da_emb.x/1000., y=da_emb.y/1000.,
+            explained_variance=np.round(da_emb.explained_variance, 2)
+        )
+        da_emb.x.attrs['units'] = 'km'
+        da_emb.y.attrs['units'] = 'km'
 
         img, img_extent = self.get_image(da_emb=da_emb)
 
-        ax = axes[0]
-        ax.imshow(img, extent=img_extent)
+        img_extent = np.array(img_extent)/1000.
 
-        for n, ax in zip(self.components, axes):
+        # find non-xy dim
+        d_not_xy = next(filter(lambda d: d not in ['x', 'y'], da_emb.dims))
+
+        N_subplots = len(self.components) + 1
+        data_r = 3.
+        ncols = self.col_wrap
+        size = 3.
+
+        nrows = int(np.ceil(N_subplots / ncols))
+        figsize = (int(size*data_r*ncols), int(size*nrows))
+
+        fig, axes = plt.subplots(figsize=figsize, nrows=nrows, ncols=ncols,
+                                 subplot_kw=dict(aspect=1), sharex=True)
+
+        ax = axes.flatten()[0]
+        ax.imshow(img, extent=img_extent)
+        ax.set_title(da_emb.scene_id.item())
+
+        for n, ax in zip(self.components, axes.flatten()[1:]):
             ax.imshow(img, extent=img_extent)
             da_ = da_emb.sel(**{d_not_xy: n})
-            da_.plot.imshow(ax=ax, y='y')
+            da_ = da_.drop(['i0', 'j0', 'scene_id'])
+
+            da_.plot.imshow(ax=ax, y='y', alpha=0.5, add_colorbar=False)
 
             ax.set_xlim(*img_extent[:2])
             ax.set_ylim(*img_extent[2:])
 
-        [ax.set_aspect(1) for ax in axes]
+        [ax.set_aspect(1) for ax in axes.flatten()]
+        [ax.set_xlabel('') for ax in axes[:-1,:].flatten()]
 
+        plt.tight_layout()
+
+        Path(self.output().fn).parent.mkdir(exist_ok=True, parents=True)
         plt.savefig(self.output().fn)
 
     def get_image(self, da_emb):
@@ -589,7 +614,7 @@ class DatasetComponentsAnnotationMapImage(ComponentsAnnotationMapImage):
             "_".join([str(v) for v in self.components])
         )
 
-        p = Path(self.dataset_path)/"embeddings"/"rect"/model_name/fn
+        p = Path(self.dataset_path)/"embeddings"/"rect"/model_name/"components_map"/fn
         return XArrayTarget(str(p))
 
 
@@ -606,7 +631,7 @@ class AllDatasetComponentAnnotationMapImages(SceneBulkProcessingBaseTask):
             model_path=self.model_path,
             step_size=self.step_size,
             transform_type=self.transform_type,
-            rgb_components=self.rgb_components
+            components=self.components
         )
 
 
