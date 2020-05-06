@@ -477,6 +477,139 @@ def _make_rgb(da, dims, alpha=0.5):
     return da_rgba
 
 
+class ComponentsAnnotationMapImage(luigi.Task):
+    input_path = luigi.Parameter()
+    components = luigi.ListParameter(default=[0, 1, 2])
+    src_data_path = luigi.Parameter()
+
+    def run(self):
+        da_emb = xr.open_dataarray(self.input_path)
+
+        # find non-xy dim
+        d_not_xy = next(filter(lambda d: d not in ['x', 'y'], da_emb.dims))
+
+        nrows = len(self.components) + 1
+
+        fig, axes = plt.subplots(figsize=(10, 4*nrows), nrows=nrows,
+                                 subplot_kw=dict(aspect=1), sharex=True)
+
+        img, img_extent = self.get_image(da_emb=da_emb)
+
+        ax = axes[0]
+        ax.imshow(img, extent=img_extent)
+
+        for n, ax in zip(self.components, axes):
+            ax.imshow(img, extent=img_extent)
+            da_ = da_emb.sel(**{d_not_xy: n})
+            da_.plot.imshow(ax=ax, y='y')
+
+            ax.set_xlim(*img_extent[:2])
+            ax.set_ylim(*img_extent[2:])
+
+        [ax.set_aspect(1) for ax in axes]
+
+        plt.savefig(self.output().fn)
+
+    def get_image(self, da_emb):
+        raise NotImplementedError
+
+    def output(self):
+        image_fullpath = Path(self.input_path)
+        src_path, src_fn = image_fullpath.parent, image_fullpath.name
+
+        fn_out = src_fn.replace(
+            '.nc',
+            '.map.{}__comp.png'.format(
+                self.src_index, "_".join([str(v) for v in self.components])
+            )
+        )
+
+        p = Path(src_path)/fn_out
+
+        return luigi.LocalTarget(str(p))
+
+
+class DatasetComponentsAnnotationMapImage(ComponentsAnnotationMapImage):
+    dataset_path = luigi.Parameter()
+    step_size = luigi.Parameter()
+    model_path = luigi.Parameter()
+    scene_id = luigi.Parameter()
+    transform_type = luigi.OptionalParameter()
+    components = luigi.ListParameter(default=[0, 1, 2])
+    crop_img = luigi.BoolParameter(default=False)
+
+    def requires(self):
+        if self.transform_type is None:
+            return DatasetImagePredictionMapData(
+                dataset_path=self.dataset_path,
+                scene_id=self.scene_id,
+                model_path=self.model_path,
+                step_size=self.step_size
+            )
+        else:
+            return DatasetEmbeddingTransform(
+                dataset_path=self.dataset_path,
+                scene_id=self.scene_id,
+                model_path=self.model_path,
+                step_size=self.step_size,
+                transform_type=self.transform_type,
+                n_clusters=max(self.components)+1,
+            )
+
+    @property
+    def input_path(self):
+        return self.input().fn
+
+    @property
+    def src_data_path(self):
+        return self.dataset_path
+
+    def get_image(self, da_emb):
+        img_path = MakeRectRGBImage(
+            dataset_path=self.dataset_path,
+            scene_id=self.scene_id
+        ).output().fn
+
+        if self.crop_img:
+            return _get_img_with_extent_cropped(
+                da_emb, img_path
+            )
+        else:
+            return _get_img_with_extent(
+                da_emb=da_emb, img_fn=img_path,
+                dataset_path=self.dataset_path
+            )
+
+    def output(self):
+        model_name = Path(self.model_path).name.replace('.pkl', '')
+
+        fn = "{}.{}_step.{}_transform.map.{}__comp.png".format(
+            self.scene_id,
+            self.step_size, self.transform_type,
+            "_".join([str(v) for v in self.components])
+        )
+
+        p = Path(self.dataset_path)/"embeddings"/"rect"/model_name/fn
+        return XArrayTarget(str(p))
+
+
+class AllDatasetComponentAnnotationMapImages(SceneBulkProcessingBaseTask):
+    model_path = luigi.Parameter()
+    step_size = luigi.Parameter()
+    transform_type = luigi.OptionalParameter()
+    components = luigi.ListParameter(default=[0, 1, 2])
+
+    TaskClass = DatasetComponentsAnnotationMapImage
+
+    def _get_task_class_kwargs(self):
+        return dict(
+            model_path=self.model_path,
+            step_size=self.step_size,
+            transform_type=self.transform_type,
+            rgb_components=self.rgb_components
+        )
+
+
 class RGBAnnotationMapImage(luigi.Task):
     input_path = luigi.Parameter()
     rgb_components = luigi.ListParameter(default=[0, 1, 2])
