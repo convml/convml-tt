@@ -223,9 +223,10 @@ class EmbeddingTransform(luigi.Task):
 
         add_meta = None
         model = None
+        kwargs = self._parse_transform_extra_kwargs()
+
         if self.transform_type == 'kmeans':
-            fn_transform = sklearn.cluster.KMeans(
-            ).fit_predict
+            fn_transform = sklearn.cluster.KMeans(**kwargs).fit_predict
         elif self.transform_type in ['pca', 'pca_clipped']:
             if self.pretrained_model is not None:
                 p = Path(self._get_pretrained_model_path())/"{}.joblib".format(self.pretrained_model)
@@ -235,7 +236,7 @@ class EmbeddingTransform(luigi.Task):
                 model = joblib.load(str(p))
                 fn_transform = model.transform
             else:
-                model = sklearn.decomposition.PCA()
+                model = sklearn.decomposition.PCA(**kwargs)
                 fn_transform = model.fit_transform
 
             def add_meta(da):
@@ -247,15 +248,6 @@ class EmbeddingTransform(luigi.Task):
                 da_emb = da_emb.isel(x=slice(1, -1), y=slice(1, -1))
 
         elif self.transform_type == "hdbscan":
-            kwargs = {}
-            if self.transform_extra_args:
-                for s in self.transform_extra_args.split(","):
-                    k, v = s.split("=")
-                    if k in ["min_cluster_size", "min_samples"]:
-                        v = int(v)
-                    else:
-                        v = float(v)
-                    kwargs[k] = v
             model = hdbscan.HDBSCAN(core_dist_n_jobs=-1, **kwargs)
             fn_transform = lambda X: model.fit(X).labels_
 
@@ -291,6 +283,18 @@ class EmbeddingTransform(luigi.Task):
         p_out = Path(self.output()['transformed_data'].fn).parent
         p_out.mkdir(exist_ok=True, parents=True)
         da_cluster.to_netcdf(self.output()['transformed_data'].fn)
+
+    def _parse_transform_extra_kwargs(self):
+        kwargs = {}
+        if self.transform_extra_args:
+            for s in self.transform_extra_args.split(","):
+                k, v = s.split("=")
+                if k in ["min_cluster_size", "min_samples", "n_clusters"]:
+                    v = int(v)
+                else:
+                    v = float(v)
+                kwargs[k] = v
+        return kwargs
 
     def _make_transform_model_filename(self):
         return f"{self._build_transform_identifier()}.model.joblib"
