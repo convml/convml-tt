@@ -256,7 +256,7 @@ class EmbeddingTransform(luigi.Task):
                     else:
                         v = float(v)
                     kwargs[k] = v
-            model = hdbscan.HDBSCAN(**kwargs)
+            model = hdbscan.HDBSCAN(core_dist_n_jobs=-1, **kwargs)
             fn_transform = lambda X: model.fit(X).labels_
 
             def add_meta(da):
@@ -347,9 +347,22 @@ class DatasetEmbeddingTransform(EmbeddingTransform):
         )
 
     def run(self):
+        if self.transform_type == "pca_hdbscan":
+            pca_parent_input = yield EmbeddingTransform(
+                input_path=self.input_path,
+                transform_type="pca",
+                pretrained_model=self.pretrained_model,
+                transform_extra_args=None, # TODO: ensure enough components for HDBSCAN clustering
+            )
+            input_path = pca_parent_input["transformed_data"].fn
+            transform_type = "hdbscan"
+        else:
+            input_path = self.input_path
+            transform_type = self.transform_type
+
         parent_output = yield EmbeddingTransform(
-            input_path=self.input_path,
-            transform_type=self.transform_type,
+            input_path=input_path,
+            transform_type=transform_type,
             pretrained_model=self.pretrained_model,
             transform_extra_args=self.transform_extra_args,
         )
@@ -464,7 +477,12 @@ def _annotation_plot(img, da_):
 def _apply_transform(da, fn, transform_name):
     # stack all other dims apart from the `emb_dim`
     dims = list(da.dims)
-    dims.remove('emb_dim')
+    if "emb_dim" in dims:
+        dims.remove('emb_dim')
+    elif "pca_dim" in dims:
+        dims.remove('pca_dim')
+    else:
+        raise NotImplementedError(da.dims)
     da_stacked = da.stack(dict(n=dims))
     arr = fn(X=da_stacked.T)
     if len(arr.shape) == 2:
