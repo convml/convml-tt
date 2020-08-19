@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import hdbscan
+import skimage.color
 import luigi
 import numpy as np
 import xarray as xr
@@ -244,6 +246,17 @@ class EmbeddingTransform(luigi.Task):
                 )
             if self.transform_type == 'pca_clipped':
                 da_emb = da_emb.isel(x=slice(1, -1), y=slice(1, -1))
+
+        elif self.transform_type == "hdbscan":
+            model = hdbscan.HDBSCAN()
+            fn_transform = lambda X: model.fit(X).labels_
+
+            def add_meta(da):
+                return xr.DataArray(
+                    model.probabilities_,
+                    dims=('n'),
+                    coords=dict(n=da.stack(dict(n=da.dims)).n)
+                ).unstack('n')
         else:
             raise NotImplementedError(self.transform_type)
 
@@ -263,6 +276,7 @@ class EmbeddingTransform(luigi.Task):
         da_cluster.name = 'emb'
         da_cluster['i0'] = da_emb.i0
         da_cluster['j0'] = da_emb.j0
+        da_cluster.attrs['transform_type'] = self.transform_type
 
         p_out = Path(self.output()['transformed_data'].fn).parent
         p_out.mkdir(exist_ok=True, parents=True)
@@ -714,25 +728,46 @@ class RGBAnnotationMapImage(luigi.Task):
     def _make_plot(self, title=None):
         da_emb = xr.open_dataarray(self.input_path)
 
-        # ensure non-xy dim is first
-        d_not_xy = next(filter(lambda d: d not in ['x', 'y'], da_emb.dims))
-        da_emb = da_emb.transpose(d_not_xy, 'x', 'y')
+        if len(da_emb.shape) == 3:
+            # ensure non-xy dim is first
+            d_not_xy = list(filter(lambda d: d not in ['x', 'y'], da_emb.dims))
+            da_emb = da_emb.transpose(*d_not_xy, 'x', 'y')
 
         img, img_extent = self.get_image(da_emb=da_emb)
 
         # scale distances to km
         if da_emb.x.units == 'm' and da_emb.y.units == 'm':
             s = 1000.
-            da_emb.x.values /= 1000.
+            da_emb = da_emb.assign_coords(
+                dict(x=da_emb.x.values/1000., y=da_emb.y.values/1000.)
+            )
             da_emb.x.attrs['units'] = 'km'
-            da_emb.y.values /= 1000.
             da_emb.y.attrs['units'] = 'km'
 
             img_extent = np.array(img_extent)/1000.
         else:
             s = 1.
 
-        da_rgba = _make_rgb(da=da_emb, dims=self.rgb_components, alpha=0.5)
+        if len(da_emb.shape) == 3:
+            da_rgba = _make_rgb(da=da_emb, dims=self.rgb_components, alpha=0.5)
+        elif len(da_emb.shape) == 2:
+            # when we have distinct classes (identified by integers) we just
+            # want to map each label to a RGB color
+            labels = da_emb.stack(dict(n=da_emb.dims))
+            arr_rgb = skimage.color.label2rgb(label=labels.values)
+            # make an RGBA array so we can apply some alpha blending later
+            rgba_shape = list(arr_rgb.shape)
+            rgba_shape[-1] += 1
+            arr_rgba = np.ones((rgba_shape))
+            arr_rgba[...,:3] = arr_rgb
+            # and put this into a DataArray, unstack to recover original dimensions
+            da_rgba = xr.DataArray(
+                arr_rgba,
+                dims=('n', 'rgba'),
+                coords=dict(n=labels.n)
+            ).unstack('n')
+        else:
+            raise NotImplementedError(da_emb.shape)
 
         nrows = self.render_tiles and 4 or 3
 
@@ -871,9 +906,10 @@ class DatasetRGBAnnotationMapImage(RGBAnnotationMapImage):
                 self.model_path.replace('.pkl', ''), N_tile[0], N_tile[1],
                 model_resolution)
             ,
-            "prediction RGB from PCA components [{}]".format(", ".join([
-                str(v) for v in self.rgb_components
-            ]))
+            "prediction RGB from {} components [{}]".format(
+                da_emb.transform_type,
+                ", ".join([str(v) for v in self.rgb_components]
+            ))
         ])
         self._make_plot(title=title)
 
@@ -926,238 +962,6 @@ class AllDatasetRGBAnnotationMapImages(SceneBulkProcessingBaseTask):
     rgb_components = luigi.ListParameter(default=[0, 1, 2])
 
     TaskClass = DatasetRGBAnnotationMapImage
-
-    def _get_task_class_kwargs(self):
-        return dict(
-            model_path=self.model_path,
-            step_size=self.step_size,
-            transform_type=self.transform_type,
-            pretrained_transform_model=self.pretrained_transform_model,
-            rgb_components=self.rgb_components
-        )
-
-
-class RGBRectMapImage(luigi.Task):
-    input_path = luigi.Parameter()
-    rgb_components = luigi.ListParameter(default=[0, 1, 2])
-    src_data_path = luigi.Parameter()
-    render_tiles = luigi.BoolParameter(default=False)
-
-    def _make_plot(self, title=None):
-        da_emb = xr.open_dataarray(self.input_path)
-
-        # ensure non-xy dim is first
-        d_not_xy = next(filter(lambda d: d not in ['x', 'y'], da_emb.dims))
-        da_emb = da_emb.transpose(d_not_xy, 'x', 'y')
-
-        img, img_extent = self.get_image(da_emb=da_emb)
-
-        # scale distances to km
-        if da_emb.x.units == 'm' and da_emb.y.units == 'm':
-            s = 1000.
-            da_emb.x.values /= 1000.
-            da_emb.x.attrs['units'] = 'km'
-            da_emb.y.values /= 1000.
-            da_emb.y.attrs['units'] = 'km'
-
-            img_extent = np.array(img_extent)/1000.
-        else:
-            s = 1.
-
-        da_rgba = _make_rgb(da=da_emb, dims=self.rgb_components, alpha=0.5)
-
-        nrows = self.render_tiles and 4 or 3
-
-        fig, axes = plt.subplots(figsize=(8, 3*nrows), nrows=nrows,
-                                 subplot_kw=dict(aspect=1), sharex=True)
-
-        ax = axes[0]
-        ax.imshow(img, extent=img_extent, rasterized=True)
-
-        ax = axes[1]
-        ax.imshow(img, extent=img_extent)
-        da_rgba.plot.imshow(ax=ax, rgb='rgba', y='y', rasterized=True)
-
-        ax = axes[2]
-        da_rgba[3] = 1.0
-        da_rgba.plot.imshow(ax=ax, rgb='rgba', y='y', rasterized=True)
-
-        if self.render_tiles:
-            x_, y_ = xr.broadcast(da_emb.x, da_emb.y)
-            axes[2].scatter(x_, y_, marker='x')
-
-            lx = da_emb.lx_tile/s
-            ly = da_emb.ly_tile/s
-            ax = axes[3]
-            ax.imshow(img, extent=img_extent)
-            for xc, yc in zip(x_.values.flatten(), y_.values.flatten()):
-                c = da_rgba.sel(x=xc, y=yc).astype(float)
-                # set alpha so we can see overlapping tiles
-                c[-1] = 0.2
-                c_edge = np.array(c)
-                c_edge[-1] = 0.5
-                rect = mpatches.Rectangle(
-                    (xc-lx/2., yc-ly/2), lx, ly, linewidth=1,
-                    edgecolor=c_edge, facecolor=c, linestyle=':'
-                )
-                ax.scatter(xc, yc, color=c[:-1], marker='x')
-
-                ax.add_patch(rect)
-
-            def pad_lims(lim):
-                l = min(lim[1] - lim[0], lim[3] - lim[2])
-                return [
-                    (lim[0]-0.1*l, lim[1] + l*0.1),
-                    (lim[2]-0.1*l, lim[3] + l*0.1),
-                ]
-
-            xlim, ylim = pad_lims(img_extent)
-        else:
-            x0, y0 = da_emb.x.min(), da_emb.y.max()
-            lx = da_emb.lx_tile/s
-            ly = da_emb.ly_tile/s
-            rect = mpatches.Rectangle(
-                (x0-lx/2., y0-ly/2), lx, ly, linewidth=1,
-                edgecolor='grey', facecolor='none', linestyle=':'
-            )
-            ax.add_patch(rect)
-
-            xlim = img_extent[:2]
-            ylim = img_extent[2:]
-
-        [ax.set_xlim(xlim) for ax in axes]
-        [ax.set_ylim(ylim) for ax in axes]
-        [ax.set_aspect(1) for ax in axes]
-
-        plt.tight_layout()
-
-        if title is not None:
-            fig.suptitle(title, y=1.05)
-
-        Path(self.output().fn).parent.mkdir(exist_ok=True, parents=True)
-        plt.savefig(self.output().fn, bbox_inches='tight')
-
-    def run(self):
-        self._make_plot()
-
-    def get_image(self, da_emb):
-        raise NotImplementedError
-
-    def output(self):
-        image_fullpath = Path(self.input_path)
-        src_path, src_fn = image_fullpath.parent, image_fullpath.name
-
-        fn_out = src_fn.replace(
-            '.nc',
-            '.rgb_map.{}__comp.png'.format(
-                self.src_index, "_".join([str(v) for v in self.rgb_components])
-            )
-        )
-
-        p = Path(src_path)/fn_out
-
-        return luigi.LocalTarget(str(p))
-
-
-class DatasetRGBRectMapImage(RGBRectMapImage):
-    dataset_path = luigi.Parameter()
-    step_size = luigi.Parameter()
-    model_path = luigi.Parameter()
-    scene_id = luigi.Parameter()
-    transform_type = luigi.OptionalParameter()
-    pretrained_transform_model = luigi.OptionalParameter()
-    rgb_components = luigi.ListParameter(default=[0, 1, 2])
-    crop_img = luigi.BoolParameter(default=False)
-
-    def requires(self):
-        if self.transform_type is None:
-            return DatasetImagePredictionMapData(
-                dataset_path=self.dataset_path,
-                scene_id=self.scene_id,
-                model_path=self.model_path,
-                step_size=self.step_size
-            )
-        else:
-            return DatasetEmbeddingTransform(
-                dataset_path=self.dataset_path,
-                scene_id=self.scene_id,
-                model_path=self.model_path,
-                step_size=self.step_size,
-                transform_type=self.transform_type,
-                pretrained_model=self.pretrained_transform_model,
-                n_clusters=max(self.rgb_components)+1,
-            )
-
-    def run(self):
-        dataset = TripletDataset.load(self.dataset_path)
-        da_emb = xr.open_dataarray(self.input_path)
-
-        N_tile = (256, 256)
-        model_resolution = da_emb.lx_tile/N_tile[0]/1000.
-        domain_rect = dataset.extra['rectpred']['domain']
-        lat0, lon0 = domain_rect['lat0'], domain_rect['lon0']
-        title = "\n".join([
-            self.scene_id,
-            "(lat0, lon0)=({}, {})".format(lat0, lon0),
-            "{} NN model, {} x {} tiles at {:.2f}km resolution".format(
-                self.model_path.replace('.pkl', ''), N_tile[0], N_tile[1],
-                model_resolution)
-            ,
-            "prediction RGB from PCA components [{}]".format(", ".join([
-                str(v) for v in self.rgb_components
-            ]))
-        ])
-        self._make_plot(title=title)
-
-    @property
-    def input_path(self):
-        return self.input().fn
-
-    @property
-    def src_data_path(self):
-        return self.dataset_path
-
-    def get_image(self, da_emb):
-        img_path = MakeRectRGBImage(
-            dataset_path=self.dataset_path,
-            scene_id=self.scene_id
-        ).output().fn
-
-        if self.crop_img:
-            return _get_img_with_extent_cropped(
-                da_emb, img_path
-            )
-        else:
-            return _get_img_with_extent(
-                da_emb=da_emb, img_fn=img_path,
-                dataset_path=self.dataset_path
-            )
-
-    def output(self):
-        model_name = Path(self.model_path).name.replace('.pkl', '')
-
-        fn = "{}.{}_step.{}_transform.rgb_map.{}__comp.png".format(
-            self.scene_id,
-            self.step_size, self.transform_type,
-            "_".join([str(v) for v in self.rgb_components])
-        )
-
-        p_root = Path(self.dataset_path)/"embeddings"/"rect"/model_name
-        if self.pretrained_transform_model is not None:
-            p = p_root/self.pretrained_transform_model/fn
-        else:
-            p = p_root/fn
-        return XArrayTarget(str(p))
-
-
-class AllDatasetRGBRectMapImages(SceneBulkProcessingBaseTask):
-    model_path = luigi.Parameter()
-    step_size = luigi.Parameter()
-    transform_type = luigi.OptionalParameter()
-    pretrained_transform_model = luigi.OptionalParameter(default=None)
-    rgb_components = luigi.ListParameter(default=[0, 1, 2])
-
-    TaskClass = DatasetRGBRectMapImage
 
     def _get_task_class_kwargs(self):
         return dict(
