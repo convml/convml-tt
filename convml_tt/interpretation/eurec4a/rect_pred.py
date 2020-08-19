@@ -215,8 +215,8 @@ class AggregateFullDatasetImagePredictionMapData(luigi.Task):
 class EmbeddingTransform(luigi.Task):
     input_path = luigi.Parameter()
     transform_type = luigi.Parameter()
-    n_clusters = luigi.IntParameter(default=4)
     pretrained_model = luigi.OptionalParameter(default=None)
+    transform_extra_args = luigi.OptionalParameter()
 
     def run(self):
         da_emb = xr.open_dataarray(self.input_path)
@@ -225,7 +225,6 @@ class EmbeddingTransform(luigi.Task):
         model = None
         if self.transform_type == 'kmeans':
             fn_transform = sklearn.cluster.KMeans(
-                n_clusters=self.n_clusters
             ).fit_predict
         elif self.transform_type in ['pca', 'pca_clipped']:
             if self.pretrained_model is not None:
@@ -236,7 +235,7 @@ class EmbeddingTransform(luigi.Task):
                 model = joblib.load(str(p))
                 fn_transform = model.transform
             else:
-                model = sklearn.decomposition.PCA(n_components=self.n_clusters)
+                model = sklearn.decomposition.PCA()
                 fn_transform = model.fit_transform
 
             def add_meta(da):
@@ -248,7 +247,16 @@ class EmbeddingTransform(luigi.Task):
                 da_emb = da_emb.isel(x=slice(1, -1), y=slice(1, -1))
 
         elif self.transform_type == "hdbscan":
-            model = hdbscan.HDBSCAN()
+            kwargs = {}
+            if self.transform_extra_args:
+                for s in self.transform_extra_args.split(","):
+                    k, v = s.split("=")
+                    if k in ["min_cluster_size", "min_samples"]:
+                        v = int(v)
+                    else:
+                        v = float(v)
+                    kwargs[k] = v
+            model = hdbscan.HDBSCAN(**kwargs)
             fn_transform = lambda X: model.fit(X).labels_
 
             def add_meta(da):
@@ -277,29 +285,33 @@ class EmbeddingTransform(luigi.Task):
         da_cluster['i0'] = da_emb.i0
         da_cluster['j0'] = da_emb.j0
         da_cluster.attrs['transform_type'] = self.transform_type
+        if self.transform_extra_args:
+            da_cluster.attrs['transform_extra_args'] = self.transform_extra_args
 
         p_out = Path(self.output()['transformed_data'].fn).parent
         p_out.mkdir(exist_ok=True, parents=True)
         da_cluster.to_netcdf(self.output()['transformed_data'].fn)
 
     def _make_transform_model_filename(self):
-        return '{}_transform.{}_clusters.model.joblib'.format(
-            self.transform_type, self.n_clusters
-        )
+        return f"{self._build_transform_identifier()}.model.joblib"
 
     def _get_pretrained_model_path(self):
         """Return path to where pretrained transform models are expected to
         reside"""
         return Path(self.input_path).parent
 
+    def _build_transform_identifier(self):
+        s = f"{self.transform_type}_transform"
+        if self.transform_extra_args:
+            s += "__" + self.transform_extra_args.replace(",", "__").replace("=", "_")
+        return s
+
     def output(self):
         src_fullpath = Path(self.input_path)
         src_path, src_fn = src_fullpath.parent, src_fullpath.name
 
         fn_data = src_fn.replace(
-            '.nc', '.{}_transform.{}_clusters.nc'.format(
-                self.transform_type, self.n_clusters
-            )
+            '.nc', f".{self._build_transform_identifier()}.nc"
         )
 
         if self.pretrained_model:
@@ -338,8 +350,8 @@ class DatasetEmbeddingTransform(EmbeddingTransform):
         parent_output = yield EmbeddingTransform(
             input_path=self.input_path,
             transform_type=self.transform_type,
-            n_clusters=self.n_clusters,
             pretrained_model=self.pretrained_model,
+            transform_extra_args=self.transform_extra_args,
         )
 
         import ipdb
@@ -356,9 +368,9 @@ class DatasetEmbeddingTransform(EmbeddingTransform):
     def output(self):
         model_name = Path(self.model_path).name.replace('.pkl', '')
 
-        fn = "{}.{}_step.{}_transform.{}_clusters.nc".format(
+        fn = "{}.{}_step.{}.nc".format(
             self.scene_id,
-            self.step_size, self.transform_type, self.n_clusters
+            self.step_size, self._build_transform_identifier(),
         )
 
         if self.pretrained_model is not None:
@@ -393,8 +405,8 @@ class CreateAllPredictionMapsDataTransformed(EmbeddingTransform):
 
     def output(self):
         model_name = Path(self.model_path).name.replace('.pkl', '')
-        fn = "all_embeddings.{}_step.{}_transform.{}_clusters.nc".format(
-            self.step_size, self.transform_type, self.n_clusters
+        fn = "all_embeddings.{}_step.{}.nc".format(
+            self.step_size, self._build_transform_identifier(),
         )
         p_root = Path(self.dataset_path)/"embeddings"/"rect"/model_name/"components_map"
         if self.pretrained_transform_model is not None:
@@ -635,6 +647,7 @@ class DatasetComponentsAnnotationMapImage(ComponentsAnnotationMapImage):
     model_path = luigi.Parameter()
     scene_id = luigi.Parameter()
     transform_type = luigi.OptionalParameter()
+    transform_extra_args = luigi.OptionalParameter()
     pretrained_transform_model = luigi.OptionalParameter(default=None)
     components = luigi.ListParameter(default=[0, 1, 2])
     crop_img = luigi.BoolParameter(default=False)
@@ -654,8 +667,8 @@ class DatasetComponentsAnnotationMapImage(ComponentsAnnotationMapImage):
                 model_path=self.model_path,
                 step_size=self.step_size,
                 transform_type=self.transform_type,
+                transform_extra_args=self.transform_extra_args,
                 pretrained_model=self.pretrained_transform_model,
-                n_clusters=max(self.components)+1,
             )
 
     @property
@@ -754,11 +767,11 @@ class RGBAnnotationMapImage(luigi.Task):
             # when we have distinct classes (identified by integers) we just
             # want to map each label to a RGB color
             labels = da_emb.stack(dict(n=da_emb.dims))
-            arr_rgb = skimage.color.label2rgb(label=labels.values)
+            arr_rgb = skimage.color.label2rgb(label=labels.values, bg_color=(1.0, 1.0, 1.0))
             # make an RGBA array so we can apply some alpha blending later
             rgba_shape = list(arr_rgb.shape)
             rgba_shape[-1] += 1
-            arr_rgba = np.ones((rgba_shape))
+            arr_rgba = 0.3*np.ones((rgba_shape))
             arr_rgba[...,:3] = arr_rgb
             # and put this into a DataArray, unstack to recover original dimensions
             da_rgba = xr.DataArray(
@@ -771,7 +784,7 @@ class RGBAnnotationMapImage(luigi.Task):
 
         nrows = self.render_tiles and 4 or 3
 
-        fig, axes = plt.subplots(figsize=(8, 3*nrows), nrows=nrows,
+        fig, axes = plt.subplots(figsize=(8, 3.2*nrows), nrows=nrows,
                                  subplot_kw=dict(aspect=1), sharex=True)
 
         ax = axes[0]
@@ -868,6 +881,7 @@ class DatasetRGBAnnotationMapImage(RGBAnnotationMapImage):
     model_path = luigi.Parameter()
     scene_id = luigi.Parameter()
     transform_type = luigi.OptionalParameter()
+    transform_extra_args = luigi.OptionalParameter()
     pretrained_transform_model = luigi.OptionalParameter()
     rgb_components = luigi.ListParameter(default=[0, 1, 2])
     crop_img = luigi.BoolParameter(default=False)
@@ -887,8 +901,9 @@ class DatasetRGBAnnotationMapImage(RGBAnnotationMapImage):
                 model_path=self.model_path,
                 step_size=self.step_size,
                 transform_type=self.transform_type,
+                transform_extra_args=self.transform_extra_args,
                 pretrained_model=self.pretrained_transform_model,
-                n_clusters=max(self.rgb_components)+1,
+                # n_clusters=max(self.rgb_components)+1, TODO: put into transform_extra_args
             )
 
     def run(self):
@@ -899,7 +914,8 @@ class DatasetRGBAnnotationMapImage(RGBAnnotationMapImage):
         model_resolution = da_emb.lx_tile/N_tile[0]/1000.
         domain_rect = dataset.extra['rectpred']['domain']
         lat0, lon0 = domain_rect['lat0'], domain_rect['lon0']
-        title = "\n".join([
+
+        title_parts = [
             self.scene_id,
             "(lat0, lon0)=({}, {})".format(lat0, lon0),
             "{} NN model, {} x {} tiles at {:.2f}km resolution".format(
@@ -910,7 +926,10 @@ class DatasetRGBAnnotationMapImage(RGBAnnotationMapImage):
                 da_emb.transform_type,
                 ", ".join([str(v) for v in self.rgb_components]
             ))
-        ])
+        ]
+        if self.transform_extra_args:
+            title_parts.append(self.requires()._build_transform_identifier())
+        title = "\n".join(title_parts)
         self._make_plot(title=title)
 
     @property
@@ -940,11 +959,17 @@ class DatasetRGBAnnotationMapImage(RGBAnnotationMapImage):
     def output(self):
         model_name = Path(self.model_path).name.replace('.pkl', '')
 
-        fn = "{}.{}_step.{}_transform.rgb_map.{}__comp.png".format(
+        fn_parts = [
             self.scene_id,
-            self.step_size, self.transform_type,
-            "_".join([str(v) for v in self.rgb_components])
-        )
+            f"{self.step_size}_step",
+            "rgb_map",
+            "{}__comp".format("_".join([str(v) for v in self.rgb_components])),
+        ]
+
+        if self.transform_type:
+            fn_parts.insert(2, self.requires()._build_transform_identifier())
+
+        fn = f"{'.'.join(fn_parts)}.png"
 
         p_root = Path(self.dataset_path)/"embeddings"/"rect"/model_name
         if self.pretrained_transform_model is not None:
@@ -958,6 +983,7 @@ class AllDatasetRGBAnnotationMapImages(SceneBulkProcessingBaseTask):
     model_path = luigi.Parameter()
     step_size = luigi.Parameter()
     transform_type = luigi.OptionalParameter()
+    transform_extra_args = luigi.OptionalParameter(default=None)
     pretrained_transform_model = luigi.OptionalParameter(default=None)
     rgb_components = luigi.ListParameter(default=[0, 1, 2])
 
@@ -968,6 +994,7 @@ class AllDatasetRGBAnnotationMapImages(SceneBulkProcessingBaseTask):
             model_path=self.model_path,
             step_size=self.step_size,
             transform_type=self.transform_type,
+            transform_extra_args=self.transform_extra_args,
             pretrained_transform_model=self.pretrained_transform_model,
             rgb_components=self.rgb_components
         )
