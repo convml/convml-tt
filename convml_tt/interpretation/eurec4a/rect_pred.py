@@ -257,6 +257,21 @@ class EmbeddingTransform(luigi.Task):
                     dims=('n'),
                     coords=dict(n=da.stack(dict(n=da.dims)).n)
                 ).unstack('n')
+        elif self.transform_type == "pca_hdbscan":
+            try:
+                pca__n_components = kwargs.pop('pca__n_components')
+            except KeyError:
+                raise Exception("To use HDBSCAN with PCA analysis first you need"
+                                " provide the number of PCA components to keep with"
+                                " the `pca__n_components` argument")
+            pca_model = sklearn.decomposition.PCA(n_components=pca__n_components)
+            hdbscan_model = hdbscan.HDBSCAN(core_dist_n_jobs=-1, **kwargs)
+            model = hdbscan_model
+            def fn_transform(X):
+                X1 = pca_model.fit_transform(X)
+                return hdbscan_model.fit(X1).labels_
+            def add_meta(da):
+                da.attrs["notes"] = "used PCA before HDBSCAN"
         else:
             raise NotImplementedError(self.transform_type)
 
@@ -289,7 +304,7 @@ class EmbeddingTransform(luigi.Task):
         if self.transform_extra_args:
             for s in self.transform_extra_args.split(","):
                 k, v = s.split("=")
-                if k in ["min_cluster_size", "min_samples", "n_clusters"]:
+                if k in ["min_cluster_size", "min_samples", "pca__n_components", "n_components"]:
                     v = int(v)
                 else:
                     v = float(v)
@@ -351,22 +366,9 @@ class DatasetEmbeddingTransform(EmbeddingTransform):
         )
 
     def run(self):
-        if self.transform_type == "pca_hdbscan":
-            pca_parent_input = yield EmbeddingTransform(
-                input_path=self.input_path,
-                transform_type="pca",
-                pretrained_model=self.pretrained_model,
-                transform_extra_args=None, # TODO: ensure enough components for HDBSCAN clustering
-            )
-            input_path = pca_parent_input["transformed_data"].fn
-            transform_type = "hdbscan"
-        else:
-            input_path = self.input_path
-            transform_type = self.transform_type
-
         parent_output = yield EmbeddingTransform(
-            input_path=input_path,
-            transform_type=transform_type,
+            input_path=self.input_path,
+            transform_type=self.transform_type,
             pretrained_model=self.pretrained_model,
             transform_extra_args=self.transform_extra_args,
         )
