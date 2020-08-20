@@ -3,7 +3,6 @@ from pathlib import Path
 import luigi
 import skimage.color
 import matplotlib.pyplot as plt
-import seaborn as sns
 import matplotlib.image as mpimg
 import matplotlib.patches as mpatches
 import numpy as np
@@ -15,52 +14,6 @@ from ...data.sources.satellite.rectpred import MakeRectRGBImage
 from ...pipeline import XArrayTarget
 from .data import DatasetImagePredictionMapData
 from .transform import DatasetEmbeddingTransform
-
-
-def _annotation_plot(img, da_):
-    img_kws = {}
-    aug_kws = dict(add_colorbar=False, y="y")
-    nx_e, ny_e = da_.shape
-    img_kws["extent"] = [0, nx_e, 0, ny_e]
-
-    if np.issubdtype(da_.dtype, np.integer):
-        # use barplot if we have discrete values
-        n_classes = len(np.unique(da_))
-        aug_kws["colors"] = sns.color_palette(n_colors=n_classes)
-        aug_kws["levels"] = n_classes - 1
-
-    ny, nx, _ = img.shape
-    r = nx // ny
-
-    sp_inches = 3
-    fig, axes = plt.subplots(
-        figsize=(r * sp_inches * 2, sp_inches * 2.4), nrows=2, ncols=2,
-    )
-
-    ax = axes[1, 0]
-    ax.imshow(img, **img_kws)
-
-    ax = axes[0, 1]
-    if np.issubdtype(da_.dtype, np.integer):
-        # use barplot if we have discrete values
-        barlist = ax.bar(*np.unique(da_, return_counts=True))
-        for bar, color in zip(barlist, aug_kws["colors"]):
-            bar.set_color(color)
-    else:
-        da_.plot.hist(ax=ax)
-
-    ax = axes[0, 0]
-    ax.imshow(img, **img_kws)
-
-    ax = axes[1, 1]
-    da_.plot(ax=ax, **aug_kws)
-
-    plt.tight_layout()
-
-    [ax.set_aspect(1) for ax in axes.flatten()[[0, 2, 3]]]
-    sns.despine()
-
-    return fig
 
 
 def _get_img_with_extent_cropped(da_emb, img_fn):
@@ -333,8 +286,8 @@ class RGBAnnotationMapImage(luigi.Task):
     src_data_path = luigi.Parameter()
     render_tiles = luigi.BoolParameter(default=False)
 
-    def _make_plot(self, title=None):
-        da_emb = xr.open_dataarray(self.input_path)
+    @staticmethod
+    def _make_plot(self, da_emb):
 
         if len(da_emb.shape) == 3:
             # ensure non-xy dim is first
@@ -456,14 +409,14 @@ class RGBAnnotationMapImage(luigi.Task):
 
         plt.tight_layout()
 
-        if title is not None:
-            fig.suptitle(title, y=1.05)
-
-        Path(self.output().fn).parent.mkdir(exist_ok=True, parents=True)
-        plt.savefig(self.output().fn, bbox_inches="tight")
+        return fig, axes
 
     def run(self):
-        self._make_plot()
+        da_emb = xr.open_dataarray(self.input_path)
+        fig, axes = self._make_plot(da_emb=da_emb)
+
+        Path(self.output().fn).parent.mkdir(exist_ok=True, parents=True)
+        plt.savefig(self.output().fn, fig=fig, bbox_inches="tight")
 
     def get_image(self, da_emb):
         raise NotImplementedError
@@ -540,7 +493,13 @@ class DatasetRGBAnnotationMapImage(RGBAnnotationMapImage):
         if self.transform_extra_args:
             title_parts.append(self.requires()._build_transform_identifier())
         title = "\n".join(title_parts)
-        self._make_plot(title=title)
+
+        self._make_plot(da_emb=da_emb)
+        fig, axes = self._make_plot(da_emb=da_emb)
+        fig.suptitle(title, y=1.05)
+
+        Path(self.output().fn).parent.mkdir(exist_ok=True, parents=True)
+        plt.savefig(self.output().fn, fig=fig, bbox_inches="tight")
 
     @property
     def input_path(self):
