@@ -286,8 +286,7 @@ class RGBAnnotationMapImage(luigi.Task):
     src_data_path = luigi.Parameter()
     render_tiles = luigi.BoolParameter(default=False)
 
-    @staticmethod
-    def _make_plot(self, da_emb):
+    def make_plot(self, da_emb):
 
         if len(da_emb.shape) == 3:
             # ensure non-xy dim is first
@@ -413,7 +412,7 @@ class RGBAnnotationMapImage(luigi.Task):
 
     def run(self):
         da_emb = xr.open_dataarray(self.input_path)
-        fig, axes = self._make_plot(da_emb=da_emb)
+        fig, axes = self.make_plot(da_emb=da_emb)
 
         Path(self.output().fn).parent.mkdir(exist_ok=True, parents=True)
         plt.savefig(self.output().fn, fig=fig, bbox_inches="tight")
@@ -442,9 +441,9 @@ class DatasetRGBAnnotationMapImage(RGBAnnotationMapImage):
     step_size = luigi.Parameter()
     model_path = luigi.Parameter()
     scene_id = luigi.Parameter()
-    transform_type = luigi.OptionalParameter()
-    transform_extra_args = luigi.OptionalParameter()
-    pretrained_transform_model = luigi.OptionalParameter()
+    transform_type = luigi.OptionalParameter(default=None)
+    transform_extra_args = luigi.OptionalParameter(default=None)
+    pretrained_transform_model = luigi.OptionalParameter(default=None)
     rgb_components = luigi.ListParameter(default=[0, 1, 2])
     crop_img = luigi.BoolParameter(default=False)
 
@@ -494,8 +493,7 @@ class DatasetRGBAnnotationMapImage(RGBAnnotationMapImage):
             title_parts.append(self.requires()._build_transform_identifier())
         title = "\n".join(title_parts)
 
-        self._make_plot(da_emb=da_emb)
-        fig, axes = self._make_plot(da_emb=da_emb)
+        fig, axes = self.make_plot(da_emb=da_emb)
         fig.suptitle(title, y=1.05)
 
         Path(self.output().fn).parent.mkdir(exist_ok=True, parents=True)

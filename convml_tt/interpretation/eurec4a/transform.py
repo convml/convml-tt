@@ -10,7 +10,7 @@ from ...pipeline import XArrayTarget
 from .data import AggregateFullDatasetImagePredictionMapData
 
 
-def _apply_transform(da, fn, transform_name):
+def apply_transform(da, fn, transform_name):
     # stack all other dims apart from the `emb_dim`
     dims = list(da.dims)
     if "emb_dim" in dims:
@@ -103,7 +103,7 @@ class EmbeddingTransform(luigi.Task):
         else:
             raise NotImplementedError(self.transform_type)
 
-        da_cluster = _apply_transform(
+        da_cluster = apply_transform(
             da=da_emb, fn=fn_transform, transform_name=self.transform_type
         )
 
