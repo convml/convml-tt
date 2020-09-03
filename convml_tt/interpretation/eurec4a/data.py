@@ -107,6 +107,10 @@ class ImagePredictionMapData(luigi.Task):
             da_pred.attrs["lx_tile"] = float(da_src.x[N_tile[0]] - da_src.x[0])
             da_pred.attrs["ly_tile"] = float(da_src.y[N_tile[1]] - da_src.y[0])
 
+            # make sure the lat lon coords are available later
+            da_pred.coords['lat'] = da_src.lat.isel(x=i0, y=j0)
+            da_pred.coords['lon'] = da_src.lon.isel(x=i0, y=j0)
+
         da_pred.attrs["model_path"] = self.model_path
         da_pred.attrs["image_path"] = self.image_path
         da_pred.attrs["src_data_path"] = self.src_data_path
