@@ -119,6 +119,10 @@ class EmbeddingTransform(luigi.Task):
         da_cluster.name = "emb"
         da_cluster["i0"] = da_emb.i0
         da_cluster["j0"] = da_emb.j0
+        if 'lat' in da_emb.coords:
+            da_cluster['lat'] = da_emb.coords['lat']
+        if 'lon' in da_emb.coords:
+            da_cluster['lon'] = da_emb.coords['lon']
         da_cluster.attrs["transform_type"] = self.transform_type
         if self.transform_extra_args:
             da_cluster.attrs["transform_extra_args"] = self.transform_extra_args
