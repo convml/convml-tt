@@ -12,6 +12,8 @@ from ...dataset import TripletDataset
 
 SOURCE_DIR = Path("source_data")
 
+SCENE_ID_DATE_FORMAT = "%Y%m%d%H%M"
+
 
 class DatetimeListParameter(luigi.Parameter):
     def parse(self, x):
@@ -153,7 +155,7 @@ class GOES16Fetch(luigi.Task):
     def _make_scene_id(self, files):
         attrs = satdata.Goes16AWS.parse_key(files[0], parse_times=True)
         t = attrs['start_time']
-        return "goes16_{}".format(t.strftime("%Y%m%d%H%M"))
+        return "goes16_{}".format(t.strftime(SCENE_ID_DATE_FORMAT))
 
     def output(self):
         fn = 'source_data/all_files.yaml'
