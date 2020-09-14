@@ -10,7 +10,7 @@ from ...pipeline import XArrayTarget
 from .data import AggregateFullDatasetImagePredictionMapData
 
 
-def apply_transform(da, fn, transform_name):
+def _apply_transform_function(da, fn, transform_name):
     # stack all other dims apart from the `emb_dim`
     dims = list(da.dims)
     if "emb_dim" in dims:
@@ -28,6 +28,86 @@ def apply_transform(da, fn, transform_name):
     return xr.DataArray(arr, dims=dims, coords=dict(n=da_stacked.n)).unstack("n")
 
 
+def apply_transform(da, transform_type, pretrained_model=None, **kwargs):
+    add_meta = None
+    model = None
+
+    if transform_type == "kmeans":
+        fn_transform = sklearn.cluster.KMeans(**kwargs).fit_predict
+    elif transform_type in ["pca", "pca_clipped"]:
+        if pretrained_model is not None:
+            model = pretrained_model
+            fn_transform = model.transform
+        else:
+            model = sklearn.decomposition.PCA(**kwargs)
+            fn_transform = model.fit_transform
+
+        def add_meta(da):
+            da["explained_variance"] = (
+                "{}_dim".format(transform_type),
+                model.explained_variance_ratio_,
+            )
+
+        if transform_type == "pca_clipped":
+            da = da.isel(x=slice(1, -1), y=slice(1, -1))
+
+    elif transform_type == "hdbscan":
+        model = hdbscan.HDBSCAN(core_dist_n_jobs=-1, **kwargs)
+
+        def fn_transform(X):
+            return model.fit(X).labels_
+
+        def add_meta(da):
+            return xr.DataArray(
+                model.probabilities_,
+                dims=("n"),
+                coords=dict(n=da.stack(dict(n=da.dims)).n),
+            ).unstack("n")
+
+    elif transform_type == "pca_hdbscan":
+        try:
+            pca__n_components = kwargs.pop("pca__n_components")
+        except KeyError:
+            raise Exception(
+                "To use HDBSCAN with PCA analysis first you need"
+                " provide the number of PCA components to keep with"
+                " the `pca__n_components` argument"
+            )
+        pca_model = sklearn.decomposition.PCA(n_components=pca__n_components)
+        hdbscan_model = hdbscan.HDBSCAN(core_dist_n_jobs=-1, **kwargs)
+        model = hdbscan_model
+
+        def fn_transform(X):
+            X1 = pca_model.fit_transform(X)
+            return hdbscan_model.fit(X1).labels_
+
+        def add_meta(da):
+            da.attrs["notes"] = "used PCA before HDBSCAN"
+
+    else:
+        raise NotImplementedError(transform_type)
+
+    da_cluster = _apply_transform_function(
+        da=da, fn=fn_transform, transform_name=transform_type
+    )
+
+    da_cluster.attrs.update(da.attrs)
+
+    if add_meta is not None:
+        add_meta(da_cluster)
+
+    da_cluster.attrs.update(da.attrs)
+    da_cluster.name = "emb"
+    for v in ["i0", "j0"]:
+        if v in da:
+            da_cluster[v] = da[v]
+    da_cluster.attrs["transform_type"] = transform_type
+    if kwargs:
+        s = ",".join([f"{k}={v}" for (k, v) in kwargs])
+        da_cluster.attrs["transform_extra_args"] = s
+    return da_cluster, model
+
+
 class EmbeddingTransform(luigi.Task):
     input_path = luigi.Parameter()
     transform_type = luigi.Parameter()
@@ -37,91 +117,26 @@ class EmbeddingTransform(luigi.Task):
     def run(self):
         da_emb = xr.open_dataarray(self.input_path)
 
-        add_meta = None
-        model = None
-        kwargs = self._parse_transform_extra_kwargs()
-
-        if self.transform_type == "kmeans":
-            fn_transform = sklearn.cluster.KMeans(**kwargs).fit_predict
-        elif self.transform_type in ["pca", "pca_clipped"]:
-            if self.pretrained_model is not None:
-                p = Path(self._get_pretrained_model_path()) / "{}.joblib".format(
-                    self.pretrained_model
-                )
-                if not p.exists():
-                    raise Exception(
-                        "Couldn't find pre-trained transform" " model in `{}`".format(p)
-                    )
-                model = joblib.load(str(p))
-                fn_transform = model.transform
-            else:
-                model = sklearn.decomposition.PCA(**kwargs)
-                fn_transform = model.fit_transform
-
-            def add_meta(da):
-                da["explained_variance"] = (
-                    "{}_dim".format(self.transform_type),
-                    model.explained_variance_ratio_,
-                )
-
-            if self.transform_type == "pca_clipped":
-                da_emb = da_emb.isel(x=slice(1, -1), y=slice(1, -1))
-
-        elif self.transform_type == "hdbscan":
-            model = hdbscan.HDBSCAN(core_dist_n_jobs=-1, **kwargs)
-
-            def fn_transform(X):
-                return model.fit(X).labels_
-
-            def add_meta(da):
-                return xr.DataArray(
-                    model.probabilities_,
-                    dims=("n"),
-                    coords=dict(n=da.stack(dict(n=da.dims)).n),
-                ).unstack("n")
-
-        elif self.transform_type == "pca_hdbscan":
-            try:
-                pca__n_components = kwargs.pop("pca__n_components")
-            except KeyError:
+        if self.pretrained_model:
+            p = Path(self._get_pretrained_model_path()) / "{}.joblib".format(
+                self.pretrained_model
+            )
+            if not p.exists():
                 raise Exception(
-                    "To use HDBSCAN with PCA analysis first you need"
-                    " provide the number of PCA components to keep with"
-                    " the `pca__n_components` argument"
+                    "Couldn't find pre-trained transform" " model in `{}`".format(p)
                 )
-            pca_model = sklearn.decomposition.PCA(n_components=pca__n_components)
-            hdbscan_model = hdbscan.HDBSCAN(core_dist_n_jobs=-1, **kwargs)
-            model = hdbscan_model
-
-            def fn_transform(X):
-                X1 = pca_model.fit_transform(X)
-                return hdbscan_model.fit(X1).labels_
-
-            def add_meta(da):
-                da.attrs["notes"] = "used PCA before HDBSCAN"
-
+            pretrained_model = joblib.load(str(p))
         else:
-            raise NotImplementedError(self.transform_type)
+            pretrained_model = None
 
-        da_cluster = apply_transform(
-            da=da_emb, fn=fn_transform, transform_name=self.transform_type
+        da_cluster, model = apply_transform(
+            da=da_emb, transform_type=self.transform_type,
+            pretrained_model=pretrained_model,
+            **self._parse_transform_extra_kwargs()
         )
 
         if model is not None and self.pretrained_model is None:
             joblib.dump(model, self.output()["model"].fn)
-
-        da_cluster.attrs.update(da_emb.attrs)
-
-        if add_meta is not None:
-            add_meta(da_cluster)
-
-        da_cluster.attrs.update(da_emb.attrs)
-        da_cluster.name = "emb"
-        da_cluster["i0"] = da_emb.i0
-        da_cluster["j0"] = da_emb.j0
-        da_cluster.attrs["transform_type"] = self.transform_type
-        if self.transform_extra_args:
-            da_cluster.attrs["transform_extra_args"] = self.transform_extra_args
 
         p_out = Path(self.output()["transformed_data"].fn).parent
         p_out.mkdir(exist_ok=True, parents=True)
