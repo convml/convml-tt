@@ -14,11 +14,7 @@ from ...architectures.triplet_trainer import monkey_patch_fastai
 
 monkey_patch_fastai()  # noqa
 
-
-def crop_fastai_im(img, i, j, nx=256, ny=256):
-    img_copy = img.__class__(img._px[:, j : j + ny, i : i + nx])
-    # From PIL docs: The crop rectangle, as a (left, upper, right, lower)-tuple.
-    return img_copy
+IMAGE_TILE_FILENAME_FORMAT = "{i:0d}_{j:0d}.png"
 
 
 class FakeImagesList(list):
@@ -38,38 +34,52 @@ class FakeImagesList(list):
         return items
 
 
-def rect_predict(model, img, N_tile, step=(10, 10)):
-    """
-    Produce moving-window prediction array from `img` with `model` with
-    step-size defined by `step` and tile-size `N_tile`.
+class RectTiler:
+    def __init__(self, img, N_tile, step):
+        self.img = img
+        self.ny, self.nx = img.size
+        self.nxt, self.nyt = N_tile
+        self.x_step, self.y_step = step
 
-    NB: j-indexing is from "top_left" i.e. is likely in the opposite order to
-    what would be expected for y-axis of original image (positive being up)
+        self.i_ = np.arange(0, self.nx - self.nxt + 1, self.x_step)
+        self.j_ = np.arange(0, self.ny - self.nyt + 1, self.y_step)
 
-    i0 and j0 coordinates denote center of each prediction tile
-    """
-    ny, nx = img.size
-    nxt, nyt = N_tile
-    x_step, y_step = step
+    @staticmethod
+    def _crop_fastai_im(img, i, j, nx=256, ny=256):
+        img_copy = img.__class__(img._px[:, j : j + ny, i : i + nx])
+        # From PIL docs: The crop rectangle, as a (left, upper, right, lower)-tuple.
+        return img_copy
 
-    il = FakeImagesList(None, None)
-    i_ = np.arange(0, nx - nxt + 1, x_step)
-    j_ = np.arange(0, ny - nyt + 1, y_step)
+    def get_tile_images(self):
+        for i in self.i_:
+            for j in self.j_:
+                tile_img = self._crop_fastai_im(self.img, i=i, j=j, nx=self.nxt, ny=self.nyt)
+                yield (i, j), tile_img
 
-    for n in i_:
-        for m in j_:
-            il.append(crop_fastai_im(img, n, m, nx=nxt, ny=nyt))
+    def make_tile_predictions(self, model):
+        """
+        Produce moving-window prediction array from `img` with `model` with
+        step-size defined by `step` and tile-size `N_tile`.
 
-    result = np.stack(model.predict(il)[1]).reshape((len(i_), len(j_), -1))
+        NB: j-indexing is from "top_left" i.e. is likely in the opposite order to
+        what would be expected for y-axis of original image (positive being up)
 
-    da = xr.DataArray(
-        result,
-        dims=("i0", "j0", "emb_dim"),
-        coords=dict(i0=i_ + nxt // 2, j0=j_ + nyt // 2),
-        attrs=dict(tile_nx=nxt, tile_ny=nyt),
-    )
+        i0 and j0 coordinates denote center of each prediction tile
+        """
+        il = FakeImagesList(None, None)
 
-    return da
+        for tile_img in self.get_tile_images():
+            il.append(tile_img)
+
+        final_shape = (len(self.i_), len(self.j_), -1)
+        result = np.stack(model.predict(il)[1]).reshape(final_shape)
+
+        return xr.DataArray(
+            result,
+            dims=("i0", "j0", "emb_dim"),
+            coords=dict(i0=self.i_ + self.nxt // 2, j0=self.j_ + self.nyt // 2),
+            attrs=dict(tile_nx=self.nxt, tile_ny=self.nyt),
+        )
 
 
 class ImagePredictionMapData(luigi.Task):
@@ -86,9 +96,8 @@ class ImagePredictionMapData(luigi.Task):
 
         N_tile = (256, 256)
 
-        da_pred = rect_predict(
-            model=model, img=img, step=(self.step_size, self.step_size), N_tile=N_tile
-        )
+        tiler = RectTiler(img=img, N_tile=N_tile, step=(self.step_size, self.step_size))
+        da_pred = tiler.make_tile_predictions(model=model)
 
         if self.src_data_path:
             da_src = xr.open_dataarray(self.src_data_path)
@@ -108,6 +117,8 @@ class ImagePredictionMapData(luigi.Task):
             da_pred.attrs["ly_tile"] = float(da_src.y[N_tile[1]] - da_src.y[0])
 
             # make sure the lat lon coords are available later
+            i0 = da_pred.i0
+            j0 = da_pred.j0
             da_pred.coords['lat'] = da_src.lat.isel(x=i0, y=j0)
             da_pred.coords['lon'] = da_src.lon.isel(x=i0, y=j0)
 
@@ -125,6 +136,68 @@ class ImagePredictionMapData(luigi.Task):
             ".png", ".embeddings.{}_step.nc".format(self.step_size)
         )
         return XArrayTarget(str(image_path / fn_out))
+
+
+class ImagePredictionMapImageTiles(luigi.Task):
+    image_path = luigi.Parameter()
+    src_data_path = luigi.OptionalParameter()
+    step_size = luigi.IntParameter(default=10)
+
+    def run(self):
+        img = open_image(self.image_path)
+
+        N_tile = (256, 256)
+
+        tiler = RectTiler(img=img, N_tile=N_tile, step=(self.step_size, self.step_size))
+
+        for (i, j), tile_img in tiler.get_tile_images():
+            filename = IMAGE_TILE_FILENAME_FORMAT.format(i=i, j=j)
+            tile_filepath = Path(self.output().fn).parent/filename
+            tile_img.save(str(tile_filepath))
+
+    def output(self):
+        image_fullpath = Path(self.image_path)
+        image_path, image_fn = image_fullpath.parent, image_fullpath.name
+
+        tile_path = Path(image_path) / "tiles" / image_fn.replace(".png", "")
+        tile_path.mkdir(exist_ok=True, parents=True)
+
+        fn_tile00 = IMAGE_TILE_FILENAME_FORMAT.format(i=0, j=0)
+        p = tile_path / fn_tile00
+        return luigi.LocalTarget(str(p))
+
+
+class DatasetImagePredictionMapImageTiles(ImagePredictionMapImageTiles):
+    dataset_path = luigi.Parameter()
+    scene_id = luigi.Parameter()
+
+    def requires(self):
+        return MakeRectRGBImage(dataset_path=self.dataset_path, scene_id=self.scene_id)
+
+    @property
+    def image_path(self):
+        return self.input().fn
+
+    @property
+    def src_data_path(self):
+        return self.requires().input().fn
+
+    def output(self):
+        dir_name = "{}_tiles_{}step".format(self.scene_id, self.step_size)
+        p_out = Path(self.dataset_path) / "composites" / "rect" / "tiles" / dir_name
+        p_out.mkdir(exist_ok=True, parents=True)
+        fn_tile00 = IMAGE_TILE_FILENAME_FORMAT.format(i=0, j=0)
+        p = p_out / fn_tile00
+        return luigi.LocalTarget(str(p))
+
+
+class AllDatasetImagePredictionMapImageTiles(SceneBulkProcessingBaseTask):
+    step_size = luigi.Parameter()
+
+    TaskClass = DatasetImagePredictionMapImageTiles
+
+    def _get_task_class_kwargs(self):
+        return dict(step_size=self.step_size,)
 
 
 class DatasetImagePredictionMapData(ImagePredictionMapData):

@@ -280,81 +280,97 @@ class AllDatasetComponentAnnotationMapImages(SceneBulkProcessingBaseTask):
         )
 
 
-class RGBAnnotationMapImage(luigi.Task):
-    input_path = luigi.Parameter()
-    rgb_components = luigi.ListParameter(default=[0, 1, 2])
-    src_data_path = luigi.Parameter()
-    render_tiles = luigi.BoolParameter(default=False)
+def make_rgb_annotation_map_image(da, rgb_components, dataset_path, render_tiles=False, crop_image=True):
+    if len(da.shape) == 3:
+        # ensure non-xy dim is first
+        d_not_xy = list(filter(lambda d: d not in ["x", "y"], da.dims))
+        da = da.transpose(*d_not_xy, "x", "y")
 
-    def make_plot(self, da_emb):
-
-        if len(da_emb.shape) == 3:
-            # ensure non-xy dim is first
-            d_not_xy = list(filter(lambda d: d not in ["x", "y"], da_emb.dims))
-            da_emb = da_emb.transpose(*d_not_xy, "x", "y")
-
-        img, img_extent = self.get_image(da_emb=da_emb)
-
-        # scale distances to km
-        if da_emb.x.units == "m" and da_emb.y.units == "m":
-            s = 1000.0
-            da_emb = da_emb.assign_coords(
-                dict(x=da_emb.x.values / 1000.0, y=da_emb.y.values / 1000.0)
+    def _get_image():
+        if "scene_id" in list(da.coords) + list(da.attrs.keys()):
+            try:
+                scene_id = da.attrs['scene_id']
+            except KeyError:
+                scene_id = da.scene_id.item()
+                assert type(scene_id) == str
+            img_path = (
+                MakeRectRGBImage(dataset_path=dataset_path, scene_id=scene_id)
+                .output()
+                .fn
             )
-            da_emb.x.attrs["units"] = "km"
-            da_emb.y.attrs["units"] = "km"
 
-            img_extent = np.array(img_extent) / 1000.0
+            if crop_image:
+                return _get_img_with_extent_cropped(da, img_path)
+            else:
+                return _get_img_with_extent(
+                    da=da, img_fn=img_path, dataset_path=dataset_path
+                )
         else:
-            s = 1.0
+            raise NotImplementedError(da)
 
-        if len(da_emb.shape) == 3:
-            da_rgba = _make_rgb(da=da_emb, dims=self.rgb_components, alpha=0.5)
-        elif len(da_emb.shape) == 2:
-            # when we have distinct classes (identified by integers) we just
-            # want to map each label to a RGB color
-            labels = da_emb.stack(dict(n=da_emb.dims))
-            arr_rgb = skimage.color.label2rgb(
-                label=labels.values, bg_color=(1.0, 1.0, 1.0)
-            )
-            # make an RGBA array so we can apply some alpha blending later
-            rgba_shape = list(arr_rgb.shape)
-            rgba_shape[-1] += 1
-            arr_rgba = 0.3 * np.ones((rgba_shape))
-            arr_rgba[..., :3] = arr_rgb
-            # and put this into a DataArray, unstack to recover original dimensions
-            da_rgba = xr.DataArray(
-                arr_rgba, dims=("n", "rgba"), coords=dict(n=labels.n)
-            ).unstack("n")
-        else:
-            raise NotImplementedError(da_emb.shape)
+    img, img_extent = _get_image()
 
-        nrows = self.render_tiles and 4 or 3
-
-        fig, axes = plt.subplots(
-            figsize=(8, 3.2 * nrows),
-            nrows=nrows,
-            subplot_kw=dict(aspect=1),
-            sharex=True,
+    # scale distances to km
+    if da.x.units == "m" and da.y.units == "m":
+        s = 1000.0
+        da = da.assign_coords(
+            dict(x=da.x.values / 1000.0, y=da.y.values / 1000.0)
         )
+        da.x.attrs["units"] = "km"
+        da.y.attrs["units"] = "km"
 
-        ax = axes[0]
-        ax.imshow(img, extent=img_extent, rasterized=True)
+        img_extent = np.array(img_extent) / 1000.0
+    else:
+        s = 1.0
 
-        ax = axes[1]
-        ax.imshow(img, extent=img_extent)
-        da_rgba.plot.imshow(ax=ax, rgb="rgba", y="y", rasterized=True)
+    if len(da.shape) == 3:
+        da_rgba = _make_rgb(da=da, dims=rgb_components, alpha=0.5)
+    elif len(da.shape) == 2:
+        # when we have distinct classes (identified by integers) we just
+        # want to map each label to a RGB color
+        labels = da.stack(dict(n=da.dims))
+        arr_rgb = skimage.color.label2rgb(
+            label=labels.values, bg_color=(1.0, 1.0, 1.0)
+        )
+        # make an RGBA array so we can apply some alpha blending later
+        rgba_shape = list(arr_rgb.shape)
+        rgba_shape[-1] += 1
+        arr_rgba = 0.3 * np.ones((rgba_shape))
+        arr_rgba[..., :3] = arr_rgb
+        # and put this into a DataArray, unstack to recover original dimensions
+        da_rgba = xr.DataArray(
+            arr_rgba, dims=("n", "rgba"), coords=dict(n=labels.n)
+        ).unstack("n")
+    else:
+        raise NotImplementedError(da.shape)
 
-        ax = axes[2]
-        da_rgba[3] = 1.0
-        da_rgba.plot.imshow(ax=ax, rgb="rgba", y="y", rasterized=True)
+    nrows = render_tiles and 4 or 3
 
-        if self.render_tiles:
-            x_, y_ = xr.broadcast(da_emb.x, da_emb.y)
+    fig, axes = plt.subplots(
+        figsize=(8, 3.2 * nrows),
+        nrows=nrows,
+        subplot_kw=dict(aspect=1),
+        sharex=True,
+    )
+
+    ax = axes[0]
+    ax.imshow(img, extent=img_extent, rasterized=True)
+
+    ax = axes[1]
+    ax.imshow(img, extent=img_extent)
+    da_rgba.plot.imshow(ax=ax, rgb="rgba", y="y", rasterized=True)
+
+    ax = axes[2]
+    da_rgba[3] = 1.0
+    da_rgba.plot.imshow(ax=ax, rgb="rgba", y="y", rasterized=True)
+
+    if 'lx_tile' in da.attrs and 'ly_tile' in da.attrs:
+        if render_tiles:
+            x_, y_ = xr.broadcast(da.x, da.y)
             axes[2].scatter(x_, y_, marker="x")
 
-            lx = da_emb.lx_tile / s
-            ly = da_emb.ly_tile / s
+            lx = da.lx_tile / s
+            ly = da.ly_tile / s
             ax = axes[3]
             ax.imshow(img, extent=img_extent)
             for xc, yc in zip(x_.values.flatten(), y_.values.flatten()):
@@ -385,9 +401,9 @@ class RGBAnnotationMapImage(luigi.Task):
 
             xlim, ylim = pad_lims(img_extent)
         else:
-            x0, y0 = da_emb.x.min(), da_emb.y.max()
-            lx = da_emb.lx_tile / s
-            ly = da_emb.ly_tile / s
+            x0, y0 = da.x.min(), da.y.max()
+            lx = da.lx_tile / s
+            ly = da.ly_tile / s
             rect = mpatches.Rectangle(
                 (x0 - lx / 2.0, y0 - ly / 2),
                 lx,
@@ -399,16 +415,26 @@ class RGBAnnotationMapImage(luigi.Task):
             )
             ax.add_patch(rect)
 
-            xlim = img_extent[:2]
-            ylim = img_extent[2:]
+    xlim = img_extent[:2]
+    ylim = img_extent[2:]
 
-        [ax.set_xlim(xlim) for ax in axes]
-        [ax.set_ylim(ylim) for ax in axes]
-        [ax.set_aspect(1) for ax in axes]
+    [ax.set_xlim(xlim) for ax in axes]
+    [ax.set_ylim(ylim) for ax in axes]
+    [ax.set_aspect(1) for ax in axes]
 
-        plt.tight_layout()
+    plt.tight_layout()
 
-        return fig, axes
+    return fig, axes
+
+
+class RGBAnnotationMapImage(luigi.Task):
+    input_path = luigi.Parameter()
+    rgb_components = luigi.ListParameter(default=[0, 1, 2])
+    src_data_path = luigi.Parameter()
+    render_tiles = luigi.BoolParameter(default=False)
+
+    def make_plot(self, da_emb):
+        return make_rgb_annotation_map_image(da_emb=da_emb, rgb_components=self.rgb_components)
 
     def run(self):
         da_emb = xr.open_dataarray(self.input_path)
@@ -416,9 +442,6 @@ class RGBAnnotationMapImage(luigi.Task):
 
         Path(self.output().fn).parent.mkdir(exist_ok=True, parents=True)
         plt.savefig(self.output().fn, fig=fig, bbox_inches="tight")
-
-    def get_image(self, da_emb):
-        raise NotImplementedError
 
     def output(self):
         image_fullpath = Path(self.input_path)
@@ -506,20 +529,6 @@ class DatasetRGBAnnotationMapImage(RGBAnnotationMapImage):
     @property
     def src_data_path(self):
         return self.dataset_path
-
-    def get_image(self, da_emb):
-        img_path = (
-            MakeRectRGBImage(dataset_path=self.dataset_path, scene_id=self.scene_id)
-            .output()
-            .fn
-        )
-
-        if self.crop_img:
-            return _get_img_with_extent_cropped(da_emb, img_path)
-        else:
-            return _get_img_with_extent(
-                da_emb=da_emb, img_fn=img_path, dataset_path=self.dataset_path
-            )
 
     def output(self):
         model_name = Path(self.model_path).name.replace(".pkl", "")
