@@ -14,7 +14,7 @@ from ...architectures.triplet_trainer import monkey_patch_fastai
 
 monkey_patch_fastai()  # noqa
 
-IMAGE_TILE_FILENAME_FORMAT = "{i:0d}_{j:0d}.png"
+IMAGE_TILE_FILENAME_FORMAT = "{i0:05d}_{j0:05d}.png"
 
 
 class FakeImagesList(list):
@@ -151,7 +151,8 @@ class ImagePredictionMapImageTiles(luigi.Task):
         tiler = RectTiler(img=img, N_tile=N_tile, step=(self.step_size, self.step_size))
 
         for (i, j), tile_img in tiler.get_tile_images():
-            filename = IMAGE_TILE_FILENAME_FORMAT.format(i=i, j=j)
+            nxt, nyt = tiler.nxt, tiler.nyt
+            filename = IMAGE_TILE_FILENAME_FORMAT.format(i0=i + nxt // 2, j0=j + nyt // 2)
             tile_filepath = Path(self.output().fn).parent/filename
             tile_img.save(str(tile_filepath))
 
@@ -186,7 +187,7 @@ class DatasetImagePredictionMapImageTiles(ImagePredictionMapImageTiles):
         dir_name = "{}_tiles_{}step".format(self.scene_id, self.step_size)
         p_out = Path(self.dataset_path) / "composites" / "rect" / "tiles" / dir_name
         p_out.mkdir(exist_ok=True, parents=True)
-        fn_tile00 = IMAGE_TILE_FILENAME_FORMAT.format(i=0, j=0)
+        fn_tile00 = IMAGE_TILE_FILENAME_FORMAT.format(i0=0, j0=0)
         p = p_out / fn_tile00
         return luigi.LocalTarget(str(p))
 
