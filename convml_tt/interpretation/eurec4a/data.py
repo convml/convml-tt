@@ -185,7 +185,7 @@ class DatasetImagePredictionMapImageTiles(ImagePredictionMapImageTiles):
         dir_name = "{}_tiles_{}step".format(self.scene_id, self.step_size)
         p_out = Path(self.dataset_path) / "composites" / "rect" / "tiles" / dir_name
         p_out.mkdir(exist_ok=True, parents=True)
-        fn_tile00 = IMAGE_TILE_FILENAME_FORMAT.format(i0=0, j0=0)
+        fn_tile00 = IMAGE_TILE_FILENAME_FORMAT.format(i0=128, j0=128)
         p = p_out / fn_tile00
         return luigi.LocalTarget(str(p))
 
