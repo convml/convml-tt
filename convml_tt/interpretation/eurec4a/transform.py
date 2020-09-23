@@ -138,6 +138,20 @@ class EmbeddingTransform(luigi.Task):
         if model is not None and self.pretrained_model is None:
             joblib.dump(model, self.output()["model"].fn)
 
+        da_cluster.attrs.update(da_emb.attrs)
+
+        da_cluster.attrs.update(da_emb.attrs)
+        da_cluster.name = "emb"
+        da_cluster["i0"] = da_emb.i0
+        da_cluster["j0"] = da_emb.j0
+        if 'lat' in da_emb.coords:
+            da_cluster['lat'] = da_emb.coords['lat']
+        if 'lon' in da_emb.coords:
+            da_cluster['lon'] = da_emb.coords['lon']
+        da_cluster.attrs["transform_type"] = self.transform_type
+        if self.transform_extra_args:
+            da_cluster.attrs["transform_extra_args"] = self.transform_extra_args
+
         p_out = Path(self.output()["transformed_data"].fn).parent
         p_out.mkdir(exist_ok=True, parents=True)
         da_cluster.to_netcdf(self.output()["transformed_data"].fn)
