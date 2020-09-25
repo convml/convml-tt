@@ -434,7 +434,10 @@ class RGBAnnotationMapImage(luigi.Task):
     render_tiles = luigi.BoolParameter(default=False)
 
     def make_plot(self, da_emb):
-        return make_rgb_annotation_map_image(da_emb=da_emb, rgb_components=self.rgb_components)
+        return make_rgb_annotation_map_image(
+            da=da_emb, rgb_components=self.rgb_components,
+            dataset_path=self.dataset_path
+            )
 
     def run(self):
         da_emb = xr.open_dataarray(self.input_path)
