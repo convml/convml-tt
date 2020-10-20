@@ -83,6 +83,12 @@ class RectTiler:
 
 
 class ImagePredictionMapData(luigi.Task):
+    """
+    Make embeddings for a Cartesian 2D image using a specific model skipping
+    every `step_size` grid-points in x and y. If `src_data_path` is provided
+    then the attributes from that will be copied over (for example lat lon
+    coordinates)
+    """
     model_path = luigi.Parameter()
     image_path = luigi.Parameter()
     src_data_path = luigi.OptionalParameter()
