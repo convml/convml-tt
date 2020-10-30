@@ -7,7 +7,7 @@ import luigi
 import xarray as xr
 import numpy as np
 
-from ...dataset import TripletDataset
+from ...dataset import TripletDataset, TrajectoryDataset
 from . import processing, pipeline
 from .bbox import LatLonBox
 from .tiler import RectTile
@@ -15,20 +15,46 @@ from .tiler import RectTile
 
 def _ensure_task_run(t):
     if not t.output().exists():
-        luigi.build([t, ], local_scheduler=True)
+        luigi.build([t,], local_scheduler=True)
     if not t.output().exists():
         raise Exception("Task didn't complete")
 
 
-class SatelliteTripletDataset(TripletDataset):
-    def __init__(self, domain_bbox, tile_size, tile_N, channels=[1, 2, 3],
-                 **kwargs):
+class SatelliteDatasetMixin:
+    def fetch_source_data(self):
+        return pipeline.GOES16Fetch(
+            dt_max=self._dt_max,
+            channels=self.channels,
+            times=self._times,
+            data_path=self.data_path,
+        )
+
+
+class SatelliteTripletDataset(TripletDataset, SatelliteDatasetMixin):
+    def __init__(self, domain_bbox, tile_size, tile_N, channels=[1, 2, 3], **kwargs):
         """
         tile_size: size of tile [m]
         tile_N: dimension of tile [1]
         """
         super().__init__(**kwargs)
+        self.tile_size = tile_size
+        self.tile_N = tile_N
+        self.channels = channels
         self.domain_bbox = domain_bbox
+
+
+class SatelliteTrajectoryDataset(TrajectoryDataset, SatelliteDatasetMixin):
+    # GOES-16 data is every 10min now, so 5min before/after should ensure we
+    # get one and only one scene
+    _dt_max = datetime.timedelta(minutes=5)
+    channels = [1, 2, 3]
+
+    def __init__(self, tile_size, tile_N, channels=[1, 2, 3], **kwargs):
+        """
+        tile_size: size of tile [m]
+        tile_N: dimension of tile [1]
+        """
+        super().__init__(**kwargs)
         self.tile_size = tile_size
         self.tile_N = tile_N
         self.channels = channels
@@ -38,39 +64,37 @@ class FixedTimeRangeSatelliteTripletDataset(SatelliteTripletDataset):
     class SourceDataNotDownloaded(Exception):
         pass
 
-    def __init__(self, t_start, N_days, N_hours_from_zenith,
-                 **kwargs):
-        if 'domain_bbox' not in kwargs and 'domain' in kwargs:
-            domain_rect = RectTile(**kwargs['domain'])
+    def __init__(self, t_start, N_days, N_hours_from_zenith, **kwargs):
+        if "domain_bbox" not in kwargs and "domain" in kwargs:
+            domain_rect = RectTile(**kwargs["domain"])
             domain_bounds = domain_rect.get_bounds()
-            kwargs['domain_bbox'] = [
-                [domain_bounds[:,0].min(), domain_bounds[:,1].min()], # noqa
-                [domain_bounds[:,0].max(), domain_bounds[:,1].max()], # noqa
+            kwargs["domain_bbox"] = [
+                [domain_bounds[:, 0].min(), domain_bounds[:, 1].min()],  # noqa
+                [domain_bounds[:, 0].max(), domain_bounds[:, 1].max()],  # noqa
             ]
-            kwargs['extra']['rectpred']['domain'] = kwargs.pop('domain')
+            kwargs["extra"]["rectpred"]["domain"] = kwargs.pop("domain")
         super().__init__(**kwargs)
         self.t_start = t_start
         self.N_days = N_days
         self.N_hours_from_zenith = N_hours_from_zenith
 
-        lon_zenith = kwargs['domain_bbox'][1][0]
+        lon_zenith = kwargs["domain_bbox"][1][0]
 
         self._dt_max = datetime.timedelta(hours=N_hours_from_zenith)
-        t_zenith = satdata.calc_nearest_zenith_time_at_loc(
-            lon_zenith, t_ref=t_start)
+        t_zenith = satdata.calc_nearest_zenith_time_at_loc(lon_zenith, t_ref=t_start)
         self._times = [
-            t_zenith + datetime.timedelta(days=n) for n in range(1, N_days+1)
+            t_zenith + datetime.timedelta(days=n) for n in range(1, N_days + 1)
         ]
 
     def _get_tiles_base_path(self):
-        return self.data_path/self.name
+        return self.data_path / self.name
 
     def _get_dataset_train_study_split(self):
         return pipeline.StudyTrainSplit(
-                dt_max=self._dt_max,
-                channels=[1, 2, 3],
-                times=self._times,
-                data_path=self.data_path
+            dt_max=self._dt_max,
+            channels=[1, 2, 3],
+            times=self._times,
+            data_path=self.data_path,
         )
 
     def get_num_scenes(self, for_training=True):
@@ -79,9 +103,9 @@ class FixedTimeRangeSatelliteTripletDataset(SatelliteTripletDataset):
         datasets_filenames_split = t.output().read()
 
         if for_training:
-            datasets_filenames = datasets_filenames_split['train']
+            datasets_filenames = datasets_filenames_split["train"]
         else:
-            datasets_filenames = datasets_filenames_split['study']
+            datasets_filenames = datasets_filenames_split["study"]
 
         return len(datasets_filenames)
 
@@ -92,9 +116,9 @@ class FixedTimeRangeSatelliteTripletDataset(SatelliteTripletDataset):
 
         datasets_filenames_split = t.output().read()
         if for_training:
-            datasets_filenames = datasets_filenames_split['train']
+            datasets_filenames = datasets_filenames_split["train"]
         else:
-            datasets_filenames = datasets_filenames_split['study']
+            datasets_filenames = datasets_filenames_split["study"]
 
         return pipeline.CreateRGBScene(
             source_fns=datasets_filenames[scene_num],
@@ -102,27 +126,19 @@ class FixedTimeRangeSatelliteTripletDataset(SatelliteTripletDataset):
             data_path=self.data_path,
         )
 
-    def fetch_source_data(self):
-        return pipeline.GOES16Fetch(
-                dt_max=self._dt_max,
-                channels=[1, 2, 3],
-                times=self._times,
-                data_path=self.data_path
-            )
-
     def generate(self):
         t = self._get_dataset_train_study_split()
         luigi.build([t], local_worker=True)
         datasets_filenames_split = t.output().read()
 
-        local_storage_dir = self.data_path/"source_data"/"goes16"
-        path_composites = self.data_path/"composites"
+        local_storage_dir = self.data_path / "source_data" / "goes16"
+        path_composites = self.data_path / "composites"
 
         for identifier, datasets_filenames in datasets_filenames_split.items():
             print("Creating tiles for `{}`".format(identifier))
 
             datasets_fullpaths = [
-                [str(local_storage_dir/fn) for fn in dataset]
+                [str(local_storage_dir / fn) for fn in dataset]
                 for dataset in datasets_filenames
             ]
 
@@ -133,15 +149,17 @@ class FixedTimeRangeSatelliteTripletDataset(SatelliteTripletDataset):
             scenes = processing.load_data_for_rgb(
                 datasets_filenames=datasets_fullpaths,
                 datasource_cli=satdata.Goes16AWS,
-                bbox_extent=self.domain_bbox, path_composites=path_composites
+                bbox_extent=self.domain_bbox,
+                path_composites=path_composites,
             )
 
             tile_path_base = self._get_tiles_base_path()
-            tile_path = tile_path_base/identifier
+            tile_path = tile_path_base / identifier
             tile_path.mkdir(exist_ok=True)
 
             processing.generate_tile_triplets(
-                scenes=scenes, tiling_bbox=self.domain_bbox,
+                scenes=scenes,
+                tiling_bbox=self.domain_bbox,
                 tile_size=self.tile_size,
                 tile_N=self.tile_N,
                 N_triplets=self.N_triplets[identifier],
@@ -151,7 +169,7 @@ class FixedTimeRangeSatelliteTripletDataset(SatelliteTripletDataset):
     def get_domain(self):
         return LatLonBox(self.domain_bbox)
 
-    def _plot_scene_outline(self, ax, scene_num=0, color='orange'):
+    def _plot_scene_outline(self, ax, scene_num=0, color="orange"):
         da_scene = None
         task_scene = self.get_scene(scene_num=scene_num)
         if task_scene.output().exists():
@@ -169,39 +187,45 @@ class FixedTimeRangeSatelliteTripletDataset(SatelliteTripletDataset):
         x_edge = border_elems(x_all.values, 1).flatten()
         y_edge = border_elems(y_all.values, 1).flatten()
 
-        return ax.scatter(x_edge, y_edge, transform=da_scene.crs, s=1,
-                          color=color, label='source data')
+        return ax.scatter(
+            x_edge,
+            y_edge,
+            transform=da_scene.crs,
+            s=1,
+            color=color,
+            label="source data",
+        )
 
     def plot_domain(self, ax, **kwargs):
         try:
-            ax.gridlines(linestyle='--', draw_labels=True)
+            ax.gridlines(linestyle="--", draw_labels=True)
         except TypeError:
-            ax.gridlines(linestyle='--', draw_labels=False)
-        ax.coastlines(resolution='10m', color='grey')
+            ax.gridlines(linestyle="--", draw_labels=False)
+        ax.coastlines(resolution="10m", color="grey")
 
         lines = []
 
         def draw_box(geom, color, face_alpha=0.5, label=None):
             lines.append(Line2D([0], [0], color=color, lw=1, label=label))
-            kwargs = dict(
-                crs=ccrs.PlateCarree(), edgecolor=color
-            )
+            kwargs = dict(crs=ccrs.PlateCarree(), edgecolor=color)
+            ax.add_geometries([geom,], alpha=face_alpha, facecolor=color, **kwargs)
             ax.add_geometries(
-                [geom, ], alpha=face_alpha, facecolor=color, **kwargs
+                [geom,],
+                alpha=face_alpha * 2.0,
+                facecolor="none",
+                linewidth=1.0,
+                label=label,
+                **kwargs
             )
-            ax.add_geometries(
-                [geom, ], alpha=face_alpha*2.0, facecolor='none',
-                linewidth=1.0, label=label, **kwargs
-            )
+
         domain_bbox = self.get_domain()
         bbox_shape = domain_bbox.get_outline_shape()
-        draw_box(bbox_shape, color='red', face_alpha=0.2, label="tiling bbox")
+        draw_box(bbox_shape, color="red", face_alpha=0.2, label="tiling bbox")
 
-        if 'rectpred' in self.extra:
-            domain_rect = RectTile(**self.extra['rectpred']['domain'])
+        if "rectpred" in self.extra:
+            domain_rect = RectTile(**self.extra["rectpred"]["domain"])
             bbox_shape = domain_rect.get_outline_shape()
-            draw_box(bbox_shape, color='green', face_alpha=0.2,
-                     label="rect domain")
+            draw_box(bbox_shape, color="green", face_alpha=0.2, label="rect domain")
 
         try:
             s = self._plot_scene_outline(ax=ax)

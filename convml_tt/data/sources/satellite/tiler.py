@@ -138,21 +138,41 @@ class RectTile():
 
         x = xr.DataArray(
             np.arange(-self.l_zonal/2., self.l_zonal/2, dx),
-            attrs=dict(longname='distance', units='m'),
+            attrs=dict(longname='approx distance from center', units='m'),
             dims=('x',)
         )
         y = xr.DataArray(
             np.arange(-self.l_meridional/2., self.l_meridional/2, dx),
-            attrs=dict(longname='distance', units='m'),
+            attrs=dict(longname='approx distance from center', units='m'),
             dims=('y',)
         )
 
         ds = xr.Dataset(coords=dict(x=x, y=y))
 
-        ds['lon'] = (('x', 'y'), pts[...,0])
-        ds['lat'] = (('x', 'y'), pts[...,1])
+        ds['lon'] = xr.DataArray(
+            pts[...,0],
+            dims=('x', 'y'),
+            coords=dict(x=ds.x, y=ds.y),
+            attrs=dict(standard_name="grid_longitude", units="degree")
+        )
+        ds['lat'] = xr.DataArray(
+            pts[...,1],
+            dims=('x', 'y'),
+            coords=dict(x=ds.x, y=ds.y),
+            attrs=dict(standard_name="grid_latitude", units="degree")
+        )
 
         return ds
+
+    def get_grid_extent(self):
+        """
+        Return grid extent compatible with matplotlib.imshow
+        [x0 ,x1, y0, y1] in Cartesian coordinates
+        """
+        return [
+            -self.l_zonal/2., self.l_zonal/2.,
+            -self.l_meridional/2., self.l_meridional/2.
+        ]
 
     def crop_field(self, da, pad_pct=0.1):
         return crop_field_to_latlon_box(

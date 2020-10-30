@@ -64,7 +64,7 @@ def save_scene_meta(source_fns, fn_meta):
 
     meta_info = dict(
         projection=serialize_attrs(ds.goes_imager_projection.attrs),
-        source_files=source_fns
+        source_files=[str(p) for p in source_fns]
     )
 
     with open(fn_meta, 'w') as fh:
