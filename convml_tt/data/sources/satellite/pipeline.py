@@ -8,7 +8,7 @@ import numpy as np
 
 from . import processing, satpy_rgb, tiler, bbox
 from ....pipeline import YAMLTarget
-from ...dataset import TripletDataset
+from ...dataset import GenericDataset
 
 SOURCE_DIR = Path("source_data")
 
@@ -224,11 +224,11 @@ class CreateRGBScene(luigi.Task):
     dataset_path = luigi.Parameter()
 
     def requires(self):
-        d = TripletDataset.load(self.dataset_path)
+        d = GenericDataset.load(self.dataset_path)
         return d.fetch_source_data()
 
     def run(self):
-        d = TripletDataset.load(self.dataset_path)
+        d = GenericDataset.load(self.dataset_path)
 
         all_source_data = self.input().read()
         if self.scene_id not in all_source_data:
@@ -246,7 +246,7 @@ class CreateRGBScene(luigi.Task):
             scene_fns=scene_fns
         )
 
-        bbox_domain = bbox.LatLonBox(d.domain_bbox)
+        bbox_domain = d.get_domain(da_scene=da_truecolor)
         domain_bbox_pad_frac = getattr(d, 'domain_bbox_pad_frac', 0.1)
 
         da_truecolor_domain = tiler.crop_field_to_latlon_box(

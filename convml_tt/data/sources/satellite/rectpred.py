@@ -5,6 +5,7 @@ from ....pipeline import XArrayTarget
 from ....data.dataset import SceneBulkProcessingBaseTask
 
 from pathlib import Path
+import warnings
 import luigi
 
 
@@ -16,16 +17,25 @@ class MakeRectRGBDataArray(luigi.Task):
         return FixedTimeRangeSatelliteTripletDataset.load(self.dataset_path)
 
     def requires(self):
-        return sat_pipeline.CreateRGBScene(
+        t = sat_pipeline.CreateRGBScene(
             scene_id=self.scene_id,
             dataset_path=self.dataset_path,
         )
+
+        if t.output().exists():
+            da_scene = t.output().open()
+            if da_scene.count() == 0:
+                warnings.warn("Something is wrong with RGB DataArray file"
+                              f" `{t.output().fn}`, it doesn't contain any"
+                              "data. Deleting so it can be recreated.")
+                Path(t.output().fn).unlink()
+        return t
 
     def run(self):
         da_scene = self.input().open()
 
         dataset = self._get_dataset()
-        domain_rect = tiler.RectTile(**dataset.extra['rectpred']['domain'])
+        domain_rect = dataset.get_domain_rect(da_scene=da_scene)
         da_rect = domain_rect.resample(
             da=da_scene,
             dx=dataset.extra['rectpred']['resolution'],

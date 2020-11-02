@@ -59,6 +59,16 @@ class SatelliteTrajectoryDataset(TrajectoryDataset, SatelliteDatasetMixin):
         self.tile_N = tile_N
         self.channels = channels
 
+    def get_domain_rect(self, da_scene):
+        ds_pt = self._ds_traj.sel(time=da_scene.start_time, method='nearest')
+        lat0, lon0 = ds_pt.lat.item(), ds_pt.lon.item()
+        tile = RectTile(lat0=lat0, lon0=lon0, l_meridional=self.tile_size, l_zonal=self.tile_size)
+        return tile
+
+    def get_domain(self, da_scene):
+        tile = self.get_domain_rect(da_scene=da_scene)
+        return LatLonBox(tile.get_bounds())
+
 
 class FixedTimeRangeSatelliteTripletDataset(SatelliteTripletDataset):
     class SourceDataNotDownloaded(Exception):
@@ -166,7 +176,7 @@ class FixedTimeRangeSatelliteTripletDataset(SatelliteTripletDataset):
                 output_dir=tile_path,
             )
 
-    def get_domain(self):
+    def get_domain(self, da_scene):
         return LatLonBox(self.domain_bbox)
 
     def _plot_scene_outline(self, ax, scene_num=0, color="orange"):
