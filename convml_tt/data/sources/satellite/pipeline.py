@@ -5,6 +5,7 @@ import luigi
 import dateutil.parser
 import xarray as xr
 import numpy as np
+import datetime
 
 from . import processing, satpy_rgb, tiler, bbox
 from ....pipeline import YAMLTarget
@@ -13,6 +14,11 @@ from ...dataset import GenericDataset
 SOURCE_DIR = Path("source_data")
 
 SCENE_ID_DATE_FORMAT = "%Y%m%d%H%M"
+
+def parse_scene_id(s):
+    return datetime.datetime.strptime(
+        s.replace("goes16_", ""), SCENE_ID_DATE_FORMAT
+    )
 
 
 class DatetimeListParameter(luigi.Parameter):

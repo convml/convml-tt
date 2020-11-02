@@ -16,6 +16,7 @@ monkey_patch_fastai()  # noqa
 
 IMAGE_TILE_FILENAME_FORMAT = "{i0:05d}_{j0:05d}.png"
 
+N_TILE = (256, 256)
 
 class FakeImagesList(list):
     def __init__(self, src_path, id, *args, **kwargs):
@@ -100,9 +101,7 @@ class ImagePredictionMapData(luigi.Task):
         model = load_learner(model_path, model_fn)
         img = open_image(self.image_path)
 
-        N_tile = (256, 256)
-
-        tiler = RectTiler(img=img, N_tile=N_tile, step=(self.step_size, self.step_size))
+        tiler = RectTiler(img=img, N_tile=n_TILE, step=(self.step_size, self.step_size))
         da_pred = tiler.make_tile_predictions(model=model)
 
         if self.src_data_path:
