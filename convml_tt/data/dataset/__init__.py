@@ -158,3 +158,39 @@ class SceneBulkProcessingBaseTask(luigi.Task):
         else:
             tasks = self._build_runtime_tasks()
             return {scene_id: t.output() for scene_id, t in tasks.items()}
+
+
+class GroupedSceneBulkProcessingBaseTask(SceneBulkProcessingBaseTask):
+    """
+    Groups all scenes in dataset by date and runs them provided Task
+    """
+    scene_prefix = "DATE"
+
+    def _build_runtime_tasks(self):
+        all_source_data = self.input().read()
+        kwargs = self._get_task_class_kwargs()
+
+        if not self.scene_prefix == "DATE":
+            raise NotImplementedError(self.scene_prefix)
+
+        scenes_by_prefix = {}
+        for scene_id in all_source_data.keys():
+            if not scene_id.startswith('goes16_'):
+                raise NotImplementedError(scene_id)
+
+            # the last four characters are the hour and minute
+            # TODO: generalise this to have a parser for the scene_id
+            prefix = scene_id[:-4]
+
+            if not prefix in scenes_by_prefix:
+                scenes_by_prefix[prefix] = []
+            scenes_by_prefix[prefix].append(scene_id)
+
+        tasks = {}
+        for prefix, scene_ids in scenes_by_prefix.items():
+            # XXX: fixme
+            scene_ids = scene_ids[20:]
+            tasks[prefix] = self.TaskClass(
+                scene_ids=scene_ids, prefix=prefix, dataset_path=self.dataset_path, **kwargs
+            )
+        return tasks

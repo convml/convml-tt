@@ -83,6 +83,12 @@ class RectTiler:
 
 
 class ImagePredictionMapData(luigi.Task):
+    """
+    Make embeddings for a Cartesian 2D image using a specific model skipping
+    every `step_size` grid-points in x and y. If `src_data_path` is provided
+    then the attributes from that will be copied over (for example lat lon
+    coordinates)
+    """
     model_path = luigi.Parameter()
     image_path = luigi.Parameter()
     src_data_path = luigi.OptionalParameter()
@@ -185,7 +191,7 @@ class DatasetImagePredictionMapImageTiles(ImagePredictionMapImageTiles):
         dir_name = "{}_tiles_{}step".format(self.scene_id, self.step_size)
         p_out = Path(self.dataset_path) / "composites" / "rect" / "tiles" / dir_name
         p_out.mkdir(exist_ok=True, parents=True)
-        fn_tile00 = IMAGE_TILE_FILENAME_FORMAT.format(i0=0, j0=0)
+        fn_tile00 = IMAGE_TILE_FILENAME_FORMAT.format(i0=128, j0=128)
         p = p_out / fn_tile00
         return luigi.LocalTarget(str(p))
 

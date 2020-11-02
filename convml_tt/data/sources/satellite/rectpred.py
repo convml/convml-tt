@@ -76,7 +76,7 @@ class MakeRectRGBImage(luigi.Task):
         p_out = (
             Path(self.dataset_path)/"composites"/"rect"/fn
         )
-        return XArrayTarget(str(p_out))
+        return luigi.LocalTarget(str(p_out))
 
 
 class MakeAllRectRGBDataArrays(SceneBulkProcessingBaseTask):
