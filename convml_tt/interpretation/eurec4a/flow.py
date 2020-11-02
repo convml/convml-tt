@@ -22,7 +22,7 @@ import luigi
 
 from ...data.dataset import GroupedSceneBulkProcessingBaseTask
 from ...pipeline import XArrayTarget
-from ...data.sources.satellite.rectpred import MakeRectRGBImage
+from ...data.sources.satellite.rectpred import MakeRectRGBImage, MakeRectRGBDataArray
 
 
 def shitomasi_detection(
@@ -197,18 +197,28 @@ class DatasetOpticalFlowTrajectories(luigi.Task):
     def requires(self):
         tasks = OrderedDict()
         for scene_id in self.scene_ids:
-            tasks[scene_id] = MakeRectRGBImage(
-                dataset_path=self.dataset_path, scene_id=scene_id)
+            tasks[scene_id] = dict(
+                image=MakeRectRGBImage(
+                    dataset_path=self.dataset_path, scene_id=scene_id,
+                ),
+                data=MakeRectRGBDataArray(
+                    dataset_path=self.dataset_path, scene_id=scene_id,
+                )
+            )
 
         return tasks
 
     def run(self):
-        image_filenames = [t.fn for t in self.input().values()]
+        image_filenames = [t['image'].fn for t in self.input().values()]
         ds_trajs = extract_trajectories(image_filenames=image_filenames)
         fn_to_scene_id = dict([(t.fn, scene_id) for (scene_id, t) in self.input().items()])
         scene_ids = [fn_to_scene_id[fn] for fn in ds_trajs.image_filename.values]
         ds_trajs['scene_id'] = 'image_filename', scene_ids
         ds_trajs = ds_trajs.swap_dims(dict(image_filename="scene_id"))
+
+        import ipdb
+        ipdb.set_trace()
+
         ds_trajs.to_netcdf(self.output().fn)
 
     def output(self):
@@ -222,3 +232,16 @@ class FullDatasetOpticalFlowTrajectories(GroupedSceneBulkProcessingBaseTask):
 
     def _get_task_class_kwargs(self):
         return {}
+
+    def run(self):
+        super().run()
+
+        tasks = self._build_runtime_tasks()
+        datasets = [t.output().open() for t in tasks.values()]
+
+        ds = xr.concat(datasets, dim="scene_id")
+        ds.to_netcdf(self.output().fn)
+
+    def output(self):
+        fn = "flow_trajectories_all.nc"
+        return XArrayTarget(fn)
