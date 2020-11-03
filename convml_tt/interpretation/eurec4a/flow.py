@@ -23,6 +23,7 @@ import luigi
 from ...data.dataset import GroupedSceneBulkProcessingBaseTask
 from ...pipeline import XArrayTarget
 from ...data.sources.satellite.rectpred import MakeRectRGBImage, MakeRectRGBDataArray
+from ...data.sources.satellite.pipeline import parse_scene_id
 
 
 def shitomasi_detection(
@@ -295,6 +296,8 @@ class FullDatasetOpticalFlowTrajectories(GroupedSceneBulkProcessingBaseTask):
         datasets = [t.output().open() for t in tasks.values()]
 
         ds = xr.concat(datasets, dim="scene_id")
+        times = [parse_scene_id(scene_id) for scene_id in ds.scene_id.values]
+        ds.coords['time'] = ('scene_id', ), times
         ds.to_netcdf(self.output().fn)
 
     def output(self):

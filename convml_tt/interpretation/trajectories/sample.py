@@ -116,6 +116,8 @@ class TrajectoryEmbeddingSampling(luigi.Task):
             emb_dataarrays.append(da_embs_scene)
 
         da_embs = xr.concat(emb_dataarrays, dim='scene_id')
+        times = [parse_scene_id(scene_id) for scene_id in da_embs.scene_id.values]
+        da_embs.coords['time'] = ('scene_id', ), times
         da_embs.to_netcdf(self.output().fn)
 
     def output(self):
