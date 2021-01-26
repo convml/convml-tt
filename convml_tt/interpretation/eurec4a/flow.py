@@ -26,6 +26,9 @@ from ...data.sources.satellite.rectpred import MakeRectRGBImage, MakeRectRGBData
 from ...data.sources.satellite.pipeline import parse_scene_id
 
 
+MIN_CORNERS = 100
+
+
 def shitomasi_detection(
     input_image,
     max_corners=1000,
@@ -165,7 +168,7 @@ def extract_trajectories(
         img_gray_arr = np.array(rgb2gray(rgba2rgb(np.array(img_src))))
         if img_prev_arr is None:
             points = shitomasi_detection(img_gray_arr, **point_method_kwargs)
-            if len(points) < 100:
+            if len(points) < MIN_CORNERS:
                 continue
             else:
                 traj_points.append(points)
@@ -220,6 +223,7 @@ class DatasetOpticalFlowTrajectories(luigi.Task):
     scene_ids = luigi.ListParameter()
     dataset_path = luigi.Parameter()
     prefix = luigi.Parameter()
+    max_num_trajectories = luigi.IntParameter(default=400)
 
     def requires(self):
         tasks = OrderedDict()
@@ -238,7 +242,12 @@ class DatasetOpticalFlowTrajectories(luigi.Task):
     def run(self):
         input = self.input()
         image_filenames = [t['image'].fn for t in input.values()]
-        ds_trajs = extract_trajectories(image_filenames=image_filenames)
+        ds_trajs = extract_trajectories(
+            image_filenames=image_filenames,
+            point_method_kwargs=dict(
+                max_corners=self.max_num_trajectories,
+            )
+        )
 
         # add a `scene_id` coordinate and make it the primary one
         fn_to_scene_id = dict([
