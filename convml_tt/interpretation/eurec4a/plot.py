@@ -281,6 +281,13 @@ class AllDatasetComponentAnnotationMapImages(SceneBulkProcessingBaseTask):
 
 
 def make_rgb_annotation_map_image(da, rgb_components, dataset_path, render_tiles=False, crop_image=True):
+    """
+    Render the contents of `da` onto the RGB image represented by the scene
+    (`scene_id` expected to be defined for `da`).
+
+    If `da` is 2D it will be rendered with discrete colours, otherwise if `da`
+    is 3D the components of da to use should be given by `rgb_components`
+    """
     if len(da.shape) == 3:
         # ensure non-xy dim is first
         d_not_xy = list(filter(lambda d: d not in ["x", "y"], da.dims))
