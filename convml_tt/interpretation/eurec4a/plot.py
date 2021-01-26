@@ -57,7 +57,7 @@ def _get_img_with_extent_cropped(da_emb, img_fn):
 
         extent = [*xlim, *ylim]
 
-    return img, extent
+    return img, np.array(extent)
 
 
 def _get_img_with_extent(da_emb, img_fn, dataset_path):
@@ -280,7 +280,7 @@ class AllDatasetComponentAnnotationMapImages(SceneBulkProcessingBaseTask):
         )
 
 
-def make_rgb_annotation_map_image(da, rgb_components, dataset_path, render_tiles=False, crop_image=True):
+def plot_scene_image(da, rgb_components, dataset_path, render_tiles=False, crop_image=True):
     """
     Render the contents of `da` onto the RGB image represented by the scene
     (`scene_id` expected to be defined for `da`).
@@ -317,16 +317,37 @@ def make_rgb_annotation_map_image(da, rgb_components, dataset_path, render_tiles
 
     img, img_extent = _get_image()
 
+    if ax is None:
+        lx = img_extent[1] - img_extent[0]
+        ly = img_extent[3] - img_extent[2]
+        r = lx/ly
+        fig_height = 3.0
+        fig_width = fig_height*r
+        fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+        ax.set_aspect(1.0)
+        ax.set_xlabel(xr.plot.utils.label_from_attrs(da.x))
+        ax.set_ylabel(xr.plot.utils.label_from_attrs(da.y))
+    ax.imshow(img, extent=img_extent, rasterized=True)
+
+    return ax, img_extent
+
+
+def make_rgb_annotation_map_image(da, rgb_components, dataset_path, render_tiles=False, crop_image=True):
+    if len(da.shape) == 3:
+        # ensure non-xy dim is first
+        d_not_xy = list(filter(lambda d: d not in ["x", "y"], da.dims))
+        da = da.transpose(*d_not_xy, "x", "y")
+
+    # now we get to adding the annotation
+
     # scale distances to km
     if da.x.units == "m" and da.y.units == "m":
         s = 1000.0
-        da = da.assign_coords(
-            dict(x=da.x.values / 1000.0, y=da.y.values / 1000.0)
+        da = da.copy().assign_coords(
+            dict(x=da.x.values / s, y=da.y.values / s)
         )
         da.x.attrs["units"] = "km"
         da.y.attrs["units"] = "km"
-
-        img_extent = np.array(img_extent) / 1000.0
     else:
         s = 1.0
 
@@ -351,8 +372,8 @@ def make_rgb_annotation_map_image(da, rgb_components, dataset_path, render_tiles
     else:
         raise NotImplementedError(da.shape)
 
+    # set up the figure
     nrows = render_tiles and 4 or 3
-
     fig, axes = plt.subplots(
         figsize=(8, 3.2 * nrows),
         nrows=nrows,
@@ -361,10 +382,10 @@ def make_rgb_annotation_map_image(da, rgb_components, dataset_path, render_tiles
     )
 
     ax = axes[0]
-    ax.imshow(img, extent=img_extent, rasterized=True)
+    _, img_extent = plot_scene_image(da=da, dataset_path=dataset_path, ax=ax, crop_image=crop_image)
 
     ax = axes[1]
-    ax.imshow(img, extent=img_extent)
+    plot_scene_image(da=da, dataset_path=dataset_path, ax=ax, crop_image=crop_image)
     da_rgba.plot.imshow(ax=ax, rgb="rgba", y="y", rasterized=True)
 
     ax = axes[2]
