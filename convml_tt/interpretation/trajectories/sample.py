@@ -99,13 +99,17 @@ class TrajectoryEmbeddingSampling(luigi.Task):
                     has_valid_tile[n] = True
                     tile_images.append(tile_img)
 
-            embs = make_tile_predictions(model=model, tile_images=tile_images)
-
-            N_embs, N_dims = embs.shape
-            assert np.count_nonzero(has_valid_tile) == N_embs
-
+            N_dims = 100
             embs_all = np.nan*np.ones((N_points, N_dims))
-            embs_all[has_valid_tile] == embs
+
+            if len(tile_images) > 0:
+                embs = make_tile_predictions(model=model, tile_images=tile_images)
+                N_embs, N_dims_ = embs.shape
+                assert N_dims == N_dims_
+                assert np.count_nonzero(has_valid_tile) == N_embs
+                embs_all[has_valid_tile] = embs
+            else:
+                embs = None
 
             da_embs_scene = xr.DataArray(
                 embs_all,

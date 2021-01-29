@@ -176,8 +176,11 @@ class FixedTimeRangeSatelliteTripletDataset(SatelliteTripletDataset):
                 output_dir=tile_path,
             )
 
-    def get_domain(self, da_scene):
+    def get_domain(self, **kwargs):
         return LatLonBox(self.domain_bbox)
+
+    def get_domain_rect(self, **kwargs):
+        return RectTile(**self.extra['rectpred']['domain'])
 
     def _plot_scene_outline(self, ax, scene_num=0, color="orange"):
         da_scene = None
