@@ -23,12 +23,16 @@ class MakeRectRGBDataArray(luigi.Task):
         )
 
         if t.output().exists():
-            da_scene = t.output().open()
-            if da_scene.count() == 0:
-                warnings.warn("Something is wrong with RGB DataArray file"
-                              f" `{t.output().fn}`, it doesn't contain any"
-                              "data. Deleting so it can be recreated.")
-                Path(t.output().fn).unlink()
+            try:
+                da_scene = t.output().open()
+                if da_scene.count() == 0:
+                    warnings.warn("Something is wrong with RGB DataArray file"
+                                  f" `{t.output().fn}`, it doesn't contain any"
+                                  "data. Deleting so it can be recreated.")
+                    Path(t.output().fn).unlink()
+            except Exception:
+                print(f"There was a problem opening `{t.output().fn}`")
+                raise
         return t
 
     def run(self):
