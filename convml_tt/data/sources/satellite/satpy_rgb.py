@@ -7,6 +7,11 @@ import numpy as np
 from satdata import Goes16AWS
 from . import tiler, bbox
 
+import satpy.composites.viirs
+import satpy.composites.abi
+import satpy.composites.cloud_products
+import satpy.enhancements
+
 
 def _cleanup_composite_da_attrs(da_composite):
     """
@@ -39,8 +44,9 @@ def _cleanup_composite_da_attrs(da_composite):
     return da_composite
 
 
-def _save_projection_info_to_yaml(channel_fn, fn_meta):
-    ds = xr.open_dataset(channel_fn)
+def save_scene_meta(source_fns, fn_meta):
+    # get projection info just from the first source file
+    ds = xr.open_dataset(source_fns[0])
 
     def serialize_attrs(attrs):
         new_attrs = {}
@@ -57,14 +63,15 @@ def _save_projection_info_to_yaml(channel_fn, fn_meta):
         return new_attrs
 
     meta_info = dict(
-        projection=serialize_attrs(ds.goes_imager_projection.attrs)
+        projection=serialize_attrs(ds.goes_imager_projection.attrs),
+        source_files=[str(p) for p in source_fns]
     )
 
     with open(fn_meta, 'w') as fh:
         yaml.dump(meta_info, stream=fh, default_flow_style=False)
 
 
-def _create_ccrs_from_yaml(fn_meta):
+def load_scene_meta(fn_meta):
     with open(fn_meta) as fh:
         meta_info = yaml.load(fh)
 
@@ -76,14 +83,17 @@ def _create_ccrs_from_yaml(fn_meta):
         semiminor_axis=gp['semi_minor_axis']
     )
 
-    return ccrs.Geostationary(
+    crs = ccrs.Geostationary(
         satellite_height=gp['perspective_point_height'],
         central_longitude=gp['longitude_of_projection_origin'],
         globe=globe
     )
 
+    meta_info['crs'] = crs
+    del(meta_info['projection'])
+    return meta_info
 
-def _load_rgb_files_and_get_composite_da(scene_fns):
+def load_rgb_files_and_get_composite_da(scene_fns):
     scene = satpy.Scene(reader='abi_l1b', filenames=scene_fns)
 
     # instruct satpy to load the channels necessary for the `true_color`
@@ -98,6 +108,9 @@ def _load_rgb_files_and_get_composite_da(scene_fns):
     # get out a dask-backed DataArray for the composite
     da_truecolor = new_scn['true_color']
 
+    if 'crs' in da_truecolor:
+        da_truecolor = da_truecolor.drop('crs')
+
     # to be able to crop the DataArray to the bounding box we need to set the
     # projection attribute
     da_truecolor.attrs['crs'] = scene.max_area().to_cartopy_crs()
@@ -105,7 +118,7 @@ def _load_rgb_files_and_get_composite_da(scene_fns):
     return da_truecolor
 
 
-def _make_composite_filename(scene_fns, bbox_extent):
+def make_composite_filename(scene_fns, bbox_extent):
     key_attrs = Goes16AWS.parse_key(scene_fns[0])
     t_start_str, t_end_str = key_attrs['start_time'], key_attrs['end_time']
 
@@ -125,16 +138,18 @@ def get_rgb_composite_in_bbox(scene_fns, data_path, bbox_extent,
 
     bbox_extent = (pt_SW, pt_NE)
     """
-    fn_nc = _make_composite_filename(scene_fns=scene_fns,
+    fn_nc = make_composite_filename(scene_fns=scene_fns,
                                      bbox_extent=bbox_extent)
 
     path_nc = data_path/fn_nc
     path_meta = data_path/fn_nc.replace('.nc', '.meta.yaml')
 
+    data_path.mkdir(exist_ok=True, parents=True)
+
     bbox_domain = bbox.LatLonBox(bbox_extent)
 
     if not path_nc.exists():
-        da_truecolor = _load_rgb_files_and_get_composite_da(scene_fns=scene_fns)
+        da_truecolor = load_rgb_files_and_get_composite_da(scene_fns=scene_fns)
 
         da_truecolor_domain = tiler.crop_field_to_latlon_box(
             da=da_truecolor, box=np.array(bbox_domain.get_bounds()).T,
@@ -145,17 +160,14 @@ def get_rgb_composite_in_bbox(scene_fns, data_path, bbox_extent,
 
         da_truecolor_domain.to_netcdf(path_nc)
 
-        meta = _save_projection_info_to_yaml(channel_fn=scene_fns[0],
+        meta = _save_scene_meta(source_fns=scene_fns,
                                              fn_meta=path_meta)
-
-    da = xr.open_dataarray(path_nc)
-    da.attrs['crs'] = _create_ccrs_from_yaml(fn_meta=path_meta)
-
-    if not 'source_files' in da.attrs:
-        da.attrs['source_files'] = scene_fns
 
     return da
 
 
 def rgb_da_to_img(da):
-    return satpy.writers.get_enhanced_image(da)
+    # need to sort by y otherize resulting image is flipped... there must be a
+    # better way
+    da_ = da.sortby('y', ascending=False)
+    return satpy.writers.get_enhanced_image(da_)

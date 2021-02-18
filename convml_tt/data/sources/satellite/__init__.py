@@ -1,153 +1,252 @@
 import datetime
-import yaml
-from pathlib import Path
 
+from matplotlib.lines import Line2D
+import cartopy.crs as ccrs
 import satdata
+import luigi
+import xarray as xr
+import numpy as np
 
-from ...dataset import TripletDataset
-from . import processing
+from ...dataset import TripletDataset, TrajectoryDataset
+from . import processing, pipeline
 from .bbox import LatLonBox
+from .tiler import RectTile
 
 
-class SatelliteTripletDataset(TripletDataset):
-    def __init__(self, domain_bbox, tile_size, tile_N, channels=[1,2,3],
-                 **kwargs):
+def _ensure_task_run(t):
+    if not t.output().exists():
+        luigi.build([t,], local_scheduler=True)
+    if not t.output().exists():
+        raise Exception("Task didn't complete")
+
+
+class SatelliteDatasetMixin:
+    def fetch_source_data(self):
+        return pipeline.GOES16Fetch(
+            dt_max=self._dt_max,
+            channels=self.channels,
+            times=self._times,
+            data_path=self.data_path,
+        )
+
+
+class SatelliteTripletDataset(TripletDataset, SatelliteDatasetMixin):
+    def __init__(self, domain_bbox, tile_size, tile_N, channels=[1, 2, 3], **kwargs):
         """
         tile_size: size of tile [m]
         tile_N: dimension of tile [1]
         """
         super().__init__(**kwargs)
+        self.tile_size = tile_size
+        self.tile_N = tile_N
+        self.channels = channels
         self.domain_bbox = domain_bbox
+
+
+class SatelliteTrajectoryDataset(TrajectoryDataset, SatelliteDatasetMixin):
+    # GOES-16 data is every 10min now, so 5min before/after should ensure we
+    # get one and only one scene
+    _dt_max = datetime.timedelta(minutes=5)
+    channels = [1, 2, 3]
+
+    def __init__(self, tile_size, tile_N, channels=[1, 2, 3], **kwargs):
+        """
+        tile_size: size of tile [m]
+        tile_N: dimension of tile [1]
+        """
+        super().__init__(**kwargs)
         self.tile_size = tile_size
         self.tile_N = tile_N
         self.channels = channels
 
+    def get_domain_rect(self, da_scene):
+        ds_pt = self._ds_traj.sel(time=da_scene.start_time, method='nearest')
+        lat0, lon0 = ds_pt.lat.item(), ds_pt.lon.item()
+        tile = RectTile(lat0=lat0, lon0=lon0, l_meridional=self.tile_size, l_zonal=self.tile_size)
+        return tile
+
+    def get_domain(self, da_scene):
+        tile = self.get_domain_rect(da_scene=da_scene)
+        return LatLonBox(tile.get_bounds())
+
+
 class FixedTimeRangeSatelliteTripletDataset(SatelliteTripletDataset):
-    def __init__(self, t_start, N_days, N_hours_from_zenith,
-                 **kwargs):
+    class SourceDataNotDownloaded(Exception):
+        pass
+
+    def __init__(self, t_start, N_days, N_hours_from_zenith, **kwargs):
+        if "domain_bbox" not in kwargs and "domain" in kwargs:
+            domain_rect = RectTile(**kwargs["domain"])
+            domain_bounds = domain_rect.get_bounds()
+            kwargs["domain_bbox"] = [
+                [domain_bounds[:, 0].min(), domain_bounds[:, 1].min()],  # noqa
+                [domain_bounds[:, 0].max(), domain_bounds[:, 1].max()],  # noqa
+            ]
+            kwargs["extra"]["rectpred"]["domain"] = kwargs.pop("domain")
         super().__init__(**kwargs)
         self.t_start = t_start
         self.N_days = N_days
         self.N_hours_from_zenith = N_hours_from_zenith
 
-        lon_zenith = kwargs['domain_bbox'][1][0]
+        lon_zenith = kwargs["domain_bbox"][1][0]
 
         self._dt_max = datetime.timedelta(hours=N_hours_from_zenith)
-        t_zenith = satdata.calc_nearest_zenith_time_at_loc(lon_zenith, t_ref=t_start) 
-        self._times = [t_zenith + datetime.timedelta(days=n) for n in range(1, N_days)]
+        t_zenith = satdata.calc_nearest_zenith_time_at_loc(lon_zenith, t_ref=t_start)
+        self._times = [
+            t_zenith + datetime.timedelta(days=n) for n in range(1, N_days + 1)
+        ]
 
     def _get_tiles_base_path(self):
-        return self.data_path/self.name
+        return self.data_path / self.name
 
-    def _get_dataset_train_study_split(self, cli):
-        path_tiles_meta = self._get_tiles_base_path()/"training_study_split.yaml"
-
-        if path_tiles_meta.exists():
-            print("Definition for test vs study split was found in `{}`, "
-                  "assuming that all necessary data has already been downloaded"
-                  "".format(path_tiles_meta))
-            with open(path_tiles_meta) as fh:
-                datasets_filenames_split = yaml.load(fh)
-        else:
-            # get tuples of channel "keys" (storage ids) for all the valid times queried
-            datasets_keys = processing.find_datasets_keys(
-                times=self._times, dt_max=self._dt_max, channels=self.channels,
-                cli=cli,
-            )
-
-            if len(datasets_keys) == 0:
-                raise Exception("Couldn't find any data matching the provided query")
-
-            # download all the files using the cli (flatting list first...)
-            print("Downloading channel files...")
-            keys = [fn for fns in datasets_keys for fn in fns]
-            fns = cli.download(keys)
-
-            # now we know where each key was stored, so we can map the dataset keys to
-            # the filenames they were stored into
-            kfmap = dict(zip(keys, fns))
-            datasets_filenames_all = [
-                [kfmap[k] for k in dataset_keys]
-                for dataset_keys in datasets_keys
-            ]
-
-            datasets_filenames_split = (
-                processing.pick_one_time_per_date_for_study(datasets_filenames_all)
-            )
-
-            with open(path_tiles_meta, "w") as fh:
-                yaml.dump(datasets_filenames_split, fh, default_flow_style=False)
-
-        return datasets_filenames_split
-
-    def get_dataset_scene(self, data_path, scene_num, offline_cli=True, for_training=True):
-
-        local_storage_dir = Path(data_path).expanduser()/"sources"/"goes16"
-        path_composites = Path(data_path).expanduser()/"composites"
-        cli = satdata.Goes16AWS(
-            offline=offline_cli,
-            local_storage_dir=local_storage_dir
+    def _get_dataset_train_study_split(self):
+        return pipeline.StudyTrainSplit(
+            dt_max=self._dt_max,
+            channels=[1, 2, 3],
+            times=self._times,
+            data_path=self.data_path,
         )
 
-        datasets_filenames_split = self._get_dataset_train_study_split(cli=cli)
+    def get_num_scenes(self, for_training=True):
+        t = self._get_dataset_train_study_split()
+        _ensure_task_run(t)
+        datasets_filenames_split = t.output().read()
+
         if for_training:
-            datasets_filenames = datasets_filenames_split['train']
+            datasets_filenames = datasets_filenames_split["train"]
         else:
-            datasets_filenames = datasets_filenames_split['study']
+            datasets_filenames = datasets_filenames_split["study"]
 
-        scenes = processing.load_data_for_rgb(
-            datasets_filenames=[datasets_filenames[scene_num],], cli=cli,
-            bbox_extent=self.domain_bbox, path_composites=path_composites
-        )
-        return scenes[0]
+        return len(datasets_filenames)
 
-    def generate(self, data_path, offline_cli):
-        local_storage_dir = data_path/"sources"/"goes16"
-        path_composites = data_path/"composites"
+    def get_scene(self, scene_num, for_training=True):
+        t = self._get_dataset_train_study_split()
+        if not t.output().exists():
+            raise self.SourceDataNotDownloaded("Please run `fetch_data`")
 
-        cli = satdata.Goes16AWS(
-            offline=offline_cli,
-            local_storage_dir=local_storage_dir
-        )
+        datasets_filenames_split = t.output().read()
+        if for_training:
+            datasets_filenames = datasets_filenames_split["train"]
+        else:
+            datasets_filenames = datasets_filenames_split["study"]
 
-        datasets_filenames_split = self._get_dataset_train_study_split(cli=cli)
-        self._generate(
-            data_path=data_path,
-            offline_clie=offline_cli,
-            datasets_filenames_split=datasets_filenames_split
+        return pipeline.CreateRGBScene(
+            source_fns=datasets_filenames[scene_num],
+            domain_bbox=self.domain_bbox,
+            data_path=self.data_path,
         )
 
-    def get_domain(self):
-        return LatLonBox(self.domain_bbox)
+    def generate(self):
+        t = self._get_dataset_train_study_split()
+        luigi.build([t], local_worker=True)
+        datasets_filenames_split = t.output().read()
 
-    def _generate(self, data_path, offline_cli, datasets_filenames_split):
-        local_storage_dir = data_path/"sources"/"goes16"
-        path_composites = data_path/"composites"
-
-        cli = satdata.Goes16AWS(
-            offline=offline_cli,
-            local_storage_dir=local_storage_dir
-        )
+        local_storage_dir = self.data_path / "source_data" / "goes16"
+        path_composites = self.data_path / "composites"
 
         for identifier, datasets_filenames in datasets_filenames_split.items():
             print("Creating tiles for `{}`".format(identifier))
 
-            # load "scenes", either a dataarray containing all channels for a given
-            # time or a satpy channel (which is primed to create a RGB composite)
+            datasets_fullpaths = [
+                [str(local_storage_dir / fn) for fn in dataset]
+                for dataset in datasets_filenames
+            ]
+
+            # load "scenes", either a dataarray containing all channels for a
+            # given time or a satpy channel (which is primed to create a RGB
+            # composite)
             print("Reading in files")
             scenes = processing.load_data_for_rgb(
-                datasets_filenames=datasets_filenames, cli=cli,
-                bbox_extent=self.domain_bbox, path_composites=path_composites
+                datasets_filenames=datasets_fullpaths,
+                datasource_cli=satdata.Goes16AWS,
+                bbox_extent=self.domain_bbox,
+                path_composites=path_composites,
             )
 
-            tile_path = tile_path_base/identifier
+            tile_path_base = self._get_tiles_base_path()
+            tile_path = tile_path_base / identifier
             tile_path.mkdir(exist_ok=True)
 
             processing.generate_tile_triplets(
-                scenes=scenes, tiling_bbox=TILING_BBOX_EXTENT,
-                tile_size=tile_size,
-                tile_N=tile_N,
-                N_triplets=N_triplets[identifier],
+                scenes=scenes,
+                tiling_bbox=self.domain_bbox,
+                tile_size=self.tile_size,
+                tile_N=self.tile_N,
+                N_triplets=self.N_triplets[identifier],
                 output_dir=tile_path,
-                max_workers=max_workers
             )
+
+    def get_domain(self, **kwargs):
+        return LatLonBox(self.domain_bbox)
+
+    def get_domain_rect(self, **kwargs):
+        return RectTile(**self.extra['rectpred']['domain'])
+
+    def _plot_scene_outline(self, ax, scene_num=0, color="orange"):
+        da_scene = None
+        task_scene = self.get_scene(scene_num=scene_num)
+        if task_scene.output().exists():
+            da_scene = task_scene.output().open()  # noqa
+
+        x_all, y_all = xr.broadcast(da_scene.x, da_scene.y)
+
+        def border_elems(a, W):
+            n1 = a.shape[0]
+            r1 = np.minimum(np.arange(n1)[::-1], np.arange(n1))
+            n2 = a.shape[1]
+            r2 = np.minimum(np.arange(n2)[::-1], np.arange(n2))
+            return a[np.minimum(r1[:, None], r2) < W]
+
+        x_edge = border_elems(x_all.values, 1).flatten()
+        y_edge = border_elems(y_all.values, 1).flatten()
+
+        return ax.scatter(
+            x_edge,
+            y_edge,
+            transform=da_scene.crs,
+            s=1,
+            color=color,
+            label="source data",
+        )
+
+    def plot_domain(self, ax, **kwargs):
+        try:
+            ax.gridlines(linestyle="--", draw_labels=True)
+        except TypeError:
+            ax.gridlines(linestyle="--", draw_labels=False)
+        ax.coastlines(resolution="10m", color="grey")
+
+        lines = []
+
+        def draw_box(geom, color, face_alpha=0.5, label=None):
+            lines.append(Line2D([0], [0], color=color, lw=1, label=label))
+            kwargs = dict(crs=ccrs.PlateCarree(), edgecolor=color)
+            ax.add_geometries([geom,], alpha=face_alpha, facecolor=color, **kwargs)
+            ax.add_geometries(
+                [geom,],
+                alpha=face_alpha * 2.0,
+                facecolor="none",
+                linewidth=1.0,
+                label=label,
+                **kwargs
+            )
+
+        domain_bbox = self.get_domain()
+        bbox_shape = domain_bbox.get_outline_shape()
+        draw_box(bbox_shape, color="red", face_alpha=0.2, label="tiling bbox")
+
+        if "rectpred" in self.extra:
+            domain_rect = RectTile(**self.extra["rectpred"]["domain"])
+            bbox_shape = domain_rect.get_outline_shape()
+            draw_box(bbox_shape, color="green", face_alpha=0.2, label="rect domain")
+
+        try:
+            s = self._plot_scene_outline(ax=ax)
+            lines.append(s)
+        except self.SourceDataNotDownloaded:
+            pass
+
+        # [x0, x1, y0, y1]
+        ax.set_extent(domain_bbox.get_extent(pad=0.8), crs=ccrs.PlateCarree())
+
+        ax.legend(lines, [l.get_label() for l in lines])

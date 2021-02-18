@@ -6,7 +6,7 @@ channels:
   - defaults
   - conda-forge
 dependencies:
-  - pip<=19.0.0 # until PEP517 is fixed we can use pip v19.x, see https://github.com/SciTools/cartopy/issues/1270#issuecomment-458933013
+  - pip
   - python=3.7
   - boto3
   - cartopy
@@ -26,7 +26,7 @@ dependencies:
   - xesmf
   - pip:
     # satpy deps
-    - satpy==0.12.0
+    - satpy
     - esmpy
     - progressbar
     - fastai==1.0.53
@@ -34,3 +34,5 @@ dependencies:
     - "git+https://github.com/leifdenby/satdata@v0.1.3#egg=satdata"
     - "git+https://github.com/leifdenby/convorg@v0.1.2#egg=convorg"
     - fastprogress==0.1.19  # fastai==1.0.53 needs this but requirements they define allow for newer version
+    - hdbscan
+    - coloredlogs
