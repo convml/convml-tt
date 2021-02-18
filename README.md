@@ -51,18 +51,47 @@ Once you have a conda environment set up and **activated** you can install
 pip install .
 ```
 
-Now you will have `convml_tt` available whenever you activate the `convml_tt`
-conda environment.
+Now you will have `convml_tt` available whenever you activate the
+`convml_tt` conda environment. You will have the *base* components of
+`convml_tt` installed which enable training the model on a existing
+triplet-dataset and making predictions with a trained model. To produce
+training data for `convml_tt` more dependecies are required depending on
+the kind of input data you want to use (see "Creating training data"
+below).
+
 
 ## Training
 
 ### Training data
+
+#### Example dataset
 
 A small example training dataset (2000 triplets for training and 500 for study)
 can be download
 [here](https://leeds365-my.sharepoint.com/:u:/g/personal/earlcd_leeds_ac_uk/Ee-_nQExD9VCpWYEj8oBA1UBQ0XA6X8GlrXNdBVNe06jQg?e=s1cEBY).
 **NOTE**: it's 1.10GB in size(!) To use the directory structure above this
 tar-ball should be extracted into `~/ml_project/data/storage/tiles/goes16/`
+
+
+#### Creating training data from GOES-16 satellite observations
+
+To work with satellite data you will need packages that kind read this
+data, reproject it and plot it on maps. These requires some system
+libraries that can be difficult to install using only `pip`, but can
+easily be installed with conda into your `convml_tt` environment
+
+```bash
+conda install -c conda-forge xesmf cartopy
+```
+
+And then use pip to install the matching python packages
+
+```bash
+pip install .[sattiles]
+```
+
+**TODO**: complete rest of guide talking about processing pipeline and
+downloading satellite data
 
 An example of how to generate a dataset can be see in
 `training_gen_examples/goes16_training_and_study.py`. This script attempts to
