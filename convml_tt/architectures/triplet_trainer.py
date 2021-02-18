@@ -1,129 +1,167 @@
-from torch.utils.data import Dataset, DataLoader
-
 # fastai v1.0.46: ImageItemList -> ImageList
 try:
     from fastai.vision.data import ImageList
 except ImportError:
     from fastai.vision.data import ImageItemList as ImageList
 
-from fastai.vision.image import Image, pil2tensor
-from fastai.data_block import get_files, EmptyLabelList, ItemList
-from fastai.vision.data import ImageDataBunch, channel_view, normalize_funcs
-from fastai.basic_data import DeviceDataLoader, DatasetType
-from fastai.vision import open_image
-
-from fastai.torch_core import TensorImage, FloatTensor, OptLossFunc
-from fastai.torch_core import OptOptimizer, tensor, F, to_detach
-from fastai.torch_core import List, Tuple, Tensor, Callable, Collection
-from fastai.core import PathOrStr, Optional, Union, partial, ifnone, is_listy
-from fastai.callback import CallbackHandler
-
-from pathlib import Path
 import enum
+from pathlib import Path
 
-import torch.nn as nn
 import torch
+import torch.nn as nn
+from fastai.basic_data import DatasetType
+from fastai.callback import CallbackHandler
+from fastai.core import Optional, PathOrStr, Union, ifnone, is_listy, partial
+from fastai.data_block import EmptyLabelList, ItemList
+from fastai.torch_core import (
+    Callable,
+    Collection,
+    F,
+    FloatTensor,
+    List,
+    OptLossFunc,
+    OptOptimizer,
+    Tensor,
+    TensorImage,
+    Tuple,
+    tensor,
+    to_detach,
+)
+from fastai.vision import open_image
+from fastai.vision.data import ImageDataBunch, channel_view
 
-import numpy as np
-
-from PIL import Image as PILImage
 
 def loss_func(ys, margin=1.00, l2=0.01):
     z_p, z_n, z_d = ys
 
     l_n = torch.sqrt(((z_p - z_n) ** 2).sum(dim=1))
-    l_d = - torch.sqrt(((z_p - z_d) ** 2).sum(dim=1))
-    l_nd = l_n + l_d
+    l_d = -torch.sqrt(((z_p - z_d) ** 2).sum(dim=1))
+    # l_nd = l_n + l_d
     loss = F.relu(l_n + l_d + margin)
     l_n = torch.mean(l_n)
     l_d = torch.mean(l_d)
-    l_nd = torch.mean(l_n + l_d)
+    # l_nd = torch.mean(l_n + l_d)
     loss = torch.mean(loss)
     if l2 != 0:
         loss += l2 * (torch.norm(z_p) + torch.norm(z_n) + torch.norm(z_d))
     return loss
 
+
 class TileType(enum.Enum):
     """
-    Simple enum for mapping into triplet array """
+    Simple enum for mapping into triplet array"""
+
     ANCHOR = 0
     NEIGHBOR = 1
     DISTANT = 2
 
 
-def normalize_triplet(x:TensorImage, mean:FloatTensor,std:FloatTensor)->TensorImage:
+def normalize_triplet(
+    x: TensorImage, mean: FloatTensor, std: FloatTensor
+) -> TensorImage:
     "Normalize `x` with `mean` and `std`."
-    return [
-        (x_-mean[...,None,None]) / std[...,None,None]
-        for x_ in x
-    ]
+    return [(x_ - mean[..., None, None]) / std[..., None, None] for x_ in x]
 
-def denormalize_triplet(x:List[TensorImage], mean:FloatTensor,std:FloatTensor, do_x:bool=True)->TensorImage:
+
+def denormalize_triplet(
+    x: List[TensorImage], mean: FloatTensor, std: FloatTensor, do_x: bool = True
+) -> TensorImage:
     "Denormalize `x` with `mean` and `std`."
     return [
-        x_.cpu().float()*std[...,None,None] + mean[...,None,None] 
-        if do_x else x_.cpu()
+        x_.cpu().float() * std[..., None, None] + mean[..., None, None]
+        if do_x
+        else x_.cpu()
         for x_ in x
     ]
 
-def _normalize_triplet_batch(b:Tuple[Tensor,Tensor], mean:FloatTensor, std:FloatTensor, do_x:bool=True, do_y:bool=False)->Tuple[Tensor,Tensor]:
+
+def _normalize_triplet_batch(
+    b: Tuple[Tensor, Tensor],
+    mean: FloatTensor,
+    std: FloatTensor,
+    do_x: bool = True,
+    do_y: bool = False,
+) -> Tuple[Tensor, Tensor]:
     "`b` = `x`,`y` - normalize `x` array of imgs and `do_y` optionally `y`."
-    x,y = b
+    x, y = b
     mean, std = mean.to(y.device), std.to(y.device)
     if do_x:
         x = normalize_triplet(x, mean, std)
     if do_y:
-        raise Exception("`y` isn't used for the triplet trainer, we shouldn't"
-                        " be trying to normalize it")
-    return x,y
+        raise Exception(
+            "`y` isn't used for the triplet trainer, we shouldn't"
+            " be trying to normalize it"
+        )
+    return x, y
 
-def normalize_triplet_funcs(mean:FloatTensor, std:FloatTensor, do_x:bool=True, do_y:bool=False)->Tuple[Callable,Callable]:
+
+def normalize_triplet_funcs(
+    mean: FloatTensor, std: FloatTensor, do_x: bool = True, do_y: bool = False
+) -> Tuple[Callable, Callable]:
     "Create normalize/denormalize func using `mean` and `std`, can specify `do_y` and `device`."
-    mean,std = tensor(mean),tensor(std)
-    return (partial(_normalize_triplet_batch, mean=mean, std=std, do_x=do_x, do_y=do_y),
-            partial(denormalize_triplet, mean=mean, std=std, do_x=do_x))
+    mean, std = tensor(mean), tensor(std)
+    return (
+        partial(_normalize_triplet_batch, mean=mean, std=std, do_x=do_x, do_y=do_y),
+        partial(denormalize_triplet, mean=mean, std=std, do_x=do_x),
+    )
 
 
 class MultiImageDataBunch(ImageDataBunch):
-
-    def normalize(self, stats:Collection[Tensor]=None, do_x:bool=True, do_y:bool=False)->None:
+    def normalize(
+        self, stats: Collection[Tensor] = None, do_x: bool = True, do_y: bool = False
+    ) -> None:
         "Add normalize transform using `stats` (defaults to `DataBunch.batch_stats`)"
-        if getattr(self,'norm',False): raise Exception('Can not call normalize twice')
-        if stats is None: self.stats = self.batch_stats()
-        else:             self.stats = stats
-        self.norm,self.denorm = normalize_triplet_funcs(*self.stats, do_x=do_x, do_y=do_y)
+        if getattr(self, "norm", False):
+            raise Exception("Can not call normalize twice")
+        if stats is None:
+            self.stats = self.batch_stats()
+        else:
+            self.stats = stats
+        self.norm, self.denorm = normalize_triplet_funcs(
+            *self.stats, do_x=do_x, do_y=do_y
+        )
         self.add_tfm(self.norm)
         return self
 
-    def batch_stats(self, funcs:Collection[Callable]=None)->Tensor:
+    def batch_stats(self, funcs: Collection[Callable] = None) -> Tensor:
         "Grab a batch of data and call reduction function `func` per channel"
-        funcs = ifnone(funcs, [torch.mean,torch.std])
-        #x = self.one_batch(ds_type=DatasetType.Valid, denorm=False)[0].cpu()
-        
+        funcs = ifnone(funcs, [torch.mean, torch.std])
+        # x = self.one_batch(ds_type=DatasetType.Valid, denorm=False)[0].cpu()
+
         # one_batch gives (x,y) pair on first dim, next dim is going to be the number of images
         # xs = [b.cpu() for b in self.one_batch(ds_type=DatasetType.Valid, denorm=False)[0]]
         # return [[func(channel_view(x), 1) for func in funcs] for x in xs]
-        
+
         x = self.one_batch(ds_type=DatasetType.Valid, denorm=False)[0][0].cpu()
         return [func(channel_view(x), 1) for func in funcs]
 
-    def show_batch(self, rows:int=5, ds_type:DatasetType=DatasetType.Train, reverse:bool=False, **kwargs)->None:
-        raise NotImplementedError("Leif: haven't made this work with the triplet trainer yet")
+    def show_batch(
+        self,
+        rows: int = 5,
+        ds_type: DatasetType = DatasetType.Train,
+        reverse: bool = False,
+        **kwargs
+    ) -> None:
+        raise NotImplementedError(
+            "Leif: haven't made this work with the triplet trainer yet"
+        )
+
 
 class UnlabelledTripletsList(EmptyLabelList):
     def __init__(self, *args, **kwargs):
-        self.c = kwargs.pop('embedding_length', 100)
+        self.c = kwargs.pop("embedding_length", 100)
         super().__init__(*args, **kwargs)
 
     def reconstruct(self, *args, **kwargs):
         return None
 
-class NPMultiImageList(ImageList):
 
+class NPMultiImageList(ImageList):
     TILE_FILENAME_FORMAT = "{triplet_id:05d}_{tile_type}.png"
     TRIPLET_META_FILENAME_FORMAT = "{triplet_id:05d}_meta.yaml"
 
     _bunch = MultiImageDataBunch
+
     class ImagesList(list):
         def __init__(self, src_path, id, *args, **kwargs):
             super().__init__(*args, **kwargs)
@@ -140,9 +178,9 @@ class NPMultiImageList(ImageList):
                 items.append(item.apply_tfms(tfms, **kwargs))
             return items
 
-    def open(self, fns, div:bool=True):
+    def open(self, fns, div: bool = True):
         src_path = fns[0].parent
-        triplet_id = int(fns[0].name.split('_')[0])
+        triplet_id = int(fns[0].name.split("_")[0])
 
         images = self.ImagesList(id=triplet_id, src_path=src_path)
 
@@ -152,7 +190,7 @@ class NPMultiImageList(ImageList):
         return images
 
     @classmethod
-    def from_folder(cls, path:PathOrStr='.', **kwargs)->ItemList:
+    def from_folder(cls, path: PathOrStr = ".", **kwargs) -> ItemList:
         path = Path(path)
 
         files_by_type = []
@@ -160,7 +198,7 @@ class NPMultiImageList(ImageList):
             fn_tiletype = cls.TILE_FILENAME_FORMAT.format(
                 tile_type=tt.name.lower(), triplet_id=0
             )
-            fn_tiletype = fn_tiletype.replace('00000', '*')
+            fn_tiletype = fn_tiletype.replace("00000", "*")
             # `glob` doesn't sort by default, so make sure we do it here so
             # that we can match with the embeddings we produce later
             files = sorted(list(path.glob(fn_tiletype)))
@@ -168,8 +206,10 @@ class NPMultiImageList(ImageList):
 
         num_files_by_type = [len(files) for files in files_by_type]
         if len(set(num_files_by_type)) != 1:
-            raise Exception("There appear to an uneven number of anchor,"
-                            " neighbor or distanta tiles.")
+            raise Exception(
+                "There appear to an uneven number of anchor,"
+                " neighbor or distanta tiles."
+            )
 
         files = zip(*files_by_type)
 
@@ -177,23 +217,32 @@ class NPMultiImageList(ImageList):
 
     def label_empty(self, **kwargs):
         "Label every item with an `UnlabelledTripletsList`."
-        kwargs['label_cls'] = UnlabelledTripletsList
-        return self.label_from_func(func=lambda o: 0., **kwargs)
+        kwargs["label_cls"] = UnlabelledTripletsList
+        return self.label_from_func(func=lambda o: 0.0, **kwargs)
 
     def reconstruct(self, *args, **kwargs):
         return None
 
 
-def loss_batch(model:nn.Module, xb:Tensor, yb:Tensor, loss_func:OptLossFunc=None, opt:OptOptimizer=None,
-               cb_handler:Optional[CallbackHandler]=None)->Tuple[Union[Tensor,int,float,str]]:
+def loss_batch(
+    model: nn.Module,
+    xb: Tensor,
+    yb: Tensor,
+    loss_func: OptLossFunc = None,
+    opt: OptOptimizer = None,
+    cb_handler: Optional[CallbackHandler] = None,
+) -> Tuple[Union[Tensor, int, float, str]]:
     "Calculate loss and metrics for a batch, call out to callbacks as necessary."
     cb_handler = ifnone(cb_handler, CallbackHandler())
-    if not is_listy(xb): xb = [xb]
-    if not is_listy(yb): yb = [yb]
+    if not is_listy(xb):
+        xb = [xb]
+    if not is_listy(yb):
+        yb = [yb]
     out = [model(x) for x in xb]
     out = cb_handler.on_loss_begin(out)
 
-    if not loss_func: return to_detach(out), yb[0].detach()
+    if not loss_func:
+        return to_detach(out), yb[0].detach()
 
     loss = loss_func(out)
 
@@ -218,12 +267,17 @@ def loss_batch(model:nn.Module, xb:Tensor, yb:Tensor, loss_func:OptLossFunc=None
 
 
 def monkey_patch_fastai():
+    """
+    monkey-patch fastai's `loss_batch` function so that it can be called
+    without having a value for the target `y`
+    """
     try:
-        print(loss_batch_orig)
-    except:
+        loss_batch_orig is not None # noqa
+    except UnboundLocalError:
         import fastai.basic_train
-        loss_batch_orig = fastai.basic_train.loss_batch
+        loss_batch_orig = fastai.basic_train.loss_batch # noqa
     fastai.basic_train.loss_batch = loss_batch
+
 
 # for backward compatability
 NPMultiImageItemList = NPMultiImageList
