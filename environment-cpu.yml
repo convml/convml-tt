@@ -34,3 +34,4 @@ dependencies:
     - "git+https://github.com/leifdenby/convorg@v0.1.2#egg=convorg"
     - fastprogress==0.1.19  # fastai==1.0.53 needs this but requirements they define allow for newer version
     - hdbscan
+    - coloredlogs
