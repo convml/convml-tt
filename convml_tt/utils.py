@@ -1,16 +1,14 @@
-import xarray as xr
-import numpy as np
-import torch
-from tqdm import tqdm
-
 import warnings
-
 from pathlib import Path
 
+import numpy as np
+import torch
+import xarray as xr
 from PIL import Image
+from tqdm import tqdm
 
-from .architectures.triplet_trainer import TileType
-from .data.sources.imagelist import SingleTileImageList
+from .data.dataset import TileType
+
 
 def get_embeddings(triplets_or_tilelist, model, tile_type=TileType.ANCHOR):
     """
@@ -18,6 +16,7 @@ def get_embeddings(triplets_or_tilelist, model, tile_type=TileType.ANCHOR):
     input triplets or tilelist. If `tile_type` is None the embedding for all
     three tiles of the triplet will be returned.
     """
+    raise NotImplementedError
     if isinstance(triplets_or_tilelist, SingleTileImageList):
         il = triplets_or_tilelist
         embeddings = np.stack([v.cpu() for v in model.predict(il)[1]])

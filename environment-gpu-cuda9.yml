@@ -2,14 +2,14 @@ name: convml_tt
 
 channels:
   - pytorch
-  - fastai
   - defaults
   - conda-forge
 dependencies:
   - pip
   - python=3.7
   - netcdf4
-  - pytorch=1.0.1
+  - pytorch
+  - pytorch-lightning
   - torchvision
   - cudatoolkit=9.0
   - Pillow=6.1

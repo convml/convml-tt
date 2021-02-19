@@ -4,3 +4,5 @@
 .ipynb_checkpoints/
 notebooks/
 .pytest_cache/
+data/
+lightning_logs/
