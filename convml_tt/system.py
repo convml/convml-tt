@@ -169,7 +169,8 @@ class TripletTrainerDataModule(pl.LightningDataModule):
             [
                 transforms.ToTensor(),
                 RemoveImageAlphaTransform(),
-                transforms.Normalize((0.1307,), (0.3081,)),
+                # apply imagenet transform for pretrained model
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
             ]
         )
         self.train_test_fraction = train_test_fraction
