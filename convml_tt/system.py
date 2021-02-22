@@ -2,11 +2,10 @@ import pytorch_lightning as pl
 import torch
 from torch import nn
 import torch.nn.functional as F
-import torchvision.models as tv_models
 from torch.utils.data import random_split, DataLoader
 from flash.vision import backbones as flash_backbones
 
-from .data.dataset import ImageTripletDataset
+from .data.dataset import ImageTripletDataset, ImageSingletDataset, TileType
 from .fastai import AdaptiveConcatPool2d
 
 from torchvision import transforms
@@ -144,6 +143,9 @@ class Tile2Vec(pl.LightningModule):
 
         return loss
 
+    def forward(self, x):
+        return self.encoder(x)
+
     def training_step(self, batch, batch_idx):
         return self._loss(batch)
 
@@ -182,13 +184,17 @@ class TripletTrainerDataModule(pl.LightningDataModule):
     def setup(self, stage=None):
         if stage == "fit":
             full_dataset = ImageTripletDataset(
-                data_dir=self.data_dir, kind="train", transform=self.transform
+                data_dir=self.data_dir, stage="train", transform=self.transform
             )
             n_samples = len(full_dataset)
             n_train = int(n_samples * self.train_test_fraction)
             n_test = n_samples - n_train
             self._train_dataset, self._test_dataset = random_split(
                 full_dataset, [n_train, n_test]
+            )
+        elif stage == "predict":
+            full_dataset = ImageTripletDataset(
+                data_dir=self.data_dir, stage="study", transform=self.transform
             )
         else:
             raise NotImplementedError(stage)
@@ -197,4 +203,26 @@ class TripletTrainerDataModule(pl.LightningDataModule):
         return DataLoader(dataset=self._train_dataset, batch_size=self.batch_size)
 
     def test_dataloader(self):
-        return DataLoader(dataset=self._train_dataset, batch_size=self.batch_size)
+        return DataLoader(dataset=self._test_dataset, batch_size=self.batch_size)
+
+
+def get_single_tile_dataloader(
+    data_dir,
+    stage="study",
+    tile_type: TileType = TileType.ANCHOR,
+    prediction_batch_size=32,
+):
+    datamodule = TripletTrainerDataModule(
+        data_dir=data_dir, batch_size=prediction_batch_size
+    )
+
+    # XXX: once `model.predict(datamodule=...)` correct calls
+    # `model.setup(stage=`predict')` we should use that instead of creating a
+    # separate dataloader here
+    items_study = ImageSingletDataset(
+        data_dir=data_dir,
+        stage=stage,
+        transform=datamodule.transform,
+        tile_type=tile_type,
+    )
+    return DataLoader(items_study, batch_size=prediction_batch_size)

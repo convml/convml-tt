@@ -1,23 +1,12 @@
 from pathlib import Path
-import tempfile
 import platform
 
-import matplotlib.pyplot as plt
 from PIL import Image
 import numpy as np
 import xarray as xr
 
-from convml_tt.data.sources.imagelist import SingleTileImageList
 from convml_tt.data.examples import ExampleData
-from convml_tt.architectures.triplet_trainer import (NPMultiImageItemList,
-                                                     loss_func,
-                                                     monkey_patch_fastai)
 import convml_tt.utils
-monkey_patch_fastai()
-
-from fastai.datasets import untar_data
-from fastai.basic_train import load_learner
-import fastai.vision
 
 
 TILE_FN_FORMAT = "{tile_id:05d}_anchor.png"
@@ -98,7 +87,7 @@ def _get_simple_trained_model():
     return learn
 
 
-def test_generation_and_interpretation():
+def _test_generation_and_interpretation():
     Nx = Ny = 256
 
     x_, y_ = np.linspace(0, 1, Nx), np.linspace(0, 1, Ny)
