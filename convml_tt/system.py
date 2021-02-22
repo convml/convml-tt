@@ -9,7 +9,6 @@ from flash.vision import backbones as flash_backbones
 from .data.dataset import ImageTripletDataset
 from .fastai import AdaptiveConcatPool2d
 
-from torchvision.datasets import MNIST
 from torchvision import transforms
 
 
@@ -162,7 +161,6 @@ class TripletTrainerDataModule(pl.LightningDataModule):
     def __init__(self, data_dir, train_test_fraction=0.9, batch_size=32):
         super().__init__()
         self.data_dir = data_dir
-        MNIST(self.data_dir, train=True, download=True)
         self.transform = None
 
         self.transform = transforms.Compose(
