@@ -1,11 +1,13 @@
 import pytorch_lightning as pl
 import torch
+from torch import nn
 import torch.nn.functional as F
 import torchvision.models as tv_models
 from torch.utils.data import random_split, DataLoader
 from flash.vision import backbones as flash_backbones
 
 from .data.dataset import ImageTripletDataset
+from .fastai import AdaptiveConcatPool2d
 
 from torchvision.datasets import MNIST
 from torchvision import transforms
@@ -32,17 +34,72 @@ class Tile2Vec(pl.LightningModule):
         self.l2_regularisation = l2_regularisation
         self.n_embedding_dims = n_embedding_dims
 
-        self.encoder = self._create_convolution_layers(
+        self.backbone, n_features_backbone = self._create_backbone_layers(
             n_input_channels=n_input_channels,
             base_arch=base_arch,
             pretrained=pretrained,
         )
+        self.head = self._create_head_layers(n_features_backbone=n_features_backbone)
+        self.encoder = torch.nn.Sequential(self.backbone, self.head)
 
-    def _create_convolution_layers(
+    def _create_head_layers(self, n_features_backbone, head_type="orig_fastai"):
+
+        if head_type == "linear":
+            # make "head" block which takes features of the encoder (resnet18 has
+            # 512), uses adaptive pooling to reduce the x- and y-dimension, and
+            # then uses a fully-connected layer to make the desired output size
+            head = torch.nn.Sequential(
+                torch.nn.AdaptiveAvgPool2d(1),  # -> (batch_size, n_features, 1, 1)
+                torch.nn.Flatten(),  # -> (batch_size, n_features)
+                torch.nn.Linear(
+                    in_features=n_features_backbone, out_features=self.n_embedding_dims
+                ),  # -> (batch_size, n_embedding_dims)
+            )
+        elif head_type == "orig_fastai":
+            # make "head" block which takes features of the encoder (resnet18 has
+            # 512), uses adaptive pooling to reduce the x- and y-dimension, and
+            # then uses two blocks of batchnorm, dropout and linear layers with
+            # a ReLU activation layer inbetween to finally make the output the
+            # size of the embedding dimensions requested. This architecture
+            # replicates the original architecture generated with fastai and
+            # used in L. Denby (2020) GRL
+
+            n_intermediate_layer_features = 512
+            head = torch.nn.Sequential(
+                AdaptiveConcatPool2d(1),  # -> (batch_size, 2*n_features, 1, 1)
+                nn.Flatten(),  # -> (batch_size, 2*n_features)
+                # first batchnorm, dropout, linear block (only the linear block
+                # affects the shape)
+                nn.BatchNorm1d(
+                    num_features=2 * n_features_backbone, eps=1.0e-5, momentum=0.1
+                ),
+                nn.Dropout(p=0.25),
+                nn.Linear(  # -> (batch_size, n_intermediate_layer_features)
+                    in_features=2 * n_features_backbone,
+                    out_features=n_intermediate_layer_features,
+                ),
+                # ReLU activation
+                nn.ReLU(inplace=True),
+                # second batchnorm, dropout, linear block
+                nn.BatchNorm1d(
+                    num_features=n_intermediate_layer_features, eps=1.0e-5, momentum=0.1
+                ),
+                nn.Dropout(p=0.5),
+                nn.Linear(
+                    in_features=n_intermediate_layer_features,
+                    out_features=self.n_embedding_dims,
+                ),  # -> (batch_size, n_embedding_dims)
+            )
+        else:
+            raise NotImplementedError(head_type)
+
+        return head
+
+    def _create_backbone_layers(
         self, n_input_channels, base_arch=None, pretrained=False
     ):
         pretrained = True
-        encoder, n_features_encoder = flash_backbones.backbone_and_num_features(
+        backbone, n_features_backbone = flash_backbones.backbone_and_num_features(
             model_name=base_arch, pretrained=pretrained
         )
 
@@ -51,7 +108,7 @@ class Tile2Vec(pl.LightningModule):
         # (loosing the pretrained weights!)
         # NOTE: at least for the resnet models the convention is that the first
         # (the input) layer is `.conv1`.
-        layers = list(encoder.children())
+        layers = list(backbone.children())
         if not isinstance(layers[0], torch.nn.Conv2d):
             raise Exception(f"Recognised type for input layer {layers[0]}")
 
@@ -67,31 +124,20 @@ class Tile2Vec(pl.LightningModule):
                 bias=input_conv_orig.bias,
             )
 
-            # make a new encoder with the right number of input layers
-            encoder = torch.nn.Sequential(*layers)
+            # make a new backbone with the right number of input layers
+            backbone = torch.nn.Sequential(*layers)
 
-        # make "head" block which takes features of the encoder (resnet18 has
-        # 512), uses adaptive pooling to reduce the x- and y-dimension, and
-        # then uses a fully-connected layer to make the desired output size
-        head = torch.nn.Sequential(
-            torch.nn.AdaptiveAvgPool2d(1),  # -> (batch_size, n_features, 1, 1)
-            torch.nn.Flatten(),  # -> (batch_size, n_features)
-            torch.nn.Linear(
-                in_features=n_features_encoder, out_features=self.n_embedding_dims
-            ),  # -> (batch_size, n_embedding_dims)
-        )
-
-        return torch.nn.Sequential(encoder, head)
+        return backbone, n_features_backbone
 
     def _loss(self, batch):
         y_anchor, y_neighbour, y_distant = [self.encoder(x) for x in batch]
 
         # per-batch distance between anchor and neighbour tile in embedding
         # space, shape: (batch_size, )
-        l_near = ((y_anchor - y_neighbour)**2.0).sum(dim=1)
+        l_near = ((y_anchor - y_neighbour) ** 2.0).sum(dim=1)
         # per-batch distance between anchor and distant tile in embedding
         # space, shape: (batch_size, )
-        l_distant = ((y_anchor - y_distant)**2.0).sum(dim=1)
+        l_distant = ((y_anchor - y_distant) ** 2.0).sum(dim=1)
 
         # total loss goes through a ReLU with the margin added, and we take
         # mean across the batch
