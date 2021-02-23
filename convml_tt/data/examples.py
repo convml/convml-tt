@@ -24,7 +24,7 @@ class PretrainedModel(enum.Enum):
 _checks = {}
 _checks[ExampleData.TINY10] = "d094cd1b25408517259fc8d8dad63f05"
 _checks[ExampleData.SMALL100] = "75b45c9f368c298685dd88018eeb4f80"
-_checks[ExampleData.LARGE2000S500] = "bdc6184db155c99411c2d401794a41ec"
+_checks[ExampleData.LARGE2000S500] = "7a128c930d97059f0796b736164a721f"
 _checks[PretrainedModel.FIXED_NORM_STAGE2] = "67c9db80576128128d0a355364abd311"
 
 

@@ -37,6 +37,7 @@ class Tile2Vec(pl.LightningModule):
         self.l2_regularisation = l2_regularisation
         self.n_embedding_dims = n_embedding_dims
         self.n_input_channels = n_input_channels
+        self.base_arch = base_arch
 
         if base_arch == "unknown":
             # special value allowing loading of weights directly to produce an encoder network

@@ -3,12 +3,13 @@ from typing import Union
 
 import matplotlib.pyplot as plt
 import numpy as np
+import xarray as xr
 
 from ...data.dataset import TileType, ImageSingletDataset, ImageTripletDataset
 
 
 def grid_overview(
-    tile_dataset: Union[ImageSingletDataset, ImageTripletDataset],
+    tile_dataset: Union[ImageSingletDataset, ImageTripletDataset, xr.DataArray],
     points,
     tile_type: TileType = None,
     figwidth=16,

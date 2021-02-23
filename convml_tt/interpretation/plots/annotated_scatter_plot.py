@@ -1,4 +1,5 @@
 from collections import OrderedDict
+import enum
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -90,7 +91,7 @@ def annotated_scatter_plot(
         )
 
     def _is_array(v):
-        return isinstance(v, np.ndarray)
+        return isinstance(v, np.ndarray) or (type(v) == list and type(v[0]) == int)
 
     x_err, y_err, x_c, y_c = None, None, None, None
     if type(points) == int:
