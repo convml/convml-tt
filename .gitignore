@@ -6,3 +6,6 @@ notebooks/
 .pytest_cache/
 /data/
 lightning_logs/
+*.tgz
+*.pkl
+*.ckpt

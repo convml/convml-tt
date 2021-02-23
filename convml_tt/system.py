@@ -1,14 +1,19 @@
+import warnings
+
 import pytorch_lightning as pl
 import torch
-from torch import nn
 import torch.nn.functional as F
-from torch.utils.data import random_split, DataLoader
-from flash.vision import backbones as flash_backbones
+from torch import nn
+from torch.utils.data import DataLoader, random_split
 
-from .data.dataset import ImageTripletDataset, ImageSingletDataset, TileType
+# lightning flash raises some warnings about module we might want to install, I
+# don't want people to get confused by seeing these
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    from flash.vision import backbones as flash_backbones
+
+from .data.dataset import ImageSingletDataset, ImageTripletDataset
 from .fastai import AdaptiveConcatPool2d
-
-from torchvision import transforms
 
 
 class Tile2Vec(pl.LightningModule):
@@ -166,7 +171,11 @@ class Tile2Vec(pl.LightningModule):
         pytorch-lightning's `trainer.save_checkpoint(...)` and
         `Tile2Vec.load_checkpoint(...)` should be used.
         """
-        loaded_encoder = torch.load(path)
+        # pytorch may issue some warnings here, but we just want to load the
+        # model anyway, so hide the wwarnings for now
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            loaded_encoder = torch.load(path)
         batch_size = 5
         nx = ny = 256
         # the first layer is the conv1d, find out how many input channels it has
@@ -192,48 +201,33 @@ class Tile2Vec(pl.LightningModule):
             raise
 
 
-class RemoveImageAlphaTransform:
-    def __call__(self, x):
-        return x[:3, :, :]
-
-
 class TripletTrainerDataModule(pl.LightningDataModule):
     def __init__(self, data_dir, train_test_fraction=0.9, batch_size=32):
         super().__init__()
         self.data_dir = data_dir
-        self.transform = None
-
-        self.transform = transforms.Compose(
-            [
-                transforms.ToTensor(),
-                RemoveImageAlphaTransform(),
-                # apply imagenet transform for pretrained model
-                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
-            ]
-        )
         self.train_test_fraction = train_test_fraction
         self.batch_size = batch_size
         self._train_dataset = None
         self._test_dataset = None
 
-    def prepare_data(self, *args, **kwargs):
-        # data already downloaded
-        pass
+    def get_dataset(self, stage):
+        if stage == "fit":
+            return ImageTripletDataset(
+                data_dir=self.data_dir, stage="train")
+        elif stage == "predict":
+            return ImageTripletDataset(
+                data_dir=self.data_dir, stage="study")
+        else:
+            raise NotImplementedError(stage)
 
     def setup(self, stage=None):
         if stage == "fit":
-            full_dataset = ImageTripletDataset(
-                data_dir=self.data_dir, stage="train", transform=self.transform
-            )
+            full_dataset = self.get_dataset(stage=stage)
             n_samples = len(full_dataset)
             n_train = int(n_samples * self.train_test_fraction)
             n_test = n_samples - n_train
             self._train_dataset, self._test_dataset = random_split(
                 full_dataset, [n_train, n_test]
-            )
-        elif stage == "predict":
-            full_dataset = ImageTripletDataset(
-                data_dir=self.data_dir, stage="study", transform=self.transform
             )
         else:
             raise NotImplementedError(stage)
@@ -243,25 +237,3 @@ class TripletTrainerDataModule(pl.LightningDataModule):
 
     def test_dataloader(self):
         return DataLoader(dataset=self._test_dataset, batch_size=self.batch_size)
-
-
-def get_single_tile_dataset(
-    data_dir,
-    stage="study",
-    tile_type: TileType = TileType.ANCHOR,
-    prediction_batch_size=32,
-):
-    datamodule = TripletTrainerDataModule(
-        data_dir=data_dir, batch_size=prediction_batch_size
-    )
-
-    # XXX: once `model.predict(datamodule=...)` correct calls
-    # `model.setup(stage=`predict')` we should use that instead of creating a
-    # separate dataloader here
-    dataset = ImageSingletDataset(
-        data_dir=data_dir,
-        stage=stage,
-        transform=datamodule.transform,
-        tile_type=tile_type,
-    )
-    return dataset

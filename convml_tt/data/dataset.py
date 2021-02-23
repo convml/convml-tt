@@ -6,8 +6,9 @@ import enum
 from pathlib import Path
 
 import parse
-from torch.utils.data.dataset import Dataset
 from PIL import Image
+from torch.utils.data.dataset import Dataset
+from torchvision import transforms
 
 
 class TileType(enum.Enum):
@@ -16,6 +17,21 @@ class TileType(enum.Enum):
     ANCHOR = 0
     NEIGHBOR = 1
     DISTANT = 2
+
+
+class RemoveImageAlphaTransform:
+    def __call__(self, x):
+        return x[:3, :, :]
+
+
+DEFAULT_IMAGE_TRANSFORMS = transforms.Compose(
+    [
+        transforms.ToTensor(),
+        RemoveImageAlphaTransform(),
+        # apply imagenet transform for pretrained model
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+    ]
+)
 
 
 class _ImageDatasetBase(Dataset):
@@ -37,7 +53,7 @@ class _ImageDatasetBase(Dataset):
                 pass
         return file_paths
 
-    def __init__(self, data_dir, stage="train", transform=None):
+    def __init__(self, data_dir, stage="train", transform=DEFAULT_IMAGE_TRANSFORMS):
         self.transform = transform
         self.num_items = -1
         self.data_dir = data_dir
@@ -55,9 +71,10 @@ class ImageTripletDataset(_ImageDatasetBase):
     """
     image-based dataset for training the triplet-trainer
     """
+
     TRIPLET_META_FILENAME_FORMAT = "{triplet_id:05d}_meta.yaml"
 
-    def __init__(self, data_dir, stage="train", transform=None):
+    def __init__(self, data_dir, stage="train", transform=DEFAULT_IMAGE_TRANSFORMS):
         super().__init__(data_dir=data_dir, stage=stage, transform=transform)
 
         self.file_paths = self._find_files()
@@ -86,8 +103,17 @@ class ImageTripletDataset(_ImageDatasetBase):
 
 
 class ImageSingletDataset(_ImageDatasetBase):
-    def __init__(self, data_dir, tile_type: TileType, stage="train", transform=None):
+    def __init__(
+        self,
+        data_dir,
+        tile_type: TileType,
+        stage="train",
+        transform=DEFAULT_IMAGE_TRANSFORMS,
+    ):
         super().__init__(data_dir=data_dir, stage=stage, transform=transform)
+
+        if type(tile_type) == str:
+            tile_type = TileType[tile_type]
 
         self.file_paths = self._find_files()[tile_type]
         self.num_items = len(self.file_paths)

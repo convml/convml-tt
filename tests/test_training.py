@@ -1,13 +1,13 @@
 import pytorch_lightning as pl
 
-from convml_tt.system import Tile2Vec, TripletTrainerDataModule, get_single_tile_dataset
+from convml_tt.system import Tile2Vec, TripletTrainerDataModule
 from convml_tt.data.examples import (
     fetch_example_dataset,
     ExampleData,
     PretrainedModel,
     fetch_pretrained_model,
 )
-from convml_tt.data.dataset import TileType
+from convml_tt.data.dataset import TileType, ImageSingletDataset
 from convml_tt.utils import get_embeddings
 
 
@@ -26,7 +26,7 @@ def test_load_from_weights():
     model = Tile2Vec.from_saved_weights(path=model_path)
 
     data_path = fetch_example_dataset(dataset=ExampleData.TINY10)
-    dataset = get_single_tile_dataset(
+    dataset = ImageSingletDataset(
         data_dir=data_path, stage="train", tile_type=TileType.ANCHOR
     )
     get_embeddings(tile_dataset=dataset, model=model, prediction_batch_size=16)
