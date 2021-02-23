@@ -19,21 +19,21 @@ class TileType(enum.Enum):
 
 
 class _ImageDatasetBase(Dataset):
-
     TILE_FILENAME_FORMAT = "{triplet_id:05d}_{tile_type}.png"
 
     def _find_files(self):
-        tile_names = [tile_type.name.lower() for tile_type in TileType]
         # dictionary to hold lists with filepaths for each tile type
-        file_paths = {tile_name: [] for tile_name in tile_names}
+        file_paths = {tile_type: [] for tile_type in TileType}
 
         ext = self.TILE_FILENAME_FORMAT.split(".")[-1]
         for f_path in sorted(self.full_path.glob(f"*.{ext}"), key=lambda p: p.name):
             file_info = parse.parse(self.TILE_FILENAME_FORMAT, f_path.name)
             tile_name = file_info["tile_type"]
-
-            if tile_name in tile_names:
-                file_paths[tile_name].append(f_path)
+            try:
+                tile_type = TileType[tile_name.upper()]
+                file_paths[tile_type].append(f_path)
+            except KeyError:
+                pass
         return file_paths
 
     def __init__(self, data_dir, stage="train", transform=None):
@@ -69,9 +69,13 @@ class ImageTripletDataset(_ImageDatasetBase):
         if set(n_tiles.values()) == 0:
             raise Exception(f"No {stage} data was found")
 
+    def get_image(self, index, tile_type):
+        image_file_path = self.file_paths[tile_type][index]
+        return self._read_image(image_file_path)
+
     def __getitem__(self, index):
         item_contents = [
-            self._read_image(self.file_paths[tile_type.name.lower()][index])
+            self._read_image(self.file_paths[tile_type][index])
             for tile_type in TileType
         ]
         if self.transform:
@@ -83,11 +87,15 @@ class ImageSingletDataset(_ImageDatasetBase):
     def __init__(self, data_dir, tile_type: TileType, stage="train", transform=None):
         super().__init__(data_dir=data_dir, stage=stage, transform=transform)
 
-        self.file_paths = self._find_files()[tile_type.name.lower()]
+        self.file_paths = self._find_files()[tile_type]
         self.num_items = len(self.file_paths)
 
         if self.num_items == 0:
             raise Exception(f"No {stage} data was found")
+
+    def get_image(self, index):
+        image_file_path = self.file_paths[index]
+        return self._read_image(image_file_path)
 
     def __getitem__(self, index):
         image_file_path = self.file_paths[index]

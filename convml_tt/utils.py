@@ -1,21 +1,19 @@
-import warnings
 from pathlib import Path
 
 import numpy as np
-import pytorch_lightning as pl
-import torch
 import xarray as xr
 from PIL import Image
-from tqdm import tqdm
+from torch.utils.data import DataLoader
 
-from .data.dataset import ImageSingletDataset, TileType
+from .data.dataset import ImageSingletDataset
 
 
-def get_embeddings(tile_dataloader, model):
+def get_embeddings(tile_dataset: ImageSingletDataset, model, prediction_batch_size=32):
     """
     Use the provided model to calculate the embeddings for all tiles of a
     specific `tile_type` in the given `data_dir`.
     """
+    tile_dataloader = DataLoader(dataset=tile_dataset, batch_size=prediction_batch_size)
     batched_results = [model.forward(x_batch) for x_batch in tile_dataloader]
     embeddings = np.vstack([v.cpu().detach().numpy() for v in batched_results])
 

@@ -207,7 +207,7 @@ class TripletTrainerDataModule(pl.LightningDataModule):
         return DataLoader(dataset=self._test_dataset, batch_size=self.batch_size)
 
 
-def get_single_tile_dataloader(
+def get_single_tile_dataset(
     data_dir,
     stage="study",
     tile_type: TileType = TileType.ANCHOR,
@@ -220,10 +220,10 @@ def get_single_tile_dataloader(
     # XXX: once `model.predict(datamodule=...)` correct calls
     # `model.setup(stage=`predict')` we should use that instead of creating a
     # separate dataloader here
-    items_study = ImageSingletDataset(
+    dataset = ImageSingletDataset(
         data_dir=data_dir,
         stage=stage,
         transform=datamodule.transform,
         tile_type=tile_type,
     )
-    return DataLoader(items_study, batch_size=prediction_batch_size)
+    return dataset

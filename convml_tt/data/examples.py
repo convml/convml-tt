@@ -18,11 +18,11 @@ class ExampleData(enum.Enum):
 # datasets tar-balls with their md5 hash
 _checks = {}
 _checks[ExampleData.TINY10] = "d094cd1b25408517259fc8d8dad63f05"
-_checks[ExampleData.SMALL100] = "f45f9da7aa77b82e493c3289ea1ea951"
+_checks[ExampleData.SMALL100] = "75b45c9f368c298685dd88018eeb4f80"
 _checks[ExampleData.LARGE2000S500] = "bdc6184db155c99411c2d401794a41ec"
 
 
-def get_example_dataset(dataset: ExampleData, data_dir="data/"):
+def fetch_example_dataset(dataset: ExampleData, data_dir="data/"):
     """
     Downloads example data and returns the path to it
     """

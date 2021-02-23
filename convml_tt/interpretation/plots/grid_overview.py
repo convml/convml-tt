@@ -1,15 +1,16 @@
 import math
+from typing import Union
 
 import matplotlib.pyplot as plt
 import numpy as np
 
-from ...data.dataset import TileType
+from ...data.dataset import TileType, ImageSingletDataset, ImageTripletDataset
 
 
 def grid_overview(
-    triplets_or_tilelist,
+    tile_dataset: Union[ImageSingletDataset, ImageTripletDataset],
     points,
-    tile=TileType.ANCHOR,
+    tile_type: TileType = None,
     figwidth=16,
     ncols=10,
     label="tile_id",
@@ -19,8 +20,6 @@ def grid_overview(
     `points` is an integer the first N=points tiles will be plotted, if
     `points` is a list it will be interpreted as indecies into `triplets`
     """
-    raise NotImplementedError
-
     if isinstance(points, int):
         idxs = np.arange(points)
     elif isinstance(points, np.ndarray):
@@ -34,17 +33,6 @@ def grid_overview(
     figheight = float(figwidth) / ncols * nrows
     figsize = (figwidth, figheight)
 
-    if isinstance(triplets_or_tilelist, SingleTileImageList):
-        if tile != TileType.ANCHOR:
-            raise Exception(
-                "Only ANCHOR tiles are assumed to be in"
-                " SingleTileImageList objects, load triplets"
-                " if you need them"
-            )
-        get_tile = lambda n: triplets_or_tilelist[n]
-    else:
-        get_tile = lambda n: triplets_or_tilelist[n][tile.value]
-
     lspace = 0.05
     fig, axes = plt.subplots(
         nrows=nrows,
@@ -56,8 +44,14 @@ def grid_overview(
     for n, i in enumerate(idxs):
         ax = axes.flatten()[n]
         ax.axison = False
-        tile = get_tile(i)
-        tile.show(ax=ax)
+        if isinstance(tile_dataset, ImageTripletDataset):
+            tile_image = tile_dataset.get_image(index=n, tile_type=tile_type)
+        elif isinstance(tile_dataset, ImageSingletDataset):
+            tile_image = tile_dataset.get_image(index=n)
+        else:
+            raise NotImplementedError(tile_dataset)
+
+        ax.imshow(tile_image)
         ax.set_aspect("equal")
         ax.set_xticklabels([])
         ax.set_yticklabels([])
