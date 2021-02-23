@@ -31,7 +31,7 @@ def get_embeddings(tile_dataset: ImageSingletDataset, model, prediction_batch_si
     coords = dict(tile_id=tile_ids)
     attrs = dict(
         data_dir=str(Path(tile_dataset.data_dir).absolute()),
-        tile_type=tile_dataset.tile_type,
+        tile_type=tile_dataset.tile_type.name,
         stage=tile_dataset.stage,
     )
 
