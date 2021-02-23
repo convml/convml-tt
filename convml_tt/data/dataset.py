@@ -26,7 +26,8 @@ class _ImageDatasetBase(Dataset):
         file_paths = {tile_type: [] for tile_type in TileType}
 
         ext = self.TILE_FILENAME_FORMAT.split(".")[-1]
-        for f_path in sorted(self.full_path.glob(f"*.{ext}"), key=lambda p: p.name):
+        full_path = Path(self.data_dir) / self.stage
+        for f_path in sorted(full_path.glob(f"*.{ext}"), key=lambda p: p.name):
             file_info = parse.parse(self.TILE_FILENAME_FORMAT, f_path.name)
             tile_name = file_info["tile_type"]
             try:
@@ -39,7 +40,8 @@ class _ImageDatasetBase(Dataset):
     def __init__(self, data_dir, stage="train", transform=None):
         self.transform = transform
         self.num_items = -1
-        self.full_path = Path(data_dir) / stage
+        self.data_dir = data_dir
+        self.stage = stage
 
     def _read_image(self, single_image_path):
         im_as_im = Image.open(single_image_path)
@@ -89,6 +91,7 @@ class ImageSingletDataset(_ImageDatasetBase):
 
         self.file_paths = self._find_files()[tile_type]
         self.num_items = len(self.file_paths)
+        self.tile_type = tile_type
 
         if self.num_items == 0:
             raise Exception(f"No {stage} data was found")

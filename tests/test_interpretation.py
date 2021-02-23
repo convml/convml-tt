@@ -23,7 +23,7 @@ def test_get_embeddings():
     results = np.vstack([v.cpu().detach().numpy() for v in batched_results])
 
     # via utily function
-    da_embeddings = get_embeddings(tile_dataset=dataset, model=model, prediction_batch_size=32)
+    da_embeddings = get_embeddings(tile_dataset=dataset, model=model, prediction_batch_size=16)
 
     Ntiles, Ndim = results.shape
 
@@ -31,7 +31,21 @@ def test_get_embeddings():
     assert int(da_embeddings.emb_dim.count()) == Ndim
 
 
-def test_overview_plot():
+def test_grid_overview_plot():
     data_path = fetch_example_dataset(dataset=ExampleData.SMALL100)
     tile_dataset = get_single_tile_dataset(data_dir=data_path, stage="train", tile_type=TileType.ANCHOR)
     interpretation_plot.grid_overview(tile_dataset=tile_dataset, points=10)
+
+
+def test_dendrogram_plot():
+    # use a model with default resnet weights to generate some embedding
+    # vectors to plot with
+    model = Tile2Vec(pretrained=True)
+    data_path = fetch_example_dataset(dataset=ExampleData.SMALL100)
+    tile_dataset = get_single_tile_dataset(data_dir=data_path, stage="train", tile_type=TileType.ANCHOR)
+    da_embeddings = get_embeddings(tile_dataset=tile_dataset, model=model, prediction_batch_size=16)
+    interpretation_plot.dendrogram(da_embeddings=da_embeddings)
+
+
+if __name__ == "__main__":
+    test_dendrogram_plot()

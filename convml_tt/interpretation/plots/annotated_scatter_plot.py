@@ -6,8 +6,6 @@ import seaborn as sns
 
 from collections import OrderedDict
 
-from ...utils import get_triplets_from_embeddings
-
 from .mpl_autopos_annotation import calc_offset_points
 from .mpl_autopos_annotation.convex_hull import calc_point_offsets as calc_offset_points_ch
 
