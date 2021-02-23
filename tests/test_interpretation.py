@@ -47,5 +47,13 @@ def test_dendrogram_plot():
     interpretation_plot.dendrogram(da_embeddings=da_embeddings)
 
 
-if __name__ == "__main__":
-    test_dendrogram_plot()
+def test_annotated_scatter_plot():
+    # use a model with default resnet weights to generate some embedding
+    # vectors to plot with
+    model = Tile2Vec(pretrained=True)
+    data_path = fetch_example_dataset(dataset=ExampleData.SMALL100)
+    tile_dataset = get_single_tile_dataset(data_dir=data_path, stage="train", tile_type=TileType.ANCHOR)
+    da_embeddings = get_embeddings(tile_dataset=tile_dataset, model=model, prediction_batch_size=16)
+    x = da_embeddings.isel(emb_dim=0)
+    y = da_embeddings.isel(emb_dim=1)
+    interpretation_plot.annotated_scatter_plot(x=x, y=y, points=10)
