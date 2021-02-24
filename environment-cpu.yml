@@ -12,3 +12,8 @@ dependencies:
   - pytorch-cpu=1.0.1
   - torchvision-cpu
   - Pillow=6.1
+  # depedencies below are for windows especially (no wheel for bottleneck, and
+  # miniconda on windows doesn't include git)
+  - git
+  - xarray
+  - bottleneck
