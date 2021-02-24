@@ -26,6 +26,9 @@ jobs:
       - name: Install dependencies
         run: |
           conda env update --file environment-cpu.yml --name base
+      - name: install convml_tt
+        run: |
+          pip install .
 # 2021/2/24: skip linting for now
 #      - name: Lint with flake8
 #        run: |
