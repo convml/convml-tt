@@ -44,8 +44,8 @@ def grid_overview(triplets_or_tilelist, points, tile=TileType.ANCHOR,
     for n, i in enumerate(idxs):
         ax = axes.flatten()[n]
         ax.axison = False
-        tile = get_tile(i)
-        tile.show(ax=ax)
+        tile_img = get_tile(i)
+        tile_img.show(ax=ax)
         ax.set_aspect('equal')
         ax.set_xticklabels([])
         ax.set_yticklabels([])
