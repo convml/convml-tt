@@ -5,6 +5,10 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 from torch.utils.data import DataLoader, random_split
+from flash.core.finetuning import FlashBaseFinetuning
+
+from .data.dataset import ImageTripletDataset
+from .external.nn_layers import AdaptiveConcatPool2d
 
 # lightning flash raises some warnings about module we might want to install, I
 # don't want people to get confused by seeing these
@@ -12,8 +16,24 @@ with warnings.catch_warnings():
     warnings.simplefilter("ignore")
     from flash.vision import backbones as flash_backbones
 
-from .data.dataset import ImageSingletDataset, ImageTripletDataset
-from .external.nn_layers import AdaptiveConcatPool2d
+
+class HeadFineTuner(FlashBaseFinetuning):
+    """
+    Freezes the backbone during Detector training.
+    """
+
+    def __init__(self, train_bn: bool = True):
+        self.train_bn = train_bn
+
+    def freeze_before_training(self, pl_module: pl.LightningModule) -> None:
+        self.freeze(modules=[pl_module.backbone], train_bn=self.train_bn)
+
+    def finetune_function(
+        self, pl_module: pl.LightningModule, epoch: int, optimizer: torch.optim.Optimizer, opt_idx: int
+    ):
+        # here we could unfreeze at a specific epoch if we wanted to for
+        # example, but we'll just keep the backbone frozen for now
+        pass
 
 
 class Tile2Vec(pl.LightningModule):
@@ -165,6 +185,9 @@ class Tile2Vec(pl.LightningModule):
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
         return optimizer
+
+    def configure_finetune_callback(self):
+        return [HeadFineTuner(train_bn=True)]
 
 
 class TripletTrainerDataModule(pl.LightningDataModule):

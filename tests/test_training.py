@@ -1,4 +1,5 @@
 import pytorch_lightning as pl
+import flash
 
 from convml_tt.system import Tile2Vec, TripletTrainerDataModule
 from convml_tt.data.examples import (
@@ -14,10 +15,18 @@ from convml_tt.external import fastai1_weights_loader
 
 def test_train_new():
     trainer = pl.Trainer(max_epochs=5)
-    model = Tile2Vec(pretrained=True)
+    model = Tile2Vec(pretrained=False)
     data_path = fetch_example_dataset(dataset=ExampleData.TINY10)
     datamodule = TripletTrainerDataModule(data_dir=data_path, batch_size=2)
     trainer.fit(model=model, datamodule=datamodule)
+
+
+def test_finetune_pretrained():
+    trainer = flash.Trainer(max_epochs=5)
+    model = Tile2Vec(pretrained=True)
+    data_path = fetch_example_dataset(dataset=ExampleData.TINY10)
+    datamodule = TripletTrainerDataModule(data_dir=data_path, batch_size=2)
+    trainer.finetune(model=model, datamodule=datamodule)
 
 
 def test_load_from_weights():
