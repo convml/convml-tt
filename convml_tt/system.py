@@ -13,7 +13,7 @@ with warnings.catch_warnings():
     from flash.vision import backbones as flash_backbones
 
 from .data.dataset import ImageSingletDataset, ImageTripletDataset
-from .fastai import AdaptiveConcatPool2d
+from .external.nn_layers import AdaptiveConcatPool2d
 
 
 class Tile2Vec(pl.LightningModule):
@@ -48,7 +48,9 @@ class Tile2Vec(pl.LightningModule):
                 base_arch=base_arch,
                 pretrained=pretrained,
             )
-            self.head = self._create_head_layers(n_features_backbone=n_features_backbone)
+            self.head = self._create_head_layers(
+                n_features_backbone=n_features_backbone
+            )
             self.encoder = torch.nn.Sequential(self.backbone, self.head)
 
     def _create_head_layers(self, n_features_backbone, head_type="orig_fastai"):
@@ -164,43 +166,6 @@ class Tile2Vec(pl.LightningModule):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
         return optimizer
 
-    @classmethod
-    def from_saved_weights(cls, path):
-        """
-        This routine is only here so that models which were trained with
-        `convml_tt` based on fastai can be loaded. In general for saving/loading
-        pytorch-lightning's `trainer.save_checkpoint(...)` and
-        `Tile2Vec.load_checkpoint(...)` should be used.
-        """
-        # pytorch may issue some warnings here, but we just want to load the
-        # model anyway, so hide the wwarnings for now
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            loaded_encoder = torch.load(path)
-        batch_size = 5
-        nx = ny = 256
-        # the first layer is the conv1d, find out how many input channels it has
-        n_input_channels = list(loaded_encoder)[0][0].in_channels
-        rand_batch = torch.rand((batch_size, n_input_channels, nx, ny))
-        try:
-            # check that the model accepts data shaped like a batch and produces the expected output
-            result_batch = loaded_encoder(rand_batch)
-            n_embedding_dims = result_batch.shape[-1]
-            expected_shape = (batch_size, n_embedding_dims)
-            if result_batch.shape != expected_shape:
-                raise Exception(
-                    "The shape of the output of the loaded encoder doesn't have "
-                    f"the expected shape, {result_batch.shape} != {expected_shape}"
-                )
-            # all we know is the weights, so this model won't be possible to train further
-            model = cls(base_arch="unknown", margin="unknown", lr="unknown", l2_regularisation="unknown")
-            model.encoder = loaded_encoder
-            print(f"Weights loaded from `{path}`")
-            return model
-        except Exception as e:  # noqa
-            print("There was a problem with loading the model weights:")
-            raise
-
 
 class TripletTrainerDataModule(pl.LightningDataModule):
     def __init__(self, data_dir, train_test_fraction=0.9, batch_size=32):
@@ -213,11 +178,9 @@ class TripletTrainerDataModule(pl.LightningDataModule):
 
     def get_dataset(self, stage):
         if stage == "fit":
-            return ImageTripletDataset(
-                data_dir=self.data_dir, stage="train")
+            return ImageTripletDataset(data_dir=self.data_dir, stage="train")
         elif stage == "predict":
-            return ImageTripletDataset(
-                data_dir=self.data_dir, stage="study")
+            return ImageTripletDataset(data_dir=self.data_dir, stage="study")
         else:
             raise NotImplementedError(stage)
 

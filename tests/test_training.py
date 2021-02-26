@@ -9,6 +9,7 @@ from convml_tt.data.examples import (
 )
 from convml_tt.data.dataset import TileType, ImageSingletDataset
 from convml_tt.utils import get_embeddings
+from convml_tt.external import fastai1_weights_loader
 
 
 def test_train_new():
@@ -23,7 +24,7 @@ def test_load_from_weights():
     model_path = fetch_pretrained_model(
         pretrained_model=PretrainedModel.FIXED_NORM_STAGE2
     )
-    model = Tile2Vec.from_saved_weights(path=model_path)
+    model = fastai1_weights_loader.model_from_saved_weights(path=model_path)
 
     data_path = fetch_example_dataset(dataset=ExampleData.TINY10)
     dataset = ImageSingletDataset(

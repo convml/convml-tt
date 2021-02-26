@@ -25,7 +25,7 @@ _checks = {}
 _checks[ExampleData.TINY10] = "d094cd1b25408517259fc8d8dad63f05"
 _checks[ExampleData.SMALL100] = "75b45c9f368c298685dd88018eeb4f80"
 _checks[ExampleData.LARGE2000S500] = "7a128c930d97059f0796b736164a721f"
-_checks[PretrainedModel.FIXED_NORM_STAGE2] = "67c9db80576128128d0a355364abd311"
+_checks[PretrainedModel.FIXED_NORM_STAGE2] = "eb1558b62b03ba939e9405080669689f"
 
 
 def _fetch_example(item: Union[ExampleData, PretrainedModel], data_dir="data/"):
