@@ -26,7 +26,9 @@ class HeadFineTuner(FlashBaseFinetuning):
         self.train_bn = train_bn
 
     def freeze_before_training(self, pl_module: pl.LightningModule) -> None:
-        self.freeze(modules=[pl_module.backbone], train_bn=self.train_bn)
+        self.freeze(module=pl_module.backbone, train_bn=self.train_bn)
+        # for pytorch-lightning v0.2.0 this will become
+        # self.freeze(modules=[pl_module.backbone], train_bn=self.train_bn)
 
     def finetune_function(
         self, pl_module: pl.LightningModule, epoch: int, optimizer: torch.optim.Optimizer, opt_idx: int
