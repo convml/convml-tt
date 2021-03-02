@@ -8,7 +8,6 @@ using fastai
 from torch import nn
 import torch
 from fastai.basic_train import load_learner
-from convml_tt.external.fastai import AdaptiveConcatPool2d, Flatten
 
 
 def get_pytorch_model(model):
@@ -23,15 +22,11 @@ def get_pytorch_model(model):
     for n in range(len(head)):
         layer = head[n]
         if type(layer).__module__.startswith("fastai"):
-            print(type(layer).__name__)
-            if type(layer).__name__ == "AdaptiveConcatPool2d":
-                new_layer = AdaptiveConcatPool2d(layer.ap.output_size)
-            elif type(layer).__name__ == "Flatten":
-                new_layer = Flatten()
-            else:
-                raise NotImplementedError(type(layer))
-
-        new_head_layers.append(new_layer)
+            # drop these layers, we'll have to remember to add them in
+            # ourselves
+            pass
+        else:
+            new_head_layers.append(layer)
     new_head = nn.Sequential(*new_head_layers)
 
     return nn.Sequential(*tmodel[:-1], new_head)
