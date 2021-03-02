@@ -19,21 +19,6 @@ class TileType(enum.Enum):
     DISTANT = 2
 
 
-class RemoveImageAlphaTransform:
-    def __call__(self, x):
-        return x[:3, :, :]
-
-
-DEFAULT_IMAGE_TRANSFORMS = transforms.Compose(
-    [
-        transforms.ToTensor(),
-        RemoveImageAlphaTransform(),
-        # apply imagenet transform for pretrained model
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
-    ]
-)
-
-
 class _ImageDatasetBase(Dataset):
     TILE_FILENAME_FORMAT = "{triplet_id:05d}_{tile_type}.png"
 
@@ -53,7 +38,7 @@ class _ImageDatasetBase(Dataset):
                 pass
         return file_paths
 
-    def __init__(self, data_dir, stage="train", transform=DEFAULT_IMAGE_TRANSFORMS):
+    def __init__(self, data_dir, stage="train", transform=None):
         self.transform = transform
         self.num_items = -1
         self.data_dir = data_dir
@@ -74,7 +59,7 @@ class ImageTripletDataset(_ImageDatasetBase):
 
     TRIPLET_META_FILENAME_FORMAT = "{triplet_id:05d}_meta.yaml"
 
-    def __init__(self, data_dir, stage="train", transform=DEFAULT_IMAGE_TRANSFORMS):
+    def __init__(self, data_dir, stage="train", transform=None):
         super().__init__(data_dir=data_dir, stage=stage, transform=transform)
 
         self.file_paths = self._find_files()
@@ -99,6 +84,7 @@ class ImageTripletDataset(_ImageDatasetBase):
         ]
         if self.transform:
             item_contents = [self.transform(v) for v in item_contents]
+
         return item_contents
 
 
@@ -108,7 +94,7 @@ class ImageSingletDataset(_ImageDatasetBase):
         data_dir,
         tile_type: TileType,
         stage="train",
-        transform=DEFAULT_IMAGE_TRANSFORMS,
+        transform=None,
     ):
         super().__init__(data_dir=data_dir, stage=stage, transform=transform)
 

@@ -43,7 +43,7 @@ def model_from_saved_weights(path):
                 f"the expected shape, {result_batch.shape} != {expected_shape}"
             )
         # all we know is the weights, so this model won't be possible to train further
-        model = Tile2Vec(base_arch="unknown", margin="unknown", lr="unknown", l2_regularisation="unknown")
+        model = Tile2Vec(base_arch="resnet18", margin="unknown", lr="unknown", l2_regularisation="unknown")
         model.encoder = loaded_encoder
         print(f"Weights loaded from `{path}`")
         return model

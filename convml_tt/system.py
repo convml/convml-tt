@@ -1,5 +1,4 @@
 import warnings
-
 import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
@@ -9,6 +8,7 @@ from flash.core.finetuning import FlashBaseFinetuning
 
 from .data.dataset import ImageTripletDataset
 from .external.nn_layers import AdaptiveConcatPool2d
+from .data.transforms import get_transforms
 
 # lightning flash raises some warnings about module we might want to install, I
 # don't want people to get confused by seeing these
@@ -23,6 +23,7 @@ class HeadFineTuner(FlashBaseFinetuning):
     """
 
     def __init__(self, train_bn: bool = True):
+        super().__init__()
         self.train_bn = train_bn
 
     def freeze_before_training(self, pl_module: pl.LightningModule) -> None:
@@ -31,7 +32,11 @@ class HeadFineTuner(FlashBaseFinetuning):
         # self.freeze(modules=[pl_module.backbone], train_bn=self.train_bn)
 
     def finetune_function(
-        self, pl_module: pl.LightningModule, epoch: int, optimizer: torch.optim.Optimizer, opt_idx: int
+        self,
+        pl_module: pl.LightningModule,
+        epoch: int,
+        optimizer: torch.optim.Optimizer,
+        opt_idx: int,
     ):
         # here we could unfreeze at a specific epoch if we wanted to for
         # example, but we'll just keep the backbone frozen for now
@@ -193,7 +198,9 @@ class Tile2Vec(pl.LightningModule):
 
 
 class TripletTrainerDataModule(pl.LightningDataModule):
-    def __init__(self, data_dir, train_test_fraction=0.9, batch_size=32):
+    def __init__(
+        self, data_dir, normalize_for_arch=None, train_test_fraction=0.9, batch_size=32
+    ):
         super().__init__()
         self.data_dir = data_dir
         self.train_test_fraction = train_test_fraction
@@ -201,11 +208,24 @@ class TripletTrainerDataModule(pl.LightningDataModule):
         self._train_dataset = None
         self._test_dataset = None
 
+        self._train_transforms = get_transforms(
+            step="train", normalize_for_arch=normalize_for_arch
+        )
+        self._predict_transforms = get_transforms(
+            step="predict", normalize_for_arch=normalize_for_arch
+        )
+
     def get_dataset(self, stage):
         if stage == "fit":
-            return ImageTripletDataset(data_dir=self.data_dir, stage="train")
+            return ImageTripletDataset(
+                data_dir=self.data_dir, stage="train", transform=self._train_transforms
+            )
         elif stage == "predict":
-            return ImageTripletDataset(data_dir=self.data_dir, stage="study")
+            return ImageTripletDataset(
+                data_dir=self.data_dir,
+                stage="study",
+                transform=self._predict_transforms,
+            )
         else:
             raise NotImplementedError(stage)
 

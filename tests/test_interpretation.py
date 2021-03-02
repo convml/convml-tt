@@ -3,17 +3,20 @@ from torch.utils.data import DataLoader
 
 from convml_tt.data.dataset import TileType, ImageSingletDataset
 from convml_tt.data.examples import ExampleData, fetch_example_dataset
+from convml_tt.data.transforms import get_transforms
 from convml_tt.interpretation import plots as interpretation_plot
 from convml_tt.system import Tile2Vec
 from convml_tt.utils import get_embeddings
 
 
 def test_get_embeddings():
-    model = Tile2Vec(pretrained=True)
+    backbone_arch = "resnet18"
+    model = Tile2Vec(pretrained=True, base_arch=backbone_arch)
 
     data_path = fetch_example_dataset(dataset=ExampleData.TINY10)
     dataset = ImageSingletDataset(
-        data_dir=data_path, stage="train", tile_type=TileType.ANCHOR
+        data_dir=data_path, stage="train", tile_type=TileType.ANCHOR,
+        transform=get_transforms(step="predict", normalize_for_arch=backbone_arch)
     )
 
     # direct
@@ -43,11 +46,15 @@ def test_grid_overview_plot():
 def test_dendrogram_plot():
     # use a model with default resnet weights to generate some embedding
     # vectors to plot with
-    model = Tile2Vec(pretrained=True)
+    backbone_arch = "resnet18"
+    model = Tile2Vec(pretrained=True, base_arch=backbone_arch)
+
     data_path = fetch_example_dataset(dataset=ExampleData.SMALL100)
     tile_dataset = ImageSingletDataset(
-        data_dir=data_path, stage="train", tile_type=TileType.ANCHOR
+        data_dir=data_path, stage="train", tile_type=TileType.ANCHOR,
+        transform=get_transforms(step="predict", normalize_for_arch=backbone_arch)
     )
+
     da_embeddings = get_embeddings(
         tile_dataset=tile_dataset, model=model, prediction_batch_size=16
     )
@@ -57,11 +64,15 @@ def test_dendrogram_plot():
 def test_annotated_scatter_plot():
     # use a model with default resnet weights to generate some embedding
     # vectors to plot with
-    model = Tile2Vec(pretrained=True)
+    backbone_arch = "resnet18"
+    model = Tile2Vec(pretrained=True, base_arch=backbone_arch)
+
     data_path = fetch_example_dataset(dataset=ExampleData.SMALL100)
     tile_dataset = ImageSingletDataset(
-        data_dir=data_path, stage="train", tile_type=TileType.ANCHOR
+        data_dir=data_path, stage="train", tile_type=TileType.ANCHOR,
+        transform=get_transforms(step="predict", normalize_for_arch=backbone_arch)
     )
+
     da_embeddings = get_embeddings(
         tile_dataset=tile_dataset, model=model, prediction_batch_size=16
     )

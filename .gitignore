@@ -9,3 +9,4 @@ lightning_logs/
 *.tgz
 *.pkl
 *.ckpt
+example_notebooks/*/data/
