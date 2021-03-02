@@ -15,12 +15,17 @@ beta = 1.0e-4
 # spring constant
 k = 0.3
 # damping
-eta = .89
-delta_t = .5
+eta = 0.89
+delta_t = 0.5
 # tolerance on max kinetic energy before stopping interation
 e_tolerance = 1.0e-5
 
-def _norm(pts, mean=None, scaling=None,):
+
+def _norm(
+    pts,
+    mean=None,
+    scaling=None,
+):
     """
     Rescale the points so the length-scale it spans fits into the domain while
     having space for the offset points
@@ -30,13 +35,15 @@ def _norm(pts, mean=None, scaling=None,):
         mean = x.mean(axis=0)
     x -= mean
 
-    scaling = 2*np.max(np.abs(x), axis=0)
-    x = x/scaling + 0.5
+    scaling = 2 * np.max(np.abs(x), axis=0)
+    x = x / scaling + 0.5
 
     return x, mean, scaling
 
+
 def _denorm(x, mean, scaling):
-    return (x - 0.5)*scaling + mean
+    return (x - 0.5) * scaling + mean
+
 
 def _pseudo_coulomb_force(xi, xj, b):
     dx = xj[0] - xi[0]
@@ -51,6 +58,7 @@ def _pseudo_coulomb_force(xi, xj, b):
         const = b / (ds * ds)
     return np.array([-const * dx, -const * dy])
 
+
 def _hooke_force(xi, xj, dij):
     dx = xj[0] - xi[0]
     dy = xj[1] - xi[1]
@@ -59,13 +67,15 @@ def _hooke_force(xi, xj, dij):
     const = k * dl / ds
     return [const * dx, const * dy]
 
+
 def calc_offset_points(pts, scale=0.2, callback=None, debug=False):
     N = pts.shape[0]
 
     if debug:
         from pathlib import Path
+
         p = Path(__file__)
-        np.savetxt(str(p.parent/'points.npz'), pts)
+        np.savetxt(str(p.parent / "points.npz"), pts)
 
     def update(x, v):
         x_new = np.copy(x)
@@ -79,7 +89,7 @@ def calc_offset_points(pts, scale=0.2, callback=None, debug=False):
                 if i == j:
                     Fij = _hooke_force(x[i], x_fixed[j], dij)
                 else:
-                    Fij = _pseudo_coulomb_force(x[i], x[j], b=0.5*beta)
+                    Fij = _pseudo_coulomb_force(x[i], x[j], b=0.5 * beta)
                     Fij += _pseudo_coulomb_force(x[i], x_fixed[j], b=beta)
 
                 Fx += Fij[0]
@@ -91,7 +101,7 @@ def calc_offset_points(pts, scale=0.2, callback=None, debug=False):
             x_new[i][0] += v[i][0] * delta_t
             x_new[i][1] += v[i][1] * delta_t
 
-        ekin = np.max(np.sqrt(alpha*(v_new[:,0]**2. + v_new[:,1]**2.)))/N
+        ekin = np.max(np.sqrt(alpha * (v_new[:, 0] ** 2.0 + v_new[:, 1] ** 2.0))) / N
 
         return x_new, v_new, ekin
 
@@ -128,26 +138,26 @@ def calc_offset_points(pts, scale=0.2, callback=None, debug=False):
         if e_mean < e_tolerance:
             break
 
-
         # if e_kin > e_old:
-            # if e_increasing:
-                # pass
-            # else:
-                # pass
+        # if e_increasing:
+        # pass
         # else:
-            # pass
-            # if np.abs(e_kin - e_old) < e_tolerance:
-                # break
-            # else:
-                # e_increasing = False
+        # pass
+        # else:
+        # pass
+        # if np.abs(e_kin - e_old) < e_tolerance:
+        # break
+        # else:
+        # e_increasing = False
 
         # if n % 50 == 0:
-            # e_old = e_kin
+        # e_old = e_kin
 
         if callback is not None:
             callback(x, x_fixed)
 
     return _denorm(x, mean=pts_mean, scaling=pts_scaling)
+
 
 def interactive_calc_offset_points(pts, scale=0.2):
     try:
@@ -157,8 +167,10 @@ def interactive_calc_offset_points(pts, scale=0.2):
 
     # first call the algorithm to collect the points as they evolve
     results = []
+
     def callback(x, x_fixed):
         results.append((x, x_fixed))
+
     calc_offset_points(pts=pts, scale=scale, callback=callback)
 
     root = Tkinter.Tk()
@@ -178,17 +190,15 @@ def interactive_calc_offset_points(pts, scale=0.2):
         canvas.coords(id, newx - 5, newy - 5, newx + 5, newy + 5)
 
     def move_line(id, xi, xj):
-        canvas.coords(id,
-                      int(xi[0] * 500),
-                      int(xi[1] * 500),
-                      int(xj[0] * 500),
-                      int(xj[1] * 500))
+        canvas.coords(
+            id, int(xi[0] * 500), int(xi[1] * 500), int(xj[0] * 500), int(xj[1] * 500)
+        )
 
     def update_animation():
         try:
             x, x_fixed = next(results_iter)
         except StopIteration:
-            print('done')
+            print("done")
             return
 
         m = len(x)
@@ -218,23 +228,27 @@ def interactive_calc_offset_points(pts, scale=0.2):
     root.after(UPDATE_FREQ, update_animation)
     root.mainloop()
 
+
 if __name__ == "__main__":
     from pathlib import Path
+
     p = Path(__file__)
-    pts = np.loadtxt(p.parent/'points.npz')
+    pts = np.loadtxt(p.parent / "points.npz")
     try:
         pass
     except:
-        pts = np.array([
-            [ 0.747264, 90.93342 ],
-            [ 0.806094, 91.614726],
-            [ 0.741519, 88.184657],
-            [ 0.723471, 88.817481],
-            [ 0.777587, 90.1086  ],
-            [ 0.725995, 87.924487],
-            [ 0.834896, 91.501665],
-            [ 0.722248, 88.508865],
-            [ 0.767785, 88.731781]
-        ])
+        pts = np.array(
+            [
+                [0.747264, 90.93342],
+                [0.806094, 91.614726],
+                [0.741519, 88.184657],
+                [0.723471, 88.817481],
+                [0.777587, 90.1086],
+                [0.725995, 87.924487],
+                [0.834896, 91.501665],
+                [0.722248, 88.508865],
+                [0.767785, 88.731781],
+            ]
+        )
 
     interactive_calc_offset_points(pts=pts, scale=0.3)

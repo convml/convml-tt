@@ -130,9 +130,10 @@ class EmbeddingTransform(luigi.Task):
             pretrained_model = None
 
         da_cluster, model = apply_transform(
-            da=da_emb, transform_type=self.transform_type,
+            da=da_emb,
+            transform_type=self.transform_type,
             pretrained_model=pretrained_model,
-            **self._parse_transform_extra_kwargs()
+            **self._parse_transform_extra_kwargs(),
         )
 
         if model is not None and self.pretrained_model is None:
@@ -144,10 +145,10 @@ class EmbeddingTransform(luigi.Task):
         da_cluster.name = "emb"
         da_cluster["i0"] = da_emb.i0
         da_cluster["j0"] = da_emb.j0
-        if 'lat' in da_emb.coords:
-            da_cluster['lat'] = da_emb.coords['lat']
-        if 'lon' in da_emb.coords:
-            da_cluster['lon'] = da_emb.coords['lon']
+        if "lat" in da_emb.coords:
+            da_cluster["lat"] = da_emb.coords["lat"]
+        if "lon" in da_emb.coords:
+            da_cluster["lon"] = da_emb.coords["lon"]
         da_cluster.attrs["transform_type"] = self.transform_type
         if self.transform_extra_args:
             da_cluster.attrs["transform_extra_args"] = self.transform_extra_args
@@ -249,7 +250,9 @@ class DatasetEmbeddingTransform(EmbeddingTransform):
         model_name = Path(self.model_path).name.replace(".pkl", "")
 
         fn = "{}.{}_step.{}.nc".format(
-            self.scene_id, self.step_size, self._build_transform_identifier(),
+            self.scene_id,
+            self.step_size,
+            self._build_transform_identifier(),
         )
 
         if self.pretrained_model is not None:
@@ -285,7 +288,8 @@ class CreateAllPredictionMapsDataTransformed(EmbeddingTransform):
     def output(self):
         model_name = Path(self.model_path).name.replace(".pkl", "")
         fn = "all_embeddings.{}_step.{}.nc".format(
-            self.step_size, self._build_transform_identifier(),
+            self.step_size,
+            self._build_transform_identifier(),
         )
         p_root = (
             Path(self.dataset_path)

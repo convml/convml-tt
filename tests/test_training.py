@@ -44,7 +44,9 @@ def test_load_from_weights():
 
     data_path = fetch_example_dataset(dataset=ExampleData.TINY10)
     dataset = ImageSingletDataset(
-        data_dir=data_path, stage="train", tile_type=TileType.ANCHOR,
-        transform=get_transforms(step="predict", normalize_for_arch=model.base_arch)
+        data_dir=data_path,
+        stage="train",
+        tile_type=TileType.ANCHOR,
+        transform=get_transforms(step="predict", normalize_for_arch=model.base_arch),
     )
     get_embeddings(tile_dataset=dataset, model=model, prediction_batch_size=16)

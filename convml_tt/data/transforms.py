@@ -68,7 +68,7 @@ def get_transforms(step, normalize_for_arch):
     transforms = [
         tv_transforms.ToTensor(),
         RemoveImageAlphaTransform(),
-        arch_norm_transform
+        arch_norm_transform,
     ]
 
     if step == "train":

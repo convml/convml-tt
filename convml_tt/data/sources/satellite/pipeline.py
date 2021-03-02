@@ -15,15 +15,14 @@ SOURCE_DIR = Path("source_data")
 
 SCENE_ID_DATE_FORMAT = "%Y%m%d%H%M"
 
+
 def parse_scene_id(s):
-    return datetime.datetime.strptime(
-        s.replace("goes16_", ""), SCENE_ID_DATE_FORMAT
-    )
+    return datetime.datetime.strptime(s.replace("goes16_", ""), SCENE_ID_DATE_FORMAT)
 
 
 class DatetimeListParameter(luigi.Parameter):
     def parse(self, x):
-        return [dateutil.parser.parse(s) for s in x.split(',')]
+        return [dateutil.parser.parse(s) for s in x.split(",")]
 
     def serialize(self, x):
         return ",".join([t.isoformat() for t in x])
@@ -39,17 +38,20 @@ class GOES16Query(luigi.Task):
     def run(self):
         cli = satdata.Goes16AWS(offline=False)
 
-        filenames = cli.query(time=self.time, region='F', debug=self.debug,
-                              channel=self.channel, dt_max=self.dt_max)
+        filenames = cli.query(
+            time=self.time,
+            region="F",
+            debug=self.debug,
+            channel=self.channel,
+            dt_max=self.dt_max,
+        )
 
         Path(self.output().fn).parent.mkdir(exist_ok=True)
         self.output().write(filenames)
 
     def output(self):
-        fn = 'source_data/ch{}_keys_{}.yaml'.format(
-            self.channel, self.time.isoformat()
-        )
-        p = Path(self.data_path)/fn
+        fn = "source_data/ch{}_keys_{}.yaml".format(self.channel, self.time.isoformat())
+        p = Path(self.data_path) / fn
         return YAMLTarget(str(p))
 
 
@@ -68,8 +70,7 @@ class GOES16Fetch(luigi.Task):
         for c in self.channels:
             reqs[c] = [
                 GOES16Query(
-                    dt_max=self.dt_max, channel=c, time=t,
-                    data_path=self.data_path
+                    dt_max=self.dt_max, channel=c, time=t, data_path=self.data_path
                 )
                 for t in self.times
             ]
@@ -94,7 +95,7 @@ class GOES16Fetch(luigi.Task):
 
             def get_time(fn):
                 attrs = satdata.Goes16AWS.parse_key(fn, parse_times=True)
-                return attrs['start_time']
+                return attrs["start_time"]
 
             def time_diff(i0, i1, fpc):
                 # fpc: new sliced files_per_channel dictionary where each list
@@ -102,17 +103,13 @@ class GOES16Fetch(luigi.Task):
                 channels = list(files_per_channel.keys())
                 c1 = channels[i0]
                 c2 = channels[i1]
-                dt = (
-                    get_time(fpc[c1][0])
-                    - get_time(fpc[c2][0])
-                )
+                dt = get_time(fpc[c1][0]) - get_time(fpc[c2][0])
                 return abs(dt.total_seconds())
 
             def timediff_all(fpc):
-                return sum([
-                    time_diff(i0, i1, fpc)
-                    for (i0, i1) in [(0, 1), (0, 2), (1, 2)]
-                ])
+                return sum(
+                    [time_diff(i0, i1, fpc) for (i0, i1) in [(0, 1), (0, 2), (1, 2)]]
+                )
 
             N_max = max(num_files_per_channel.values())
 
@@ -137,10 +134,9 @@ class GOES16Fetch(luigi.Task):
                 num_files_per_channel[channel] = len(files)
             assert len(set(num_files_per_channel.values())) == 1
 
-        local_storage_dir = Path(self.data_path).expanduser()/SOURCE_DIR
+        local_storage_dir = Path(self.data_path).expanduser() / SOURCE_DIR
         cli = satdata.Goes16AWS(
-            offline=self.offline_cli,
-            local_storage_dir=local_storage_dir
+            offline=self.offline_cli, local_storage_dir=local_storage_dir
         )
 
         # download all the files using the cli (flatting list first...)
@@ -160,12 +156,12 @@ class GOES16Fetch(luigi.Task):
 
     def _make_scene_id(self, files):
         attrs = satdata.Goes16AWS.parse_key(files[0], parse_times=True)
-        t = attrs['start_time']
+        t = attrs["start_time"]
         return "goes16_{}".format(t.strftime(SCENE_ID_DATE_FORMAT))
 
     def output(self):
-        fn = 'source_data/all_files.yaml'
-        p = Path(self.data_path)/fn
+        fn = "source_data/all_files.yaml"
+        p = Path(self.data_path) / fn
         return YAMLTarget(str(p))
 
 
@@ -185,18 +181,15 @@ class StudyTrainSplit(luigi.Task):
 
     def run(self):
         datasets_filenames_all = self.input().read()
-        datasets_filenames_split = (
-            processing.pick_one_time_per_date_for_study(
-                datasets_filenames_all,
-                datasource_cli=satdata.Goes16AWS
-            )
+        datasets_filenames_split = processing.pick_one_time_per_date_for_study(
+            datasets_filenames_all, datasource_cli=satdata.Goes16AWS
         )
         Path(self.output().fn).parent.mkdir(exist_ok=True)
         self.output().write(datasets_filenames_split)
 
     def output(self):
         fn = "source_data/training_study_split.yaml"
-        p = Path(self.data_path)/fn
+        p = Path(self.data_path) / fn
         return YAMLTarget(str(p))
 
 
@@ -208,7 +201,7 @@ class RGBCompositeNetCDFFile(luigi.LocalTarget):
 
     @property
     def path_meta(self):
-        return self.fn.replace('.nc', '.meta.yaml')
+        return self.fn.replace(".nc", ".meta.yaml")
 
     def open(self):
         try:
@@ -226,6 +219,7 @@ class CreateRGBScene(luigi.Task):
     """
     Create RGB composite scene from GOES-16 radiance files
     """
+
     scene_id = luigi.Parameter()
     dataset_path = luigi.Parameter()
 
@@ -238,11 +232,13 @@ class CreateRGBScene(luigi.Task):
 
         all_source_data = self.input().read()
         if self.scene_id not in all_source_data:
-            raise Exception("scene `{}` is missing from the source data file"
-                            "".format(self.scene_id))
+            raise Exception(
+                "scene `{}` is missing from the source data file"
+                "".format(self.scene_id)
+            )
         else:
             scene_fns = [
-                Path(self.dataset_path)/SOURCE_DIR/p
+                Path(self.dataset_path) / SOURCE_DIR / p
                 for p in all_source_data[self.scene_id]
             ]
         # OBS: should probably check that the channels necessary for RGB scene
@@ -253,23 +249,21 @@ class CreateRGBScene(luigi.Task):
         )
 
         bbox_domain = d.get_domain(da_scene=da_truecolor)
-        domain_bbox_pad_frac = getattr(d, 'domain_bbox_pad_frac', 0.1)
+        domain_bbox_pad_frac = getattr(d, "domain_bbox_pad_frac", 0.1)
 
         da_truecolor_domain = tiler.crop_field_to_latlon_box(
-            da=da_truecolor, box=np.array(bbox_domain.get_bounds()).T,
-            pad_pct=domain_bbox_pad_frac
+            da=da_truecolor,
+            box=np.array(bbox_domain.get_bounds()).T,
+            pad_pct=domain_bbox_pad_frac,
         )
 
-        da_truecolor_domain = satpy_rgb._cleanup_composite_da_attrs(
-            da_truecolor_domain
-        )
+        da_truecolor_domain = satpy_rgb._cleanup_composite_da_attrs(da_truecolor_domain)
 
-        self.output().save(da_truecolor=da_truecolor_domain,
-                           source_fns=scene_fns)
+        self.output().save(da_truecolor=da_truecolor_domain, source_fns=scene_fns)
 
     def output(self):
         fn = "{}.nc".format(self.scene_id)
-        p = Path(self.dataset_path)/"composites"/"original_cropped"/fn
+        p = Path(self.dataset_path) / "composites" / "original_cropped" / fn
         t = RGBCompositeNetCDFFile(str(p))
         return t
 

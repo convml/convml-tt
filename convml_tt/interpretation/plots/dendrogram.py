@@ -157,9 +157,9 @@ def dendrogram(
         y_offset += 0.2
 
     for lid, leaf_id in enumerate(ddata["leaves"]):
-        img_idxs_in_cluster = da_embeddings.tile_id.values[leaf_mapping == leaf_id].astype(
-            int
-        )
+        img_idxs_in_cluster = da_embeddings.tile_id.values[
+            leaf_mapping == leaf_id
+        ].astype(int)
         if sampling_method == "random":
             try:
                 img_idxs = np.random.choice(

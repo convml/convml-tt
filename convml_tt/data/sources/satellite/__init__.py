@@ -15,7 +15,12 @@ from .tiler import RectTile
 
 def _ensure_task_run(t):
     if not t.output().exists():
-        luigi.build([t,], local_scheduler=True)
+        luigi.build(
+            [
+                t,
+            ],
+            local_scheduler=True,
+        )
     if not t.output().exists():
         raise Exception("Task didn't complete")
 
@@ -60,9 +65,11 @@ class SatelliteTrajectoryDataset(TrajectoryDataset, SatelliteDatasetMixin):
         self.channels = channels
 
     def get_domain_rect(self, da_scene):
-        ds_pt = self._ds_traj.sel(time=da_scene.start_time, method='nearest')
+        ds_pt = self._ds_traj.sel(time=da_scene.start_time, method="nearest")
         lat0, lon0 = ds_pt.lat.item(), ds_pt.lon.item()
-        tile = RectTile(lat0=lat0, lon0=lon0, l_meridional=self.tile_size, l_zonal=self.tile_size)
+        tile = RectTile(
+            lat0=lat0, lon0=lon0, l_meridional=self.tile_size, l_zonal=self.tile_size
+        )
         return tile
 
     def get_domain(self, da_scene):
@@ -180,7 +187,7 @@ class FixedTimeRangeSatelliteTripletDataset(SatelliteTripletDataset):
         return LatLonBox(self.domain_bbox)
 
     def get_domain_rect(self, **kwargs):
-        return RectTile(**self.extra['rectpred']['domain'])
+        return RectTile(**self.extra["rectpred"]["domain"])
 
     def _plot_scene_outline(self, ax, scene_num=0, color="orange"):
         da_scene = None
@@ -221,9 +228,18 @@ class FixedTimeRangeSatelliteTripletDataset(SatelliteTripletDataset):
         def draw_box(geom, color, face_alpha=0.5, label=None):
             lines.append(Line2D([0], [0], color=color, lw=1, label=label))
             kwargs = dict(crs=ccrs.PlateCarree(), edgecolor=color)
-            ax.add_geometries([geom,], alpha=face_alpha, facecolor=color, **kwargs)
             ax.add_geometries(
-                [geom,],
+                [
+                    geom,
+                ],
+                alpha=face_alpha,
+                facecolor=color,
+                **kwargs
+            )
+            ax.add_geometries(
+                [
+                    geom,
+                ],
                 alpha=face_alpha * 2.0,
                 facecolor="none",
                 linewidth=1.0,

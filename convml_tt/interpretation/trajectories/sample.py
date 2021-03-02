@@ -37,9 +37,13 @@ class RectTilerPoints:
             return None
         else:
             return self._crop_fastai_im(
-                img=self.img, i=i_center-nxt_hw, j=j_center-nyt_hw,
-                nx=self.nxt, ny=self.nyt,
+                img=self.img,
+                i=i_center - nxt_hw,
+                j=j_center - nyt_hw,
+                nx=self.nxt,
+                ny=self.nyt,
             )
+
 
 def make_tile_predictions(model, tile_images):
     il = FakeImagesList(None, None)
@@ -56,19 +60,15 @@ class TrajectoryEmbeddingSampling(luigi.Task):
     trajectories_path = luigi.Parameter()
 
     def requires(self):
-        return dict(
-            images=MakeAllRectRGBDataArrays(
-                dataset_path=self.dataset_path
-            )
-        )
+        return dict(images=MakeAllRectRGBDataArrays(dataset_path=self.dataset_path))
 
     def _find_nearest_scene_id(self, time, scene_ids):
         times = [parse_scene_id(scene_id) for scene_id in scene_ids]
         raise NotImplementedError
 
     def run(self):
-        ds_traj = self.input()['trajectories'].open()
-        input_images = self.input()['images']
+        ds_traj = self.input()["trajectories"].open()
+        input_images = self.input()["images"]
 
         model_fullpath = Path(self.model_path)
         model_path, model_fn = model_fullpath.parent, model_fullpath.name
@@ -94,13 +94,15 @@ class TrajectoryEmbeddingSampling(luigi.Task):
             has_valid_tile = np.zeros(N_points).astype(bool)
             for n in ds_points_stacked.n.values:
                 ds_point = ds_points_stacked.sel(n=n)
-                tile_img = tile_sampler(i_center=ds_point.i.values, j_center=ds_point.j.values)
+                tile_img = tile_sampler(
+                    i_center=ds_point.i.values, j_center=ds_point.j.values
+                )
                 if tile_img:
                     has_valid_tile[n] = True
                     tile_images.append(tile_img)
 
             N_dims = 100
-            embs_all = np.nan*np.ones((N_points, N_dims))
+            embs_all = np.nan * np.ones((N_points, N_dims))
 
             if len(tile_images) > 0:
                 embs = make_tile_predictions(model=model, tile_images=tile_images)
@@ -114,14 +116,17 @@ class TrajectoryEmbeddingSampling(luigi.Task):
             da_embs_scene = xr.DataArray(
                 embs_all,
                 coords=ds_points_stacked.coords,
-                dims=list(ds_points_stacked.dims) + ['emb_dim',]
-            ).unstack('n')
+                dims=list(ds_points_stacked.dims)
+                + [
+                    "emb_dim",
+                ],
+            ).unstack("n")
 
             emb_dataarrays.append(da_embs_scene)
 
-        da_embs = xr.concat(emb_dataarrays, dim='scene_id')
+        da_embs = xr.concat(emb_dataarrays, dim="scene_id")
         times = [parse_scene_id(scene_id) for scene_id in da_embs.scene_id.values]
-        da_embs.coords['time'] = ('scene_id', ), times
+        da_embs.coords["time"] = ("scene_id",), times
         da_embs.to_netcdf(self.output().fn)
 
     def output(self):
@@ -136,7 +141,7 @@ class FlowTrajectoryEmbeddingSampling(TrajectoryEmbeddingSampling):
 
     def requires(self):
         tasks = super().requires()
-        tasks['trajectories'] = FullDatasetOpticalFlowTrajectories(
+        tasks["trajectories"] = FullDatasetOpticalFlowTrajectories(
             dataset_path=self.dataset_path
         )
         return tasks

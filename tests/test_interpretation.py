@@ -15,8 +15,10 @@ def test_get_embeddings():
 
     data_path = fetch_example_dataset(dataset=ExampleData.TINY10)
     dataset = ImageSingletDataset(
-        data_dir=data_path, stage="train", tile_type=TileType.ANCHOR,
-        transform=get_transforms(step="predict", normalize_for_arch=backbone_arch)
+        data_dir=data_path,
+        stage="train",
+        tile_type=TileType.ANCHOR,
+        transform=get_transforms(step="predict", normalize_for_arch=backbone_arch),
     )
 
     # direct
@@ -51,8 +53,10 @@ def test_dendrogram_plot():
 
     data_path = fetch_example_dataset(dataset=ExampleData.SMALL100)
     tile_dataset = ImageSingletDataset(
-        data_dir=data_path, stage="train", tile_type=TileType.ANCHOR,
-        transform=get_transforms(step="predict", normalize_for_arch=backbone_arch)
+        data_dir=data_path,
+        stage="train",
+        tile_type=TileType.ANCHOR,
+        transform=get_transforms(step="predict", normalize_for_arch=backbone_arch),
     )
 
     da_embeddings = get_embeddings(
@@ -69,8 +73,10 @@ def test_annotated_scatter_plot():
 
     data_path = fetch_example_dataset(dataset=ExampleData.SMALL100)
     tile_dataset = ImageSingletDataset(
-        data_dir=data_path, stage="train", tile_type=TileType.ANCHOR,
-        transform=get_transforms(step="predict", normalize_for_arch=backbone_arch)
+        data_dir=data_path,
+        stage="train",
+        tile_type=TileType.ANCHOR,
+        transform=get_transforms(step="predict", normalize_for_arch=backbone_arch),
     )
 
     da_embeddings = get_embeddings(

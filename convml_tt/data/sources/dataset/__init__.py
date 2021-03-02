@@ -164,6 +164,7 @@ class GroupedSceneBulkProcessingBaseTask(SceneBulkProcessingBaseTask):
     """
     Groups all scenes in dataset by date and runs them provided Task
     """
+
     scene_prefix = "DATE"
 
     def _build_runtime_tasks(self):
@@ -175,7 +176,7 @@ class GroupedSceneBulkProcessingBaseTask(SceneBulkProcessingBaseTask):
 
         scenes_by_prefix = {}
         for scene_id in all_source_data.keys():
-            if not scene_id.startswith('goes16_'):
+            if not scene_id.startswith("goes16_"):
                 raise NotImplementedError(scene_id)
 
             # the last four characters are the hour and minute
@@ -191,6 +192,9 @@ class GroupedSceneBulkProcessingBaseTask(SceneBulkProcessingBaseTask):
             # XXX: fixme
             scene_ids = scene_ids[20:]
             tasks[prefix] = self.TaskClass(
-                scene_ids=scene_ids, prefix=prefix, dataset_path=self.dataset_path, **kwargs
+                scene_ids=scene_ids,
+                prefix=prefix,
+                dataset_path=self.dataset_path,
+                **kwargs,
             )
         return tasks

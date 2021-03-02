@@ -17,17 +17,18 @@ from .utils import create_true_color_img
 
 import os
 
-from xesmf.backend import (esmf_grid, add_corner,
-                           esmf_regrid_build, esmf_regrid_finalize)
+from xesmf.backend import esmf_grid, add_corner, esmf_regrid_build, esmf_regrid_finalize
 
 import tempfile
 import math
 
 try:
     from . import satpy_rgb
+
     HAS_SATPY = True
 except ImportError:
     HAS_SATPY = False
+
 
 class SilentRegridder(xesmf.Regridder):
     def _write_weight_file(self):
@@ -37,9 +38,10 @@ class SilentRegridder(xesmf.Regridder):
             else:
                 os.remove(self.filename)
 
-        regrid = esmf_regrid_build(self._grid_in, self._grid_out, self.method,
-                                   filename=self.filename)
-        esmf_regrid_finalize(regrid) # only need weights, not regrid object
+        regrid = esmf_regrid_build(
+            self._grid_in, self._grid_out, self.method, filename=self.filename
+        )
+        esmf_regrid_finalize(regrid)  # only need weights, not regrid object
 
 
 def crop_field_to_latlon_box(da, box, pad_pct=0.1):
@@ -50,10 +52,10 @@ def crop_field_to_latlon_box(da, box, pad_pct=0.1):
     lx = x_max - x_min
     ly = y_max - y_min
 
-    x_min -= pad_pct*lx
-    y_min -= pad_pct*ly
-    x_max += pad_pct*lx
-    y_max += pad_pct*ly
+    x_min -= pad_pct * lx
+    y_min -= pad_pct * ly
+    x_max += pad_pct * lx
+    y_max += pad_pct * ly
 
     if da.x[0] > da.x[-1]:
         x_slice = slice(x_max, x_min)
@@ -68,7 +70,7 @@ def crop_field_to_latlon_box(da, box, pad_pct=0.1):
     return da.sel(x=x_slice, y=y_slice)
 
 
-class RectTile():
+class RectTile:
     class TileBoundsOutsideOfInputException(Exception):
         pass
 
@@ -78,9 +80,9 @@ class RectTile():
         self.l_meridional = l_meridional
         self.l_zonal = l_zonal
 
-        regridder_basedir = Path('/nfs/a289/earlcd/tmp/regridding')
+        regridder_basedir = Path("/nfs/a289/earlcd/tmp/regridding")
         if not regridder_basedir.exists():
-            regridder_basedir = Path('/tmp/regridding')
+            regridder_basedir = Path("/tmp/regridding")
         regridder_basedir.mkdir(exist_ok=True, parents=True)
         self.regridder_tmpdir = Path(tempfile.mkdtemp(dir=regridder_basedir))
 
@@ -93,27 +95,27 @@ class RectTile():
         ldeg_lon = self._get_approximate_equator_deg_dist(l=self.l_zonal)
         ldeg_lat = self._get_approximate_equator_deg_dist(l=self.l_meridional)
 
-        corners_dir = list(itertools.product([1,-1], [1,-1]))
+        corners_dir = list(itertools.product([1, -1], [1, -1]))
         corners_dir.insert(0, corners_dir.pop(2))
 
-        corners = np.array([ldeg_lon/2., ldeg_lat/2.])*np.array(corners_dir)
+        corners = np.array([ldeg_lon / 2.0, ldeg_lat / 2.0]) * np.array(corners_dir)
 
-        return self._transform_from_equator(lon=corners[:,0], lat=corners[:,1])
+        return self._transform_from_equator(lon=corners[:, 0], lat=corners[:, 1])
 
     def _transform_from_equator(self, lon, lat):
         p = ccrs.RotatedPole(
             pole_latitude=90 + self.lat0,
             pole_longitude=self.lon0,
-            central_rotated_longitude=-180.
+            central_rotated_longitude=-180.0,
         )
 
-        return ccrs.PlateCarree().transform_points(p, lon, lat)[...,:2]
+        return ccrs.PlateCarree().transform_points(p, lon, lat)[..., :2]
 
     @staticmethod
     def _get_approximate_equator_deg_dist(l):
         # approximate lat/lon distance
-        r = 6371e3 # [m]
-        return np.arcsin(l/r)*180./3.14
+        r = 6371e3  # [m]
+        return np.arcsin(l / r) * 180.0 / 3.14
 
     def get_outline_shape(self):
         """return a shapely shape valid for plotting"""
@@ -125,41 +127,41 @@ class RectTile():
         Get an xarray Dataset containing the new lat/lon grid points with their
         position in meters
         """
-        N_zonal = math.ceil(self.l_zonal/dx)
-        N_meridional = math.ceil(self.l_meridional/dx)
+        N_zonal = math.ceil(self.l_zonal / dx)
+        N_meridional = math.ceil(self.l_meridional / dx)
         ldeg_lon = self._get_approximate_equator_deg_dist(l=self.l_zonal)
         ldeg_lat = self._get_approximate_equator_deg_dist(l=self.l_meridional)
 
-        lon_eq_ = np.linspace(-ldeg_lon/2., ldeg_lon/2., N_zonal)
-        lat_eq_ = np.linspace(-ldeg_lat/2., ldeg_lat/2., N_meridional)
-        lon_eq, lat_eq = np.meshgrid(lon_eq_, lat_eq_, indexing='ij')
+        lon_eq_ = np.linspace(-ldeg_lon / 2.0, ldeg_lon / 2.0, N_zonal)
+        lat_eq_ = np.linspace(-ldeg_lat / 2.0, ldeg_lat / 2.0, N_meridional)
+        lon_eq, lat_eq = np.meshgrid(lon_eq_, lat_eq_, indexing="ij")
 
         pts = self._transform_from_equator(lon=lon_eq, lat=lat_eq)
 
         x = xr.DataArray(
-            np.arange(-self.l_zonal/2., self.l_zonal/2, dx),
-            attrs=dict(longname='approx distance from center', units='m'),
-            dims=('x',)
+            np.arange(-self.l_zonal / 2.0, self.l_zonal / 2, dx),
+            attrs=dict(longname="approx distance from center", units="m"),
+            dims=("x",),
         )
         y = xr.DataArray(
-            np.arange(-self.l_meridional/2., self.l_meridional/2, dx),
-            attrs=dict(longname='approx distance from center', units='m'),
-            dims=('y',)
+            np.arange(-self.l_meridional / 2.0, self.l_meridional / 2, dx),
+            attrs=dict(longname="approx distance from center", units="m"),
+            dims=("y",),
         )
 
         ds = xr.Dataset(coords=dict(x=x, y=y))
 
-        ds['lon'] = xr.DataArray(
-            pts[...,0],
-            dims=('x', 'y'),
+        ds["lon"] = xr.DataArray(
+            pts[..., 0],
+            dims=("x", "y"),
             coords=dict(x=ds.x, y=ds.y),
-            attrs=dict(standard_name="grid_longitude", units="degree")
+            attrs=dict(standard_name="grid_longitude", units="degree"),
         )
-        ds['lat'] = xr.DataArray(
-            pts[...,1],
-            dims=('x', 'y'),
+        ds["lat"] = xr.DataArray(
+            pts[..., 1],
+            dims=("x", "y"),
             coords=dict(x=ds.x, y=ds.y),
-            attrs=dict(standard_name="grid_latitude", units="degree")
+            attrs=dict(standard_name="grid_latitude", units="degree"),
         )
 
         return ds
@@ -170,17 +172,16 @@ class RectTile():
         [x0 ,x1, y0, y1] in Cartesian coordinates
         """
         return [
-            -self.l_zonal/2., self.l_zonal/2.,
-            -self.l_meridional/2., self.l_meridional/2.
+            -self.l_zonal / 2.0,
+            self.l_zonal / 2.0,
+            -self.l_meridional / 2.0,
+            self.l_meridional / 2.0,
         ]
 
     def crop_field(self, da, pad_pct=0.1):
-        return crop_field_to_latlon_box(
-            da=da, box=self.get_bounds().T, pad_pct=pad_pct
-        )
+        return crop_field_to_latlon_box(da=da, box=self.get_bounds().T, pad_pct=pad_pct)
 
-    def resample(self, da, dx, method='bilinear', crop_pad_pct=0.1,
-                 keep_attrs=False):
+    def resample(self, da, dx, method="bilinear", crop_pad_pct=0.1, keep_attrs=False):
         """
         Resample a xarray DataArray onto this tile with grid made of NxN points
         """
@@ -191,46 +192,60 @@ class RectTile():
 
         old_grid = xr.Dataset(coords=da_cropped.coords)
 
-        if not hasattr(da_cropped, 'crs'):
-            raise Exception("The provided DataArray doesn't have a "
-                            "projection provided. Please set the `crs` "
-                            "attribute to contain a cartopy projection")
+        if not hasattr(da_cropped, "crs"):
+            raise Exception(
+                "The provided DataArray doesn't have a "
+                "projection provided. Please set the `crs` "
+                "attribute to contain a cartopy projection"
+            )
 
         latlon_old = ccrs.PlateCarree().transform_points(
-            da_cropped.crs, *np.meshgrid(da_cropped.x.values, da_cropped.y.values),
-        )[:,:,:2]
+            da_cropped.crs,
+            *np.meshgrid(da_cropped.x.values, da_cropped.y.values),
+        )[:, :, :2]
 
-        old_grid['lat'] = (('y', 'x'), latlon_old[...,1])
-        old_grid['lon'] = (('y', 'x'), latlon_old[...,0])
+        old_grid["lat"] = (("y", "x"), latlon_old[..., 1])
+        old_grid["lon"] = (("y", "x"), latlon_old[..., 0])
 
         new_grid = self.get_grid(dx=dx)
 
         Nx_in, Ny_in = da_cropped.x.shape[0], da_cropped.y.shape[0]
         Nx_out, Ny_out = int(new_grid.x.count()), int(new_grid.y.count())
 
-        regridder_weights_fn = "{method}_{Ny_in}x{Nx_in}_{Ny_out}x{Nx_out}"\
-                               "__{lat0}_{lon0}.nc".format(
-            lon0=self.lon0, lat0=self.lat0, method=method, Ny_in=Ny_in,
-            Nx_in=Nx_in, Nx_out=Nx_out, Ny_out=Ny_out,
+        regridder_weights_fn = (
+            "{method}_{Ny_in}x{Nx_in}_{Ny_out}x{Nx_out}"
+            "__{lat0}_{lon0}.nc".format(
+                lon0=self.lon0,
+                lat0=self.lat0,
+                method=method,
+                Ny_in=Ny_in,
+                Nx_in=Nx_in,
+                Nx_out=Nx_out,
+                Ny_out=Ny_out,
+            )
         )
 
-        regridder_weights_fn = str(self.regridder_tmpdir/regridder_weights_fn)
+        regridder_weights_fn = str(self.regridder_tmpdir / regridder_weights_fn)
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             try:
-                regridder = SilentRegridder(filename=regridder_weights_fn,
-                    reuse_weights=True, ds_in=old_grid, ds_out=new_grid,
+                regridder = SilentRegridder(
+                    filename=regridder_weights_fn,
+                    reuse_weights=True,
+                    ds_in=old_grid,
+                    ds_out=new_grid,
                     method=method,
                 )
             except ValueError:
-                raise self.TileBoundsOutsideOfInputException("something went wrong"
-                        " during regridding :(")
+                raise self.TileBoundsOutsideOfInputException(
+                    "something went wrong" " during regridding :("
+                )
 
         da_resampled = regridder(da_cropped)
 
-        da_resampled['x'] = new_grid.x
-        da_resampled['y'] = new_grid.y
+        da_resampled["x"] = new_grid.x
+        da_resampled["y"] = new_grid.y
 
         if keep_attrs:
             da_resampled.attrs.update(da.attrs)
@@ -245,22 +260,21 @@ class RectTile():
         from pyresample import geometry
 
         L = self.size
-        area_id = 'tile'
-        description = 'Tile local cartesian grid'
-        proj_id = 'ease_tile'
+        area_id = "tile"
+        description = "Tile local cartesian grid"
+        proj_id = "ease_tile"
         x_size = N
         y_size = N
         area_extent = (-L, -L, L, L)
         proj_dict = {
-            'a': 6371228.0,
-            'units': 'm',
-            'proj': 'laea', 
-            'lon_0': self.lon0,
-            'lat_0': self.lat0
+            "a": 6371228.0,
+            "units": "m",
+            "proj": "laea",
+            "lon_0": self.lon0,
+            "lat_0": self.lat0,
         }
         area_def = geometry.AreaDefinition(
-            area_id, description, proj_id, proj_dict, x_size, y_size,
-            area_extent
+            area_id, description, proj_id, proj_dict, x_size, y_size, area_extent
         )
 
         return area_def
@@ -273,11 +287,12 @@ class RectTile():
             return create_true_color_img(das_channels=das_channels_resampled)
         else:
             if not HAS_SATPY:
-                raise Exception("Must have satpy installed to be able to "
-                                "RGB composites with satpy")
+                raise Exception(
+                    "Must have satpy installed to be able to "
+                    "RGB composites with satpy"
+                )
 
-            da_tile_rgb = self.resample(da=da_scene, dx=resampling_dx,
-                                        keep_attrs=True)
+            da_tile_rgb = self.resample(da=da_scene, dx=resampling_dx, keep_attrs=True)
 
             return satpy_rgb.rgb_da_to_img(da_tile_rgb)
 
@@ -292,10 +307,17 @@ class RectTile():
         if ax is None:
             crs = ccrs.PlateCarree()
             fig, ax = plt.subplots(subplot_kw=dict(projection=crs), figsize=(10, 6))
-            gl = ax.gridlines(linestyle='--', draw_labels=True)
-            ax.coastlines(resolution='10m', color='grey')
+            gl = ax.gridlines(linestyle="--", draw_labels=True)
+            ax.coastlines(resolution="10m", color="grey")
 
-        ax.add_geometries([self.get_outline_shape(),], crs=ccrs.PlateCarree(), alpha=alpha, **kwargs)
+        ax.add_geometries(
+            [
+                self.get_outline_shape(),
+            ],
+            crs=ccrs.PlateCarree(),
+            alpha=alpha,
+            **kwargs,
+        )
         return ax
 
 
@@ -305,22 +327,29 @@ class Tile(RectTile):
         super().__init__(lat0=lat0, lon0=lon0, l_meridional=size, l_zonal=size)
 
     def get_grid(self, N):
-        dx = self.size/N
+        dx = self.size / N
         return super().get_grid(dx=dx)
 
-def triplet_generator(da_target_scene, tile_size, tiling_bbox, tile_N,
-                      da_distant_scene=None, neigh_dist_scaling=1.0,
-                      distant_dist_scaling=10.):
+
+def triplet_generator(
+    da_target_scene,
+    tile_size,
+    tiling_bbox,
+    tile_N,
+    da_distant_scene=None,
+    neigh_dist_scaling=1.0,
+    distant_dist_scaling=10.0,
+):
     # generate (lat, lon) locations inside tiling_box
 
     def _est_tile_size_deg(loc):
         _, lat0 = loc
         R = 6371e3  # Earth's radius in m
-        tile_size_deg = np.rad2deg(tile_size/(R*np.cos(np.deg2rad(lat0))))
+        tile_size_deg = np.rad2deg(tile_size / (R * np.cos(np.deg2rad(lat0))))
         return tile_size_deg
 
     def _point_valid(lon, lat):
-        h_ts = 0.5*_est_tile_size_deg(loc=(lon, lat))
+        h_ts = 0.5 * _est_tile_size_deg(loc=(lon, lat))
 
         (lon_min, lat_min), (lon_max, lat_max) = tiling_bbox
         try:
@@ -333,8 +362,8 @@ def triplet_generator(da_target_scene, tile_size, tiling_bbox, tile_N,
     def _generate_latlon():
         (lon_min, lat_min), (lon_max, lat_max) = tiling_bbox
 
-        lat = lat_min + (lat_max - lat_min)*np.random.random()
-        lon = lon_min + (lon_max - lon_min)*np.random.random()
+        lat = lat_min + (lat_max - lat_min) * np.random.random()
+        lon = lon_min + (lon_max - lon_min) * np.random.random()
 
         if not _point_valid(lon, lat):
             return _generate_latlon()
@@ -342,22 +371,20 @@ def triplet_generator(da_target_scene, tile_size, tiling_bbox, tile_N,
             return (lon, lat)
 
     def _perturb_loc(loc, scaling):
-        theta = 2*pi*np.random.random()
+        theta = 2 * pi * np.random.random()
 
         tile_size_deg = _est_tile_size_deg(loc=loc)
 
-        r = scaling*tile_size_deg*np.random.normal(loc=1.0, scale=0.1)
+        r = scaling * tile_size_deg * np.random.normal(loc=1.0, scale=0.1)
 
-        dlon = r*np.cos(theta)
-        dlat = r*np.sin(theta)
+        dlon = r * np.cos(theta)
+        dlat = r * np.sin(theta)
 
         new_loc = (loc[0] + dlon, loc[1] + dlat)
         if _point_valid(lon=new_loc[0], lat=new_loc[1]):
             return new_loc
         else:
             return _perturb_loc(loc=loc, scaling=scaling)
-
-
 
     anchor_loc = _generate_latlon()
     neighbor_loc = _perturb_loc(anchor_loc, scaling=neigh_dist_scaling)
@@ -372,10 +399,7 @@ def triplet_generator(da_target_scene, tile_size, tiling_bbox, tile_N,
 
     locs = [anchor_loc, neighbor_loc, dist_loc]
 
-    tiles = [
-        Tile(lat0=lat, lon0=lon, size=tile_size)
-        for (lon, lat) in locs
-    ]
+    tiles = [Tile(lat0=lat, lon0=lon, size=tile_size) for (lon, lat) in locs]
 
     # create a list of the three scenes used for creating triplets
     da_scene_set = [da_target_scene, da_target_scene]
@@ -393,6 +417,11 @@ def triplet_generator(da_target_scene, tile_size, tiling_bbox, tile_N,
         ]
     except Tile.TileBoundsOutsideOfInputException:
         return triplet_generator(
-            da_target_scene, tile_size, tiling_bbox, tile_N, da_distant_scene,
-            neigh_dist_scaling, distant_dist_scaling
+            da_target_scene,
+            tile_size,
+            tiling_bbox,
+            tile_N,
+            da_distant_scene,
+            neigh_dist_scaling,
+            distant_dist_scaling,
         )
