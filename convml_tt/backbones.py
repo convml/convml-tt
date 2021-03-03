@@ -31,7 +31,15 @@ ROOT_S3_BUCKET = "https://pl-bolts-weights.s3.us-east-2.amazonaws.com"
 
 MOBILENET_MODELS = ["mobilenet_v2"]
 VGG_MODELS = ["vgg11", "vgg13", "vgg16", "vgg19"]
-RESNET_MODELS = ["resnet18", "resnet34", "resnet50", "resnet101", "resnet152", "resnext50_32x4d", "resnext101_32x8d"]
+RESNET_MODELS = [
+    "resnet18",
+    "resnet34",
+    "resnet50",
+    "resnet101",
+    "resnet152",
+    "resnext50_32x4d",
+    "resnext101_32x8d",
+]
 DENSENET_MODELS = ["densenet121", "densenet169", "densenet161"]
 TORCHVISION_MODELS = MOBILENET_MODELS + VGG_MODELS + RESNET_MODELS + DENSENET_MODELS
 
@@ -43,7 +51,7 @@ def backbone_and_num_features(
     fpn: bool = False,
     pretrained: bool = True,
     trainable_backbone_layers: int = 3,
-    **kwargs
+    **kwargs,
 ) -> Tuple[nn.Module, int]:
     """
     Args:
@@ -62,12 +70,17 @@ def backbone_and_num_features(
     if fpn:
         if model_name in RESNET_MODELS:
             backbone = resnet_fpn_backbone(
-                model_name, pretrained=pretrained, trainable_layers=trainable_backbone_layers, **kwargs
+                model_name,
+                pretrained=pretrained,
+                trainable_layers=trainable_backbone_layers,
+                **kwargs,
             )
             fpn_out_channels = 256
             return backbone, fpn_out_channels
         else:
-            rank_zero_warn(f"{model_name} backbone is not supported with `fpn=True`, `fpn` won't be added.")
+            rank_zero_warn(
+                f"{model_name} backbone is not supported with `fpn=True`, `fpn` won't be added."
+            )
 
     if model_name in BOLTS_MODELS:
         return bolts_backbone_and_num_features(model_name)
@@ -88,31 +101,39 @@ def bolts_backbone_and_num_features(model_name: str) -> Tuple[nn.Module, int]:
 
     # TODO: maybe we should plain pytorch weights so we don't need to rely on bolts to load these
     # also mabye just use torchhub for the ssl lib
-    def load_simclr_imagenet(path_or_url: str = f"{ROOT_S3_BUCKET}/simclr/bolts_simclr_imagenet/simclr_imagenet.ckpt"):
+    def load_simclr_imagenet(
+        path_or_url: str = f"{ROOT_S3_BUCKET}/simclr/bolts_simclr_imagenet/simclr_imagenet.ckpt",
+    ):
         simclr = SimCLR.load_from_checkpoint(path_or_url, strict=False)
         # remove the last two layers & turn it into a Sequential model
         backbone = nn.Sequential(*list(simclr.encoder.children())[:-2])
         return backbone, 2048
 
-    def load_swav_imagenet(path_or_url: str = f"{ROOT_S3_BUCKET}/swav/swav_imagenet/swav_imagenet.pth.tar"):
+    def load_swav_imagenet(
+        path_or_url: str = f"{ROOT_S3_BUCKET}/swav/swav_imagenet/swav_imagenet.pth.tar",
+    ):
         swav = SwAV.load_from_checkpoint(path_or_url, strict=True)
         # remove the last two layers & turn it into a Sequential model
         backbone = nn.Sequential(*list(swav.model.children())[:-2])
         return backbone, 2048
 
     models = {
-        'simclr-imagenet': load_simclr_imagenet,
-        'swav-imagenet': load_swav_imagenet,
+        "simclr-imagenet": load_simclr_imagenet,
+        "swav-imagenet": load_swav_imagenet,
     }
     if not _BOLTS_AVAILABLE:
-        raise MisconfigurationException("Bolts isn't installed. Please, use ``pip install lightning-bolts``.")
+        raise MisconfigurationException(
+            "Bolts isn't installed. Please, use ``pip install lightning-bolts``."
+        )
     if model_name in models:
         return models[model_name]()
 
     raise ValueError(f"{model_name} is not supported yet.")
 
 
-def torchvision_backbone_and_num_features(model_name: str, pretrained: bool = True) -> Tuple[nn.Module, int]:
+def torchvision_backbone_and_num_features(
+    model_name: str, pretrained: bool = True
+) -> Tuple[nn.Module, int]:
     """
     >>> torchvision_backbone_and_num_features('mobilenet_v2')  # doctest: +ELLIPSIS
     (Sequential(...), 1280)
