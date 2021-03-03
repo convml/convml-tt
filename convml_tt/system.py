@@ -51,6 +51,7 @@ class Tile2Vec(pl.LightningModule):
         l2_regularisation=None,
         n_input_channels=3,
         n_embedding_dims=100,
+        head_type="orig_fastai",
     ):
         super().__init__()
 
@@ -65,6 +66,7 @@ class Tile2Vec(pl.LightningModule):
         self.base_arch = base_arch
         self.pretrained = pretrained
         self.save_hyperparameters()
+        self.head_type = head_type
         self.__build_model()
 
     def __build_model(self):
@@ -82,9 +84,9 @@ class Tile2Vec(pl.LightningModule):
                 n_features_backbone=n_features_backbone
             )
 
-    def _create_head_layers(self, n_features_backbone, head_type="orig_fastai"):
+    def _create_head_layers(self, n_features_backbone):
 
-        if head_type == "linear":
+        if self.hparams.head_type == "linear":
             # make "head" block which takes features of the encoder (resnet18 has
             # 512), uses adaptive pooling to reduce the x- and y-dimension, and
             # then uses a fully-connected layer to make the desired output size
@@ -92,10 +94,11 @@ class Tile2Vec(pl.LightningModule):
                 torch.nn.AdaptiveAvgPool2d(1),  # -> (batch_size, n_features, 1, 1)
                 torch.nn.Flatten(),  # -> (batch_size, n_features)
                 torch.nn.Linear(
-                    in_features=n_features_backbone, out_features=self.n_embedding_dims
+                    in_features=n_features_backbone,
+                    out_features=self.hparams.n_embedding_dims,
                 ),  # -> (batch_size, n_embedding_dims)
             )
-        elif head_type == "orig_fastai":
+        elif self.hparams.head_type == "orig_fastai":
             # make "head" block which takes features of the encoder (resnet18 has
             # 512), uses adaptive pooling to reduce the x- and y-dimension, and
             # then uses two blocks of batchnorm, dropout and linear layers with
@@ -127,11 +130,11 @@ class Tile2Vec(pl.LightningModule):
                 nn.Dropout(p=0.5),
                 nn.Linear(
                     in_features=n_intermediate_layer_features,
-                    out_features=self.n_embedding_dims,
+                    out_features=self.hparams.n_embedding_dims,
                 ),  # -> (batch_size, n_embedding_dims)
             )
         else:
-            raise NotImplementedError(head_type)
+            raise NotImplementedError(self.hparams.head_type)
 
         return head
 
@@ -235,6 +238,9 @@ class Tile2Vec(pl.LightningModule):
             "--margin", type=float, default=1.0, help="margin to distant tile"
         )
         parser.add_argument("--lr", type=float, default=1.0e-5, help="learning rate")
+        parser.add_argument(
+            "--head-type", type=str, default="orig_fastai", help="Model head type"
+        )
         return parser
 
 
