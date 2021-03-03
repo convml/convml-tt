@@ -54,3 +54,16 @@ def fetch_pretrained_model(pretrained_model: PretrainedModel, data_dir="data/"):
     """
     fname = f"{pretrained_model.value}.torch.pkl"
     return _fetch_example(item=pretrained_model, data_dir=data_dir) / fname
+
+
+if __name__ == "__main__":
+    import argparse
+
+    argparser = argparse.ArgumentParser()
+    argparser.add_argument("dataset_name", choices=[ds.name for ds in ExampleData])
+    argparser.add_argument("--path", default="data/", type=Path)
+    args = argparser.parse_args()
+    dataset_path = fetch_example_dataset(
+        dataset=ExampleData[args.dataset_name], data_dir=args.path
+    )
+    print(f"Downloaded example dataset `{args.dataset_name}` to `{dataset_path}`")
