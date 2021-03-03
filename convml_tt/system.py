@@ -221,7 +221,12 @@ class Tile2Vec(pl.LightningModule):
 
 class TripletTrainerDataModule(pl.LightningDataModule):
     def __init__(
-        self, data_dir, normalize_for_arch=None, train_val_fraction=0.9, batch_size=32
+        self,
+        data_dir,
+        normalize_for_arch=None,
+        train_val_fraction=0.9,
+        batch_size=32,
+        num_dataloader_workers=0,
     ):
         super().__init__()
         self.data_dir = data_dir
@@ -229,6 +234,7 @@ class TripletTrainerDataModule(pl.LightningDataModule):
         self.batch_size = batch_size
         self._train_dataset = None
         self._test_dataset = None
+        self.num_dataloader_workers = num_dataloader_workers
 
         self._train_transforms = get_transforms(
             step="train", normalize_for_arch=normalize_for_arch
@@ -264,10 +270,18 @@ class TripletTrainerDataModule(pl.LightningDataModule):
             raise NotImplementedError(stage)
 
     def train_dataloader(self):
-        return DataLoader(dataset=self._train_dataset, batch_size=self.batch_size)
+        return DataLoader(
+            dataset=self._train_dataset,
+            batch_size=self.batch_size,
+            num_workers=self.num_dataloader_workers,
+        )
 
     def val_dataloader(self):
-        return DataLoader(dataset=self._val_dataset, batch_size=self.batch_size)
+        return DataLoader(
+            dataset=self._val_dataset,
+            batch_size=self.batch_size,
+            num_workers=self.num_dataloader_workers,
+        )
 
     @staticmethod
     def add_data_specific_args(parent_parser):
@@ -275,4 +289,5 @@ class TripletTrainerDataModule(pl.LightningDataModule):
         parser.add_argument("data_dir", type=pathlib.Path)
         parser.add_argument("--batch-size", type=int, default=32)
         parser.add_argument("--train-valid-fraction", type=float, default=0.9)
+        parser.add_argument("--num-dataloader-workers", type=int, default=0)
         return parser
