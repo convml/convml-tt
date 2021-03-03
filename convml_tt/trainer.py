@@ -13,9 +13,6 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--base-arch", default="resnet18", type=str, help="Backbone architecture to use"
-    )
     parser.add_argument("--max-epochs", default=5, type=int)
     parser.add_argument(
         "--log-to-wandb",

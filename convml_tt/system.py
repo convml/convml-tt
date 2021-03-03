@@ -214,10 +214,19 @@ class Tile2Vec(pl.LightningModule):
     @staticmethod
     def add_model_specific_args(parent_parser):
         parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument("--base_arch", type=str, default="resnet18")
-        parser.add_argument("--pretrained", type=bool, default=True)
-        parser.add_argument("--margin", type=float, default=1.0)
-        parser.add_argument("--lr", type=float, default=1.0e-5)
+        parser.add_argument(
+            "--base-arch", type=str, default="resnet18", help="Backbone architecture"
+        )
+        parser.add_argument(
+            "--pretrained",
+            type=bool,
+            default=True,
+            help="Use a pretrained backbone, only 'head' layers are trained",
+        )
+        parser.add_argument(
+            "--margin", type=float, default=1.0, help="margin to distant tile"
+        )
+        parser.add_argument("--lr", type=float, default=1.0e-5, help="learning rate")
         return parser
 
 
