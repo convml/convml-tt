@@ -191,21 +191,29 @@ class Tile2Vec(pl.LightningModule):
         # total loss goes through a ReLU with the margin added, and we take
         # mean across the batch
         loss = torch.mean(F.relu(l_near - l_distant + self.margin))
-        self.log("loss", loss)
-        self.log("l_near_mean", torch.mean(l_near.detach()))
-        self.log("l_distant_mean", torch.mean(l_distant.detach()))
 
-        return loss
+        # compute mean distances so we can log them
+        l_near_mean = torch.mean(l_near.detach())
+        l_distant_mean = torch.mean(l_distant.detach())
+
+        return loss, (l_near_mean, l_distant_mean)
 
     def forward(self, x):
         return self.encoder(x)
 
     def training_step(self, batch, batch_idx):
-        loss = self._loss(batch)
+        loss, (l_near_mean, l_distant_mean) = self._loss(batch)
+        self.log("train_loss", loss)
+        self.log("train_l_near", l_near_mean)
+        self.log("train_l_distant", l_distant_mean)
         return loss
 
     def validation_step(self, batch, batch_idx):
-        return self.training_step(batch=batch, batch_idx=batch_idx)
+        loss, (l_near_mean, l_distant_mean) = self._loss(batch)
+        self.log("valid_loss", loss)
+        self.log("valid_l_near", l_near_mean)
+        self.log("valid_l_distant", l_distant_mean)
+        return loss
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
