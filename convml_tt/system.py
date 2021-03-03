@@ -1,14 +1,17 @@
+import pathlib
 import warnings
+
+import argparse
 import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
+from flash.core.finetuning import FlashBaseFinetuning
 from torch import nn
 from torch.utils.data import DataLoader, random_split
-from flash.core.finetuning import FlashBaseFinetuning
 
 from .data.dataset import ImageTripletDataset
-from .external.nn_layers import AdaptiveConcatPool2d
 from .data.transforms import get_transforms
+from .external.nn_layers import AdaptiveConcatPool2d
 
 # lightning flash raises some warnings about module we might want to install, I
 # don't want people to get confused by seeing these
@@ -187,7 +190,9 @@ class Tile2Vec(pl.LightningModule):
         return self.encoder(x)
 
     def training_step(self, batch, batch_idx):
-        return self._loss(batch)
+        loss = self._loss(batch)
+        self.log("loss", loss)
+        return loss
 
     def validation_step(self, batch, batch_idx):
         return self.training_step(batch=batch, batch_idx=batch_idx)
@@ -198,6 +203,15 @@ class Tile2Vec(pl.LightningModule):
 
     def configure_finetune_callback(self):
         return [HeadFineTuner(train_bn=True)]
+
+    @staticmethod
+    def add_model_specific_args(parent_parser):
+        parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
+        parser.add_argument("--base_arch", type=str, default="resnet18")
+        parser.add_argument("--pretrained", type=bool, default=True)
+        parser.add_argument("--margin", type=float, default=1.0)
+        parser.add_argument("--lr", type=float, default=1.0e-5)
+        return parser
 
 
 class TripletTrainerDataModule(pl.LightningDataModule):
@@ -249,3 +263,11 @@ class TripletTrainerDataModule(pl.LightningDataModule):
 
     def val_dataloader(self):
         return DataLoader(dataset=self._val_dataset, batch_size=self.batch_size)
+
+    @staticmethod
+    def add_data_specific_args(parent_parser):
+        parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
+        parser.add_argument("data_dir", type=pathlib.Path)
+        parser.add_argument("--batch-size", type=int, default=32)
+        parser.add_argument("--train-valid-fraction", type=float, default=0.9)
+        return parser

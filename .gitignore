@@ -10,3 +10,4 @@ lightning_logs/
 *.pkl
 *.ckpt
 example_notebooks/*/data/
+wandb/
