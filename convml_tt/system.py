@@ -191,6 +191,9 @@ class Tile2Vec(pl.LightningModule):
         # total loss goes through a ReLU with the margin added, and we take
         # mean across the batch
         loss = torch.mean(F.relu(l_near - l_distant + self.margin))
+        self.log("loss", loss)
+        self.log("l_near_mean", torch.mean(l_near.detach()))
+        self.log("l_distant_mean", torch.mean(l_distant.detach()))
 
         return loss
 
@@ -199,7 +202,6 @@ class Tile2Vec(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         loss = self._loss(batch)
-        self.log("loss", loss)
         return loss
 
     def validation_step(self, batch, batch_idx):
