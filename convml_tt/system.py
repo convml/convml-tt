@@ -189,6 +189,9 @@ class Tile2Vec(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         return self._loss(batch)
 
+    def validation_step(self, batch, batch_idx):
+        return self.training_step(batch=batch, batch_idx=batch_idx)
+
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
         return optimizer
@@ -199,11 +202,11 @@ class Tile2Vec(pl.LightningModule):
 
 class TripletTrainerDataModule(pl.LightningDataModule):
     def __init__(
-        self, data_dir, normalize_for_arch=None, train_test_fraction=0.9, batch_size=32
+        self, data_dir, normalize_for_arch=None, train_val_fraction=0.9, batch_size=32
     ):
         super().__init__()
         self.data_dir = data_dir
-        self.train_test_fraction = train_test_fraction
+        self.train_val_fraction = train_val_fraction
         self.batch_size = batch_size
         self._train_dataset = None
         self._test_dataset = None
@@ -233,10 +236,10 @@ class TripletTrainerDataModule(pl.LightningDataModule):
         if stage == "fit":
             full_dataset = self.get_dataset(stage=stage)
             n_samples = len(full_dataset)
-            n_train = int(n_samples * self.train_test_fraction)
-            n_test = n_samples - n_train
-            self._train_dataset, self._test_dataset = random_split(
-                full_dataset, [n_train, n_test]
+            n_train = int(n_samples * self.train_val_fraction)
+            n_valid = n_samples - n_train
+            self._train_dataset, self._val_dataset = random_split(
+                full_dataset, [n_train, n_valid]
             )
         else:
             raise NotImplementedError(stage)
@@ -244,5 +247,5 @@ class TripletTrainerDataModule(pl.LightningDataModule):
     def train_dataloader(self):
         return DataLoader(dataset=self._train_dataset, batch_size=self.batch_size)
 
-    def test_dataloader(self):
-        return DataLoader(dataset=self._test_dataset, batch_size=self.batch_size)
+    def val_dataloader(self):
+        return DataLoader(dataset=self._val_dataset, batch_size=self.batch_size)
