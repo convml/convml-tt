@@ -23,13 +23,19 @@ if __name__ == "__main__":
     parser.add_argument(
         "--gpus", type=int, help="Number of GPUs to use for training", default=0
     )
+    parser.add_argument(
+        "--project",
+        type=str,
+        help="Name of the project this run should belong to in the logger",
+        default="convml_tt",
+    )
     parser = Tile2Vec.add_model_specific_args(parser)
     parser = TripletTrainerDataModule.add_data_specific_args(parser)
     args = parser.parse_args()
 
     trainer_kws = dict()
     if args.log_to_wandb:
-        trainer_kws["logger"] = WandbLogger()
+        trainer_kws["logger"] = WandbLogger(project=args.project)
 
     if args.pretrained:
         trainer_kws["callbacks"] = [HeadFineTuner()]
