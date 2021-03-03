@@ -6,7 +6,7 @@ import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger
 
 from convml_tt.data.examples import ExampleData, fetch_example_dataset
-from convml_tt.system import Tile2Vec, TripletTrainerDataModule
+from convml_tt.system import Tile2Vec, TripletTrainerDataModule, HeadFineTuner
 
 if __name__ == "__main__":
     import argparse
@@ -31,6 +31,9 @@ if __name__ == "__main__":
     trainer_kws = dict()
     if args.log_to_wandb:
         trainer_kws["logger"] = WandbLogger()
+
+    if args.pretrained:
+        trainer_kws["callbacks"] = [HeadFineTuner()]
 
     trainer = pl.Trainer.from_argparse_args(args, max_epochs=5, **trainer_kws)
     # pl.Lightningmodule doesn't have a `from_argparse_args` yet, so we call it

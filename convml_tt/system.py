@@ -1,28 +1,25 @@
+"""
+Contains the main triplet-trainer architecture (Tile2Vec) and the datamodule to
+load triplet-datasets (TripletTrainerDataModule)
+"""
 import pathlib
-import warnings
 
 import argparse
 import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
-from flash.core.finetuning import FlashBaseFinetuning
 from torch import nn
 from torch.utils.data import DataLoader, random_split
 
 from .data.dataset import ImageTripletDataset
 from .data.transforms import get_transforms
 from .external.nn_layers import AdaptiveConcatPool2d
-
-# lightning flash raises some warnings about module we might want to install, I
-# don't want people to get confused by seeing these
-with warnings.catch_warnings():
-    warnings.simplefilter("ignore")
-    from flash.vision import backbones as flash_backbones
+from . import backbones
 
 
-class HeadFineTuner(FlashBaseFinetuning):
+class HeadFineTuner(pl.callbacks.BaseFinetuning):
     """
-    Freezes the backbone during Detector training.
+    Freezes the backbone during training.
     """
 
     def __init__(self, train_bn: bool = True):
@@ -30,9 +27,7 @@ class HeadFineTuner(FlashBaseFinetuning):
         self.train_bn = train_bn
 
     def freeze_before_training(self, pl_module: pl.LightningModule) -> None:
-        self.freeze(module=pl_module.backbone, train_bn=self.train_bn)
-        # for pytorch-lightning v0.2.0 this will become
-        # self.freeze(modules=[pl_module.backbone], train_bn=self.train_bn)
+        self.freeze(modules=[pl_module.backbone], train_bn=self.train_bn)
 
     def finetune_function(
         self,
@@ -68,20 +63,24 @@ class Tile2Vec(pl.LightningModule):
         self.n_embedding_dims = n_embedding_dims
         self.n_input_channels = n_input_channels
         self.base_arch = base_arch
+        self.pretrained = pretrained
+        self.save_hyperparameters()
+        self.__build_model()
 
-        if base_arch == "unknown":
+    def __build_model(self):
+        if self.hparams.base_arch == "unknown":
             # special value allowing loading of weights directly to produce an encoder network
             pass
         else:
             self.backbone, n_features_backbone = self._create_backbone_layers(
-                n_input_channels=n_input_channels,
-                base_arch=base_arch,
-                pretrained=pretrained,
+                n_input_channels=self.hparams.n_input_channels,
+                base_arch=self.hparams.base_arch,
+                pretrained=self.hparams.pretrained,
             )
+
             self.head = self._create_head_layers(
                 n_features_backbone=n_features_backbone
             )
-            self.encoder = torch.nn.Sequential(self.backbone, self.head)
 
     def _create_head_layers(self, n_features_backbone, head_type="orig_fastai"):
 
@@ -139,8 +138,7 @@ class Tile2Vec(pl.LightningModule):
     def _create_backbone_layers(
         self, n_input_channels, base_arch=None, pretrained=False
     ):
-        pretrained = True
-        backbone, n_features_backbone = flash_backbones.backbone_and_num_features(
+        backbone, n_features_backbone = backbones.backbone_and_num_features(
             model_name=base_arch, pretrained=pretrained
         )
 
@@ -169,6 +167,16 @@ class Tile2Vec(pl.LightningModule):
             backbone = torch.nn.Sequential(*layers)
 
         return backbone, n_features_backbone
+
+    def encoder(self, x):
+        # when working with a pretrained model we've frozen the backbone layers
+        # and so we don't want to calculate gradients through this layer
+        if self.pretrained:
+            with torch.no_grad():
+                z = self.backbone(x)
+        else:
+            z = self.backbone(x)
+        return self.head(z)
 
     def _loss(self, batch):
         y_anchor, y_neighbour, y_distant = [self.encoder(x) for x in batch]
@@ -200,9 +208,6 @@ class Tile2Vec(pl.LightningModule):
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
         return optimizer
-
-    def configure_finetune_callback(self):
-        return [HeadFineTuner(train_bn=True)]
 
     @staticmethod
     def add_model_specific_args(parent_parser):

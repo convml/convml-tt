@@ -1,7 +1,6 @@
 import pytorch_lightning as pl
-import flash
 
-from convml_tt.system import Tile2Vec, TripletTrainerDataModule
+from convml_tt.system import Tile2Vec, TripletTrainerDataModule, HeadFineTuner
 from convml_tt.data.examples import (
     fetch_example_dataset,
     ExampleData,
@@ -26,14 +25,14 @@ def test_train_new():
 
 
 def test_finetune_pretrained():
-    trainer = flash.Trainer(max_epochs=5)
+    trainer = pl.Trainer(max_epochs=5, callbacks=[HeadFineTuner()])
     arch = "resnet18"
-    model = Tile2Vec(pretrained=False, base_arch=arch)
+    model = Tile2Vec(pretrained=True, base_arch=arch)
     data_path = fetch_example_dataset(dataset=ExampleData.TINY10)
     datamodule = TripletTrainerDataModule(
         data_dir=data_path, batch_size=2, normalize_for_arch=arch
     )
-    trainer.finetune(model=model, datamodule=datamodule)
+    trainer.fit(model=model, datamodule=datamodule)
 
 
 def test_load_from_weights():
