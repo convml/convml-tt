@@ -5,7 +5,6 @@ Example on how to train convml_tt with logging on weights & biases
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger
 
-from convml_tt.data.examples import ExampleData, fetch_example_dataset
 from convml_tt.system import Tile2Vec, TripletTrainerDataModule, HeadFineTuner
 import convml_tt
 
@@ -39,6 +38,11 @@ if __name__ == "__main__":
 
     if args.pretrained:
         trainer_kws["callbacks"] = [HeadFineTuner()]
+
+    if args.gpus not in [0, 1]:
+        # default to Distributed Data Parallel when training on multiple GPUs
+        # https://pytorch-lightning.readthedocs.io/en/stable/advanced/multi_gpu.html#distributed-data-parallel
+        trainer_kws["accelerator"] = "ddp"
 
     trainer = pl.Trainer.from_argparse_args(args, **trainer_kws)
     # pl.Lightningmodule doesn't have a `from_argparse_args` yet, so we call it
