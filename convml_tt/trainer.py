@@ -7,6 +7,7 @@ from pytorch_lightning.loggers import WandbLogger
 
 from convml_tt.data.examples import ExampleData, fetch_example_dataset
 from convml_tt.system import Tile2Vec, TripletTrainerDataModule, HeadFineTuner
+import convml_tt
 
 if __name__ == "__main__":
     import argparse
@@ -15,9 +16,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--base-arch", default="resnet18", type=str, help="Backbone architecture to use"
     )
-    parser.add_argument(
-        "--max-epochs", default=5, type=int
-    )
+    parser.add_argument("--max-epochs", default=5, type=int)
     parser.add_argument(
         "--log-to-wandb",
         default=False,
@@ -45,5 +44,13 @@ if __name__ == "__main__":
     datamodule = TripletTrainerDataModule.from_argparse_args(
         args, normalize_for_arch=vars(args)["base_arch"]
     )
+
+    # make sure we log all the arguments to w&b, pytorch-lightning only saves
+    # the model hyperparameters by default
+    if "logger" in trainer_kws:
+        trainer_kws["logger"].experiment.config.update(args)
+        trainer_kws["logger"].experiment.config.update(
+            {"convml_tt__version": convml_tt.__version__}
+        )
 
     trainer.fit(model=model, datamodule=datamodule)
