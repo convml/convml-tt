@@ -16,6 +16,9 @@ if __name__ == "__main__":
         "--base-arch", default="resnet18", type=str, help="Backbone architecture to use"
     )
     parser.add_argument(
+        "--max-epochs", default=5, type=int
+    )
+    parser.add_argument(
         "--log-to-wandb",
         default=False,
         action="store_true",
@@ -35,7 +38,7 @@ if __name__ == "__main__":
     if args.pretrained:
         trainer_kws["callbacks"] = [HeadFineTuner()]
 
-    trainer = pl.Trainer.from_argparse_args(args, max_epochs=5, **trainer_kws)
+    trainer = pl.Trainer.from_argparse_args(args, **trainer_kws)
     # pl.Lightningmodule doesn't have a `from_argparse_args` yet, so we call it
     # here ourselves
     model = pl.utilities.argparse.from_argparse_args(Tile2Vec, args)
