@@ -30,7 +30,7 @@ def test_train_new_with_preloading():
     model = Tile2Vec(pretrained=False, base_arch=arch)
     data_path = fetch_example_dataset(dataset=ExampleData.TINY10)
     datamodule = TripletTrainerDataModule(
-        data_dir=data_path, batch_size=2, normalize_for_arch=arch, preload=True
+        data_dir=data_path, batch_size=2, normalize_for_arch=arch, preload_data=True
     )
     trainer.fit(model=model, datamodule=datamodule)
 
