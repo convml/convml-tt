@@ -252,6 +252,7 @@ class TripletTrainerDataModule(pl.LightningDataModule):
         train_val_fraction=0.9,
         batch_size=32,
         num_dataloader_workers=0,
+        preload=False,
     ):
         super().__init__()
         self.data_dir = data_dir
@@ -260,6 +261,7 @@ class TripletTrainerDataModule(pl.LightningDataModule):
         self._train_dataset = None
         self._test_dataset = None
         self.num_dataloader_workers = num_dataloader_workers
+        self.preload = preload
 
         self._train_transforms = get_transforms(
             step="train", normalize_for_arch=normalize_for_arch
@@ -271,13 +273,17 @@ class TripletTrainerDataModule(pl.LightningDataModule):
     def get_dataset(self, stage):
         if stage == "fit":
             return ImageTripletDataset(
-                data_dir=self.data_dir, stage="train", transform=self._train_transforms
+                data_dir=self.data_dir,
+                stage="train",
+                transform=self._train_transforms,
+                preload_data=self.preload,
             )
         elif stage == "predict":
             return ImageTripletDataset(
                 data_dir=self.data_dir,
                 stage="study",
                 transform=self._predict_transforms,
+                preload_data=self.preload,
             )
         else:
             raise NotImplementedError(stage)
