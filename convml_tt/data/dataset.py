@@ -20,7 +20,7 @@ class TileType(enum.Enum):
 
 
 class _ImageDatasetBase(Dataset):
-    TILE_FILENAME_FORMAT = "{triplet_id:05d}_{tile_type}.png"
+    TILE_FILENAME_FORMAT = "{triplet_id:05d}_{tile_type}.{ext}"
 
     def _find_files(self):
         # dictionary to hold lists with filepaths for each tile type
@@ -57,7 +57,6 @@ class ImageTripletDataset(_ImageDatasetBase):
     image-based dataset for training the triplet-trainer
     """
 
-    TRIPLET_META_FILENAME_FORMAT = "{triplet_id:05d}_meta.yaml"
 
     def __init__(self, data_dir, stage="train", transform=None):
         super().__init__(data_dir=data_dir, stage=stage, transform=transform)

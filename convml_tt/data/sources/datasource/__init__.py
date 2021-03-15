@@ -9,7 +9,7 @@ import numpy as np
 from datetime import datetime
 
 
-class GenericDataset:
+class GenericDatasource:
     def __init__(self, data_path, name, extra={}):
         self.data_path = data_path
         self.name = name
@@ -21,7 +21,7 @@ class GenericDataset:
 
         if tile_path_base.exists():
             raise NotImplementedError(
-                "A dataset already exists in `{}`" "".format(tile_path_base)
+                "A Datasource already exists in `{}`" "".format(tile_path_base)
             )
 
         data = {}
@@ -72,12 +72,12 @@ class GenericDataset:
         raise NotImplementedError
 
 
-class TrajectoryDataset(GenericDataset):
+class TrajectoryDatasource(GenericDatasource):
     def __init__(self, *args, **kwargs):
         traj_filename = kwargs.pop("filename")
         super().__init__(*args, **kwargs)
 
-        ds_traj = xr.open_dataset(self.data_path / traj_filename)
+        ds_traj = xr.open_Datasource(self.data_path / traj_filename)
         required_vars = set(["time", "lat", "lon"])
         available_vars = list(ds_traj.data_vars) + list(ds_traj.coords)
         missing_vars = required_vars.difference(available_vars)
@@ -103,7 +103,7 @@ class TrajectoryDataset(GenericDataset):
         return [_make_datetime(v) for v in da_time.values]
 
 
-class TripletDataset(GenericDataset):
+class TripletDatasource(GenericDatasource):
     def __init__(self, N_triplets, *args, **kwargs):
         """
         N_triplets can be an integer (interpreted as no study data being
@@ -114,7 +114,7 @@ class TripletDataset(GenericDataset):
 
 
 class SceneBulkProcessingBaseTask(luigi.Task):
-    dataset_path = luigi.Parameter()
+    Datasource_path = luigi.Parameter()
     TaskClass = None
 
     def requires(self):
@@ -123,7 +123,7 @@ class SceneBulkProcessingBaseTask(luigi.Task):
                 "Please set TaskClass to the type you would like"
                 " to process for every scene"
             )
-        return self._load_dataset().fetch_source_data()
+        return self._load_Datasource().fetch_source_data()
 
     def _get_task_class_kwargs(self):
         raise NotImplementedError(
@@ -132,8 +132,8 @@ class SceneBulkProcessingBaseTask(luigi.Task):
             " selected task"
         )
 
-    def _load_dataset(self):
-        return TripletDataset.load(self.dataset_path)
+    def _load_Datasource(self):
+        return TripletDatasource.load(self.Datasource_path)
 
     def _build_runtime_tasks(self):
         all_source_data = self.input().read()
@@ -142,7 +142,7 @@ class SceneBulkProcessingBaseTask(luigi.Task):
         tasks = {}
         for scene_id in all_source_data.keys():
             tasks[scene_id] = self.TaskClass(
-                scene_id=scene_id, dataset_path=self.dataset_path, **kwargs
+                scene_id=scene_id, Datasource_path=self.Datasource_path, **kwargs
             )
         return tasks
 
@@ -162,7 +162,7 @@ class SceneBulkProcessingBaseTask(luigi.Task):
 
 class GroupedSceneBulkProcessingBaseTask(SceneBulkProcessingBaseTask):
     """
-    Groups all scenes in dataset by date and runs them provided Task
+    Groups all scenes in Datasource by date and runs them provided Task
     """
 
     scene_prefix = "DATE"
@@ -194,7 +194,7 @@ class GroupedSceneBulkProcessingBaseTask(SceneBulkProcessingBaseTask):
             tasks[prefix] = self.TaskClass(
                 scene_ids=scene_ids,
                 prefix=prefix,
-                dataset_path=self.dataset_path,
+                Datasource_path=self.Datasource_path,
                 **kwargs,
             )
         return tasks

@@ -1,5 +1,3 @@
-name: convml_tt
-
 channels:
   - pytorch
   - defaults

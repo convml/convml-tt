@@ -1,6 +1,13 @@
+[MASTER]
+disable=
+    C0115, # (missing-class-docstring)
+    C0116, # (missing-function-docstring)
+    R0201, # no-self-use
+    R1705, # no-else-return
+
 [TYPECHECK]
 
 # List of members which are set dynamically and missed by Pylint inference
 # system, and so shouldn't trigger E1101 when accessed.
-generated-members=numpy.*, torch.*
-good-names=i,j,df,n_*
+generated-members=numpy.*, torch.*, np.*
+good-names=i,j,df,n_*,fn,p,x,y,z,t,ds,da,dt,k,v,ex,fh,dx,dy,dz,ax

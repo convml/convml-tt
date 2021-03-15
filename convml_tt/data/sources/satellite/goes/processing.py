@@ -1,17 +1,18 @@
 import os
 import random
-
-from tqdm import tqdm
-import xarray as xr
-import cartopy.crs as ccrs
-
-import warnings
-import numpy as np
 import time
+import warnings
+
+import cartopy.crs as ccrs
+import numpy as np
+import satdata
+import xarray as xr
 import yaml
+from tqdm import tqdm
 
 from . import tiler
-import satdata
+
+TRIPLET_FN_FORMAT = "{:05d}_{}.png"
 
 try:
     from . import satpy_rgb
@@ -39,40 +40,6 @@ def find_datasets_keys(times, dt_max, cli, channels=[1, 2, 3], debug=False):
         filenames += zip(*[get_channel_file(t=t, channel=c) for c in channels])
 
     return filenames
-
-
-import random
-
-
-def pick_one_time_per_date_for_study(
-    datasets_filenames, datasource_cli, ensure_each_day_has_training_data=False
-):
-    dataset_files_by_date = {}
-
-    for fns in datasets_filenames:
-        date = datasource_cli.parse_key(str(fns[0]), parse_times=True)[
-            "start_time"
-        ].date()
-        dataset_files_by_date.setdefault(date, []).append(fns)
-
-    def _split_date(datasets_filenames):
-        l = list(datasets_filenames)
-        if ensure_each_day_has_training_data and len(l) < 2:
-            raise Exception(
-                "There is only one dataset for the given date "
-                "(`{}`), is this a mistake?".format(l[0][0])
-            )
-        random.shuffle(l)
-        return l[:1], l[1:]
-
-    datasets_study = []
-    datasets_train = []
-    for d in dataset_files_by_date.keys():
-        l_study_d, l_train_d = _split_date(dataset_files_by_date[d])
-        datasets_study += l_study_d
-        datasets_train += l_train_d
-
-    return dict(train=datasets_train, study=datasets_study)
 
 
 class FakeScene(list):
@@ -155,73 +122,6 @@ def load_data_for_rgb(
             das.append(da_rgb_domain)
 
     return das
-
-
-TRIPLET_FN_FORMAT = "{:05d}_{}.png"
-
-
-def generate_tile_triplets(
-    scenes,
-    tiling_bbox,
-    tile_N,
-    tile_size,
-    output_dir,
-    N_triplets,
-    max_workers=4,
-    neighbor_distant_frac=0.8,
-    N_start=0,
-):
-    if len(scenes) < 2:
-        raise Exception("Need at least two scenes")
-
-    print("Generating tiles")
-
-    for triplet_n in tqdm(range(N_triplets)[N_start:]):
-        # sample different datasets
-        tn_target, tn_dist = random.sample(range(len(scenes)), 2)
-        da_target_scene = scenes[tn_target]
-        da_distant_scene = scenes[tn_dist]
-
-        prefixes = "anchor neighbor distant".split(" ")
-
-        output_files_exist = [
-            os.path.exists(output_dir / TRIPLET_FN_FORMAT.format(triplet_n, p))
-            for p in prefixes
-        ]
-
-        if all(output_files_exist):
-            continue
-
-        tiles_and_imgs = tiler.triplet_generator(
-            da_target_scene=da_target_scene,
-            da_distant_scene=da_distant_scene,
-            tile_size=tile_size,
-            tile_N=tile_N,
-            tiling_bbox=tiling_bbox,
-            neigh_dist_scaling=neighbor_distant_frac,
-        )
-
-        tiles, imgs = zip(*tiles_and_imgs)
-
-        for (img, prefix) in zip(imgs, prefixes):
-            fn_out = TRIPLET_FN_FORMAT.format(triplet_n, prefix)
-            img.save(output_dir / fn_out, "PNG")
-
-        meta = dict(
-            target=dict(
-                source_files=da_target_scene.attrs["source_files"],
-                anchor=tiles[0].serialize_props(),
-                neighbor=tiles[1].serialize_props(),
-            ),
-            distant=dict(
-                source_files=da_distant_scene.attrs["source_files"],
-                loc=tiles[2].serialize_props(),
-            ),
-        )
-
-        meta_fn = output_dir / "{:05d}_meta.yaml".format(triplet_n)
-        with open(meta_fn, "w") as fh:
-            yaml.dump(meta, fh, default_flow_style=False)
 
 
 class ProcessedTile(tiler.Tile):

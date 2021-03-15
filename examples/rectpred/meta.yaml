@@ -1,0 +1,19 @@
+N_days: 1
+N_hours_from_zenith: 0.2
+N_triplets: {study: 0, train: 0}
+channels: [1, 2, 3]
+#domain_bbox:
+#- [-60, 10]
+#- [-30, 30]
+domain:
+  lat0: 14
+  lon0: -48
+  l_zonal: 3000.0e+3
+  l_meridional: 1000.0e+3
+t_start: 2020-01-15 00:00:00
+tile_N: 256
+tile_size: 200000.0
+type: convml_tt.data.sources.satellite.FixedTimeRangeSatelliteTripletDataset
+extra:
+  rectpred:
+    resolution: 1000. # in m/deg, this should match the resolution of the NN being applied

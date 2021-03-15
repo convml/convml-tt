@@ -1,8 +1,10 @@
+"""
+Added functionality for creating luigi-based processing pipelines
+"""
+import coloredlogs
 import luigi
 import xarray as xr
 import yaml
-
-import coloredlogs
 
 coloredlogs.install()
 
@@ -39,3 +41,11 @@ class YAMLTarget(luigi.LocalTarget):
     def read(self):
         with self.open() as fh:
             return yaml.load(fh)
+
+
+class DatetimeListParameter(luigi.Parameter):
+    def parse(self, x):
+        return [dateutil.parser.parse(s) for s in x.split(",")]
+
+    def serialize(self, x):
+        return ",".join([t.isoformat() for t in x])

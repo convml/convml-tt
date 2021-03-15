@@ -1,0 +1,16 @@
+time:
+  num_days: 1
+  num_hours_from_zenith: 0.2
+  start: 2020-01-15 00:00:00
+tiles:
+  num_triplets:
+    study: 0
+    train: 100
+  tile_N: 256
+  tile_size: 200000.0
+domain:
+  lat0: 14
+  lon0: -48
+  l_zonal: 3000.0e+3
+  l_meridional: 1000.0e+3
+type: convml_tt.data.sources.satellite.FixedTimeRangeSatelliteTripletDataset

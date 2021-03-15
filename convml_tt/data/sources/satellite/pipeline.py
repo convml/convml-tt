@@ -1,23 +1,32 @@
+"""
+Pipeline tasks for generating triplets from satellite data
+
+Steps for GOES-16 data:
+
+    1. Fetch all radiance files that fit within given time window and group by
+       scene (same timestamp)
+    2. Crop radiance files to domain and create RGB composite on native grid of
+       observations
+"""
 from pathlib import Path
+import random
 
-import satdata
-import luigi
 import dateutil.parser
-import xarray as xr
-import numpy as np
-import datetime
+import luigi
 
-from . import processing, satpy_rgb, tiler, bbox
 from ....pipeline import YAMLTarget
-from ...dataset import GenericDataset
-
-SOURCE_DIR = Path("source_data")
-
-SCENE_ID_DATE_FORMAT = "%Y%m%d%H%M"
+from .goes.pipeline import GOES16Fetch
+from ...dataset import ImageTripletDataset
 
 
-def parse_scene_id(s):
-    return datetime.datetime.strptime(s.replace("goes16_", ""), SCENE_ID_DATE_FORMAT)
+TILE_FILENAME_FORMAT = ImageTripletDataset.TILE_FILENAME_FORMAT
+
+
+def _get_datasource_task(datasource_name):
+    if datasource_name == "goes16":
+        return GOES16Fetch
+
+    raise NotImplementedError(datasource_name)
 
 
 class DatetimeListParameter(luigi.Parameter):
@@ -28,161 +37,61 @@ class DatetimeListParameter(luigi.Parameter):
         return ",".join([t.isoformat() for t in x])
 
 
-class GOES16Query(luigi.Task):
-    dt_max = luigi.FloatParameter()
-    channel = luigi.ListParameter()
-    time = luigi.DateMinuteParameter()
-    debug = luigi.BoolParameter(default=False)
-    data_path = luigi.Parameter()
+def pick_one_time_per_date_for_study(
+    datasets_filenames, datasource_cli, ensure_each_day_has_training_data=False
+):
+    """
+    Split the the datasets filenames so that the study set contains exactly one
+    set of files for a dataset on each day
+    """
+    dataset_files_by_date = {}
 
-    def run(self):
-        cli = satdata.Goes16AWS(offline=False)
+    for fns in datasets_filenames:
+        date = datasource_cli.parse_key(str(fns[0]), parse_times=True)[
+            "start_time"
+        ].date()
+        dataset_files_by_date.setdefault(date, []).append(fns)
 
-        filenames = cli.query(
-            time=self.time,
-            region="F",
-            debug=self.debug,
-            channel=self.channel,
-            dt_max=self.dt_max,
-        )
+    def _split_date(datasets_filenames):
+        datasets_filenames = list(datasets_filenames)
+        if ensure_each_day_has_training_data and len(datasets_filenames) < 2:
+            raise Exception(
+                "There is only one dataset for the given date "
+                "(`{}`), is this a mistake?".format(datasets_filenames[0][0])
+            )
+        random.shuffle(datasets_filenames)
+        return datasets_filenames[:1], datasets_filenames[1:]
 
-        Path(self.output().fn).parent.mkdir(exist_ok=True)
-        self.output().write(filenames)
+    datasets_study = []
+    datasets_train = []
+    for date in dataset_files_by_date:
+        l_study_d, l_train_d = _split_date(dataset_files_by_date[date])
+        datasets_study += l_study_d
+        datasets_train += l_train_d
 
-    def output(self):
-        fn = "source_data/ch{}_keys_{}.yaml".format(self.channel, self.time.isoformat())
-        p = Path(self.data_path) / fn
-        return YAMLTarget(str(p))
-
-
-class GOES16Fetch(luigi.Task):
-    dt_max = luigi.FloatParameter()
-    channels = luigi.ListParameter()
-    times = DatetimeListParameter()
-    data_path = luigi.Parameter()
-    offline_cli = luigi.BoolParameter(default=False)
-
-    def requires(self):
-        if len(self.times) == 0:
-            raise Exception("`times` argument must have non-zero length")
-
-        reqs = {}
-        for c in self.channels:
-            reqs[c] = [
-                GOES16Query(
-                    dt_max=self.dt_max, channel=c, time=t, data_path=self.data_path
-                )
-                for t in self.times
-            ]
-        return reqs
-
-    def run(self):
-        files_per_channel = {}
-        for channel, queries in self.input().items():
-            files_per_channel[channel] = []
-            for qr in queries:
-                files_per_channel[channel] += qr.read()
-
-        num_files_per_channel = {}
-        for channel, files in files_per_channel.items():
-            num_files_per_channel[channel] = len(files)
-
-        if len(set(num_files_per_channel.values())) != 1:
-            # the source data queries have resulted in a different number of
-            # files being returned for the channels selected, probably because
-            # the channels are not recorded at the same time and so one fell
-            # outside the window
-
-            def get_time(fn):
-                attrs = satdata.Goes16AWS.parse_key(fn, parse_times=True)
-                return attrs["start_time"]
-
-            def time_diff(i0, i1, fpc):
-                # fpc: new sliced files_per_channel dictionary where each list
-                # now has the same length
-                channels = list(files_per_channel.keys())
-                c1 = channels[i0]
-                c2 = channels[i1]
-                dt = get_time(fpc[c1][0]) - get_time(fpc[c2][0])
-                return abs(dt.total_seconds())
-
-            def timediff_all(fpc):
-                return sum(
-                    [time_diff(i0, i1, fpc) for (i0, i1) in [(0, 1), (0, 2), (1, 2)]]
-                )
-
-            N_max = max(num_files_per_channel.values())
-
-            fpc1 = {
-                c: len(fns) == N_max and fns[1:] or fns
-                for (c, fns) in files_per_channel.items()
-            }
-
-            fpc2 = {
-                c: len(fns) == N_max and fns[:-1] or fns
-                for (c, fns) in files_per_channel.items()
-            }
-
-            if timediff_all(fpc1) < timediff_all(fpc2):
-                files_per_channel = fpc1
-            else:
-                files_per_channel = fpc2
-
-            # now double-check that we've got the right number of files
-            num_files_per_channel = {}
-            for channel, files in files_per_channel.items():
-                num_files_per_channel[channel] = len(files)
-            assert len(set(num_files_per_channel.values())) == 1
-
-        local_storage_dir = Path(self.data_path).expanduser() / SOURCE_DIR
-        cli = satdata.Goes16AWS(
-            offline=self.offline_cli, local_storage_dir=local_storage_dir
-        )
-
-        # download all the files using the cli (flatting list first...)
-        all_files = [fn for fns in files_per_channel.values() for fn in fns]
-        print("Downloading channel files...")
-        cli.download(all_files)
-
-        scenes_files = [list(a) for a in zip(*files_per_channel.values())]
-
-        indexed_scenes_files = {
-            self._make_scene_id(scene_files): scene_files
-            for scene_files in scenes_files
-        }
-
-        Path(self.output().fn).parent.mkdir(exist_ok=True)
-        self.output().write(indexed_scenes_files)
-
-    def _make_scene_id(self, files):
-        attrs = satdata.Goes16AWS.parse_key(files[0], parse_times=True)
-        t = attrs["start_time"]
-        return "goes16_{}".format(t.strftime(SCENE_ID_DATE_FORMAT))
-
-    def output(self):
-        fn = "source_data/all_files.yaml"
-        p = Path(self.data_path) / fn
-        return YAMLTarget(str(p))
+    return dict(train=datasets_train, study=datasets_study)
 
 
 class StudyTrainSplit(luigi.Task):
     dt_max = luigi.FloatParameter()
-    channels = luigi.ListParameter()
     times = DatetimeListParameter()
     data_path = luigi.Parameter()
+    datasource = luigi.Parameter()
 
     def requires(self):
-        return GOES16Fetch(
+        FetchTask = _get_datasource_task(datasource_name=self.datasource)
+        return FetchTask(
             dt_max=self.dt_max,
-            channels=self.channels,
             times=self.times,
             data_path=self.data_path,
         )
 
     def run(self):
         datasets_filenames_all = self.input().read()
-        datasets_filenames_split = processing.pick_one_time_per_date_for_study(
-            datasets_filenames_all, datasource_cli=satdata.Goes16AWS
+        datasource_cli = _get_datasource_task(datasource_name=self.datasource).CLIClass
+        datasets_filenames_split = pick_one_time_per_date_for_study(
+            datasets_filenames_all,
+            datasource_cli=datasource_cli,
         )
         Path(self.output().fn).parent.mkdir(exist_ok=True)
         self.output().write(datasets_filenames_split)
@@ -193,93 +102,130 @@ class StudyTrainSplit(luigi.Task):
         return YAMLTarget(str(p))
 
 
-class RGBCompositeNetCDFFile(luigi.LocalTarget):
-    def save(self, da_truecolor, source_fns):
-        Path(self.fn).parent.mkdir(exist_ok=True, parents=True)
-        satpy_rgb.save_scene_meta(source_fns=source_fns, fn_meta=self.path_meta)
-        da_truecolor.to_netcdf(self.fn)
+def generate_tile_triplets(
+    scenes,
+    tiling_bbox,
+    tile_N,
+    tile_size,
+    output_dir,
+    N_triplets,
+    max_workers=4,
+    neighbor_distant_frac=0.8,
+    N_start=0,
+):
+    if len(scenes) < 2:
+        raise Exception("Need at least two scenes")
 
-    @property
-    def path_meta(self):
-        return self.fn.replace(".nc", ".meta.yaml")
+    print("Generating tiles")
 
-    def open(self):
-        try:
-            da = xr.open_dataarray(self.fn)
-        except Exception:
-            print("Error opening `{}`".format(self.fn))
-            raise
-        meta_info = satpy_rgb.load_scene_meta(fn_meta=self.path_meta)
-        da.attrs.update(meta_info)
+    for triplet_n in tqdm(range(N_triplets)[N_start:]):
+        # sample different datasets
+        tn_target, tn_dist = random.sample(range(len(scenes)), 2)
+        da_target_scene = scenes[tn_target]
+        da_distant_scene = scenes[tn_dist]
 
-        return da
+        prefixes = "anchor neighbor distant".split(" ")
 
+        output_files_exist = [
+            os.path.exists(output_dir / TRIPLET_FN_FORMAT.format(triplet_n, p))
+            for p in prefixes
+        ]
 
-class CreateRGBScene(luigi.Task):
-    """
-    Create RGB composite scene from GOES-16 radiance files
-    """
+        if all(output_files_exist):
+            continue
 
-    scene_id = luigi.Parameter()
-    dataset_path = luigi.Parameter()
-
-    def requires(self):
-        d = GenericDataset.load(self.dataset_path)
-        return d.fetch_source_data()
-
-    def run(self):
-        d = GenericDataset.load(self.dataset_path)
-
-        all_source_data = self.input().read()
-        if self.scene_id not in all_source_data:
-            raise Exception(
-                "scene `{}` is missing from the source data file"
-                "".format(self.scene_id)
-            )
-        else:
-            scene_fns = [
-                Path(self.dataset_path) / SOURCE_DIR / p
-                for p in all_source_data[self.scene_id]
-            ]
-        # OBS: should probably check that the channels necessary for RGB scene
-        # generation are the ones loaded here
-
-        da_truecolor = satpy_rgb.load_rgb_files_and_get_composite_da(
-            scene_fns=scene_fns
+        tiles_and_imgs = tiler.triplet_generator(
+            da_target_scene=da_target_scene,
+            da_distant_scene=da_distant_scene,
+            tile_size=tile_size,
+            tile_N=tile_N,
+            tiling_bbox=tiling_bbox,
+            neigh_dist_scaling=neighbor_distant_frac,
         )
 
-        bbox_domain = d.get_domain(da_scene=da_truecolor)
-        domain_bbox_pad_frac = getattr(d, "domain_bbox_pad_frac", 0.1)
+        tiles, imgs = zip(*tiles_and_imgs)
 
-        da_truecolor_domain = tiler.crop_field_to_latlon_box(
-            da=da_truecolor,
-            box=np.array(bbox_domain.get_bounds()).T,
-            pad_pct=domain_bbox_pad_frac,
+        for (img, prefix) in zip(imgs, prefixes):
+            fn_out = TRIPLET_FN_FORMAT.format(triplet_n, prefix)
+            img.save(output_dir / fn_out, "PNG")
+
+        meta = dict(
+            target=dict(
+                source_files=da_target_scene.attrs["source_files"],
+                anchor=tiles[0].serialize_props(),
+                neighbor=tiles[1].serialize_props(),
+            ),
+            distant=dict(
+                source_files=da_distant_scene.attrs["source_files"],
+                loc=tiles[2].serialize_props(),
+            ),
         )
 
-        da_truecolor_domain = satpy_rgb._cleanup_composite_da_attrs(da_truecolor_domain)
 
-        self.output().save(da_truecolor=da_truecolor_domain, source_fns=scene_fns)
+def _generate_triplet_locs_for_scenes():
+    scenes_bbox = {}
+    # read in each scene's DataArray and extract its
 
-    def output(self):
-        fn = "{}.nc".format(self.scene_id)
-        p = Path(self.dataset_path) / "composites" / "original_cropped" / fn
-        t = RGBCompositeNetCDFFile(str(p))
-        return t
+    if da_distant_scene is None:
+        while True:
+            dist_loc = _perturb_loc(anchor_loc, scaling=distant_dist_scaling)
+            if _point_valid(dist_loc):
+                break
+    else:
+
+    locs = [anchor_loc, neighbor_loc, dist_loc]
+
+    tiles = [Tile(lat0=lat, lon0=lon, size=tile_size) for (lon, lat) in locs]
+
+    # create a list of the three scenes used for creating triplets
+    da_scene_set = [da_target_scene, da_target_scene]
+    if da_distant_scene is None:
+        da_scene_set.append(da_target_scene)
+    else:
+        da_scene_set.append(da_distant_scene)
+
+    # on each of the three scenes use the three tiles to create a resampled
+    # image
+    try:
+        return [
+            (tile, tile.create_true_color_img(da_scene, resampling_N=tile_N))
+            for (tile, da_scene) in zip(tiles, da_scene_set)
+        ]
+    except Tile.TileBoundsOutsideOfInputException:
+        return triplet_generator(
+            da_target_scene,
+            tile_size,
+            tiling_bbox,
+            tile_N,
+            da_distant_scene,
+            neigh_dist_scaling,
+            distant_dist_scaling,
+        )
 
 
-class GenerateTriplets(luigi.Task):
+def _write_tile_meta(tile_id, tile_type, data, append_existing=True):
+    fn = TILE_FILENAME_FORMAT.format(tile_type=tile_type, tile_id=tile_id, ext="yaml")
+
+    with open(str(output_dir/fn), "w") as fh:
+        yaml.dump(data, fh, default_flow_style=False)
+
+
+
+class GenerateTripletsMeta(luigi.Task):
+    """
+    Write meta-files for each tile to be produced
+    """
     dt_max = luigi.FloatParameter()
-    channels = luigi.ListParameter()
     times = DatetimeListParameter()
     data_path = luigi.Parameter()
+    datasource = luigi.Parameter()
 
     def requires(self):
         return StudyTrainSplit(
             dt_max=self.dt_max,
-            channels=self.channels,
             times=self.times,
             data_path=self.data_path,
+            datasource=self.datasource,
         )
 
     def run(self):
