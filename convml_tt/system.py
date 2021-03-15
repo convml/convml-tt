@@ -252,7 +252,7 @@ class TripletTrainerDataModule(pl.LightningDataModule):
         train_val_fraction=0.9,
         batch_size=32,
         num_dataloader_workers=0,
-        preload=False,
+        preload_data=False,
     ):
         super().__init__()
         self.data_dir = data_dir
@@ -261,7 +261,7 @@ class TripletTrainerDataModule(pl.LightningDataModule):
         self._train_dataset = None
         self._test_dataset = None
         self.num_dataloader_workers = num_dataloader_workers
-        self.preload = preload
+        self.preload_data = preload_data
 
         self._train_transforms = get_transforms(
             step="train", normalize_for_arch=normalize_for_arch
@@ -276,14 +276,14 @@ class TripletTrainerDataModule(pl.LightningDataModule):
                 data_dir=self.data_dir,
                 stage="train",
                 transform=self._train_transforms,
-                preload_data=self.preload,
+                preload_data=self.preload_data,
             )
         elif stage == "predict":
             return ImageTripletDataset(
                 data_dir=self.data_dir,
                 stage="study",
                 transform=self._predict_transforms,
-                preload_data=self.preload,
+                preload_data=self.preload_data,
             )
         else:
             raise NotImplementedError(stage)
@@ -321,4 +321,5 @@ class TripletTrainerDataModule(pl.LightningDataModule):
         parser.add_argument("--batch-size", type=int, default=32)
         parser.add_argument("--train-valid-fraction", type=float, default=0.9)
         parser.add_argument("--num-dataloader-workers", type=int, default=0)
+        parser.add_argument("--preload-data", default=False, action="store_true")
         return parser
