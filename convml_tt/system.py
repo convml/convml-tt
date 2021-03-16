@@ -11,7 +11,7 @@ import torch.nn.functional as F
 from torch import nn
 from torch.utils.data import DataLoader, random_split
 
-from .data.dataset import ImageTripletDataset
+from .data.dataset import ImageTripletDataset, MemoryMappedImageTripletDataset
 from .data.transforms import get_transforms
 from .external.nn_layers import AdaptiveConcatPool2d
 from . import backbones
@@ -271,19 +271,22 @@ class TripletTrainerDataModule(pl.LightningDataModule):
         )
 
     def get_dataset(self, stage):
+        if self.preload_data:
+            DatasetClass = MemoryMappedImageTripletDataset
+        else:
+            DatasetClass = ImageTripletDataset
+
         if stage == "fit":
-            return ImageTripletDataset(
+            return DatasetClass(
                 data_dir=self.data_dir,
                 stage="train",
                 transform=self._train_transforms,
-                preload_data=self.preload_data,
             )
         elif stage == "predict":
-            return ImageTripletDataset(
+            return DatasetClass(
                 data_dir=self.data_dir,
                 stage="study",
                 transform=self._predict_transforms,
-                preload_data=self.preload_data,
             )
         else:
             raise NotImplementedError(stage)
