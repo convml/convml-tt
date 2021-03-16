@@ -8,10 +8,24 @@ from pathlib import Path
 import parse
 from PIL import Image
 from torch.utils.data.dataset import Dataset
-from torchvision import transforms
+from torchvision import transforms as tv_transforms
 
 
 TILE_FILENAME_FORMAT = "{triplet_id:05d}_{tile_type}.png"
+
+
+def get_load_transforms():
+    return tv_transforms.Compose(
+        [
+            tv_transforms.ToTensor(),
+            RemoveImageAlphaTransform(),
+        ]
+    )
+
+
+class RemoveImageAlphaTransform:
+    def __call__(self, x):
+        return x[:3, :, :]
 
 
 class TileType(enum.Enum):
@@ -46,6 +60,10 @@ class _ImageDatasetBase(Dataset):
         self.data_dir = data_dir
         self.stage = stage
 
+        # prepare the transforms that ensure we get from an image to a torch
+        # tensor
+        self._image_load_transforms = get_load_transforms()
+
     def _read_image(self, single_image_path):
         im_as_im = Image.open(single_image_path)
         return im_as_im
@@ -77,28 +95,36 @@ class ImageTripletDataset(_ImageDatasetBase):
 
         self.preload_data = preload_data
         if preload_data:
-            self._images = self._preload_all_tile_images()
+            self._image_tensors = self._preload_all_tile_image_data()
         else:
-            self._images = {}
+            self._image_tensors = {}
 
-    def _preload_all_tile_images(self):
-        images = {}
+    def _preload_all_tile_image_data(self):
+        image_data = {}
+        transforms = self._image_load_transforms
         for tile_type in TileType:
-            images[tile_type] = [
-                Image.open(self.file_paths[tile_type][i]) for i in range(len(self))
+            image_data[tile_type] = [
+                transforms(self.get_image(index=i, tile_type=tile_type))
+                for i in range(len(self))
             ]
-        return images
+        return image_data
 
     def get_image(self, index, tile_type):
+        image_file_path = self.file_paths[tile_type][index]
+        return self._read_image(image_file_path)
+
+    def _get_image_tensor(self, index, tile_type):
         if self.preload_data:
-            return self._images[tile_type][index]
+            return self._image_tensors[tile_type][index]
         else:
-            image_file_path = self.file_paths[tile_type][index]
-            return self._read_image(image_file_path)
+            return self._image_load_transforms(
+                self.get_image(index=index, tile_type=tile_type)
+            )
 
     def __getitem__(self, index):
         item_contents = [
-            self.get_image(index=index, tile_type=tile_type) for tile_type in TileType
+            self._get_image_tensor(index=index, tile_type=tile_type)
+            for tile_type in TileType
         ]
         if self.transform:
             item_contents = [self.transform(v) for v in item_contents]
@@ -131,8 +157,7 @@ class ImageSingletDataset(_ImageDatasetBase):
         return self._read_image(image_file_path)
 
     def __getitem__(self, index):
-        image_file_path = self.file_paths[index]
-        item = self._read_image(image_file_path)
+        item = self._image_load_transforms(self.get_image(index=index))
 
         if self.transform:
             item = self.transform(item)
