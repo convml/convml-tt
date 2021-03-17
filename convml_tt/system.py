@@ -230,8 +230,8 @@ class Tile2Vec(pl.LightningModule):
         )
         parser.add_argument(
             "--pretrained",
-            type=bool,
-            default=True,
+            default=False,
+            action="store_true",
             help="Use a pretrained backbone, only 'head' layers are trained",
         )
         parser.add_argument(
