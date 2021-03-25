@@ -5,6 +5,7 @@ Example on how to train convml_tt with logging on weights & biases
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger
 from pathlib import Path
+import os
 
 from convml_tt.system import TripletTrainerModel, TripletTrainerDataModule, HeadFineTuner
 import convml_tt
@@ -29,16 +30,15 @@ if __name__ == "__main__":
         help="Name of the project this run should belong to in the logger",
         default="convml_tt",
     )
-    parser.add_argument(
-        "--model-from-checkpoint",
-        type=Path,
-        help="location of model checkpoint to start from",
-        default=None,
-    )
 
-    temp_args, _ = parser.parse_known_args()
-    model = None
-    if temp_args.model_from_checkpoint:
+    if os.environ.get("FROM_CHECKPOINT"):
+        parser.add_argument(
+            "--model-from-checkpoint",
+            type=Path,
+            help="location of model checkpoint to start from",
+            default=None,
+        )
+        temp_args, _ = parser.parse_known_args()
         model = TripletTrainerModel.load_from_checkpoint(temp_args.model_from_checkpoint)
     else:
         parser = TripletTrainerModel.add_model_specific_args(parser)
