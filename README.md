@@ -119,8 +119,9 @@ Training can also be done interactively in for example a jupyter notebook, you
 can see some simple examples how what commands to use by looking at the
 automated tests in [tests/](tests/).
 
-Finally detailed notes on how to train on the ARC3 HPC cluster at University of
-Leeds are in [doc/README.ARC3.md](doc/README.ARC3.md).
+Finally there detailed notes on how to train on the ARC3 HPC cluster at
+University of Leeds are in [doc/README.ARC3.md](doc/README.ARC3.md) and on the
+[JASMIN](doc/README.JASMIN.md) analysis cluster.
 
 # Model interpretation
 

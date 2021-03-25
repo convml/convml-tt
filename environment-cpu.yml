@@ -11,7 +11,7 @@ dependencies:
   # pin pytorch version until kornia have fixed issue with 1.8.0
   # https://github.com/kornia/kornia/issues/902
   - pytorch==1.7.1
-  - torchvision
+  - torchvision>=0.4.0
   - cpuonly
   - pytorch-lightning
   # depedencies below are for windows especially (no wheel for bottleneck, and
