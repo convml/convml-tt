@@ -6,7 +6,7 @@ import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger
 from pathlib import Path
 
-from convml_tt.system import Tile2Vec, TripletTrainerDataModule, HeadFineTuner
+from convml_tt.system import TripletTrainerModel, TripletTrainerDataModule, HeadFineTuner
 import convml_tt
 
 if __name__ == "__main__":
@@ -39,9 +39,9 @@ if __name__ == "__main__":
     temp_args, _ = parser.parse_known_args()
     model = None
     if temp_args.model_from_checkpoint:
-        model = Tile2Vec.load_from_checkpoint(temp_args.model_from_checkpoint)
+        model = TripletTrainerModel.load_from_checkpoint(temp_args.model_from_checkpoint)
     else:
-        parser = Tile2Vec.add_model_specific_args(parser)
+        parser = TripletTrainerModel.add_model_specific_args(parser)
 
     parser = TripletTrainerDataModule.add_data_specific_args(parser)
     args = parser.parse_args()
@@ -62,7 +62,7 @@ if __name__ == "__main__":
     # pl.Lightningmodule doesn't have a `from_argparse_args` yet, so we call it
     # here ourselves
     if model is None:
-        model = pl.utilities.argparse.from_argparse_args(Tile2Vec, args)
+        model = pl.utilities.argparse.from_argparse_args(TripletTrainerModel, args)
 
     datamodule = TripletTrainerDataModule.from_argparse_args(
         args, normalize_for_arch=model.base_arch

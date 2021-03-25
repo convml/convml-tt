@@ -4,7 +4,7 @@ import torch
 from torch import nn
 from .nn_layers import AdaptiveConcatPool2d
 
-from ..system import Tile2Vec
+from ..system import TripletTrainerModel
 
 
 def model_from_saved_weights(path):
@@ -12,7 +12,7 @@ def model_from_saved_weights(path):
     This routine is only here so that models which were trained with
     `convml_tt` based on fastai v1 can be loaded. In general for saving/loading
     pytorch-lightning's `trainer.save_checkpoint(...)` and
-    `Tile2Vec.load_checkpoint(...)` should be used.
+    `TripletTrainerModel.load_checkpoint(...)` should be used.
     """
     # pytorch may issue some warnings here, but we just want to load the
     # model anyway, so hide the wwarnings for now
@@ -43,7 +43,7 @@ def model_from_saved_weights(path):
                 f"the expected shape, {result_batch.shape} != {expected_shape}"
             )
         # all we know is the weights, so this model won't be possible to train further
-        model = Tile2Vec(
+        model = TripletTrainerModel(
             base_arch="resnet18",
             margin="unknown",
             lr="unknown",
