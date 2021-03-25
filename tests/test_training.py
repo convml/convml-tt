@@ -1,6 +1,10 @@
 import pytorch_lightning as pl
 
-from convml_tt.system import TripletTrainerModel, TripletTrainerDataModule, HeadFineTuner
+from convml_tt.system import (
+    TripletTrainerModel,
+    TripletTrainerDataModule,
+    HeadFineTuner,
+)
 from convml_tt.data.examples import (
     fetch_example_dataset,
     ExampleData,
