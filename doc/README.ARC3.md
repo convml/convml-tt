@@ -63,3 +63,39 @@ And copy files with for example
 ```
 scp localfile.txt leeds-arc3:~/{path-in-homedir}/
 ```
+
+
+## Training on ARC3
+
+First log in to ARC3
+
+```bash
+[earlcd@cloud9 ~]$ ssh arc3.leeds.ac.uk
+```
+
+Request a node with a GPU attached
+
+```bash
+[earlcd@login1.arc3 ~]$ qrsh -l coproc_k80=1,h_rt=1:0:0 -pty y /bin/bash -i
+```
+
+Once the node has spun up and the prompt is again available you will notice the
+hostname has now changed (to something containing "gpu", here `db12gpu1`). Now
+activate your conda environment (installed as above) and start a jupyter
+notebook
+
+```bash
+[earlcd@db12gpu1.arc3 ~]$ conda activate fastai
+[earlcd@db12gpu1.arc3 ~]$ jupyter notebook --no-browser --port 8888 --ip=0.0.0.0
+```
+
+Finally from your workstation start a second ssh connection to ARC3, this time
+forwarding the local port `8888` to port `8888` on the GPU node (here
+`db12gpu1`) you have been allocated on ARC3:
+
+```bash
+[earlcd@cloud9 ~]$ ssh arc3 -L 8888:db12gpu1.arc3.leeds.ac.uk:8888
+```
+
+Open up a local browser on your workstation and browse to
+`http://localhost:8888`

@@ -1,5 +1,5 @@
 """
-Contains the main triplet-trainer architecture (Tile2Vec) and the datamodule to
+Contains the main triplet-trainer architecture (TripletTrainerModel) and the datamodule to
 load triplet-datasets (TripletTrainerDataModule)
 """
 import pathlib
@@ -41,7 +41,7 @@ class HeadFineTuner(pl.callbacks.BaseFinetuning):
         pass
 
 
-class Tile2Vec(pl.LightningModule):
+class TripletTrainerModel(pl.LightningModule):
     def __init__(
         self,
         base_arch="resnet18",
