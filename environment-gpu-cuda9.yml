@@ -2,14 +2,16 @@ name: convml_tt
 
 channels:
   - pytorch
-  - fastai
   - defaults
   - conda-forge
 dependencies:
   - pip
   - python=3.7
   - netcdf4
-  - pytorch=1.0.1
+  # pin pytorch version until kornia have fixed issue with 1.8.0
+  # https://github.com/kornia/kornia/issues/902
+  - pytorch==1.7.1
+  - pytorch-lightning
   - torchvision
   - cudatoolkit=9.0
   - Pillow=6.1

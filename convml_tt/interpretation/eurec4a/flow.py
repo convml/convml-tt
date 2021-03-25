@@ -195,27 +195,25 @@ def extract_trajectories(
     # [0, Nx] and [0, Ny]
     m_invalid = np.logical_or(
         # out of x index bounds
-        np.logical_or(traj_points[...,0] < 0, traj_points[...,0] >= nx_img),
+        np.logical_or(traj_points[..., 0] < 0, traj_points[..., 0] >= nx_img),
         # out of y index bounds
-        np.logical_or(traj_points[...,1] < 0, traj_points[...,1] >= ny_img),
+        np.logical_or(traj_points[..., 1] < 0, traj_points[..., 1] >= ny_img),
     )
     # make these all -1 (indicating invalid point)
-    traj_points[...,0] = np.where(m_invalid, -1, traj_points[...,0])
-    traj_points[...,1] = np.where(m_invalid, -1, traj_points[...,1])
+    traj_points[..., 0] = np.where(m_invalid, -1, traj_points[..., 0])
+    traj_points[..., 1] = np.where(m_invalid, -1, traj_points[..., 1])
 
     N_img, N_trajs, _ = traj_points.shape
 
     assert len(traj_files) == N_img
 
-    ds = xr.Dataset(
-        coords=dict(image_filename=traj_files, traj_id=np.arange(N_trajs))
-    )
+    ds = xr.Dataset(coords=dict(image_filename=traj_files, traj_id=np.arange(N_trajs)))
     ds["i"] = ("image_filename", "traj_id"), traj_points[..., 0]
-    ds["i"].attrs['long_name'] = 'x-index'
-    ds["i"].attrs['units'] = '1'
+    ds["i"].attrs["long_name"] = "x-index"
+    ds["i"].attrs["units"] = "1"
     ds["j"] = ("image_filename", "traj_id"), traj_points[..., 1]
-    ds["j"].attrs['long_name'] = 'j-index'
-    ds["j"].attrs['units'] = '1'
+    ds["j"].attrs["long_name"] = "j-index"
+    ds["j"].attrs["units"] = "1"
     return ds
 
 
@@ -230,33 +228,33 @@ class DatasetOpticalFlowTrajectories(luigi.Task):
         for scene_id in self.scene_ids:
             tasks[scene_id] = dict(
                 image=MakeRectRGBImage(
-                    dataset_path=self.dataset_path, scene_id=scene_id,
+                    dataset_path=self.dataset_path,
+                    scene_id=scene_id,
                 ),
                 data=MakeRectRGBDataArray(
-                    dataset_path=self.dataset_path, scene_id=scene_id,
-                )
+                    dataset_path=self.dataset_path,
+                    scene_id=scene_id,
+                ),
             )
 
         return tasks
 
     def run(self):
         input = self.input()
-        image_filenames = [t['image'].fn for t in input.values()]
+        image_filenames = [t["image"].fn for t in input.values()]
         ds_trajs = extract_trajectories(
             image_filenames=image_filenames,
             point_method_kwargs=dict(
                 max_corners=self.max_num_trajectories,
-            )
+            ),
         )
 
         # add a `scene_id` coordinate and make it the primary one
-        fn_to_scene_id = dict([
-            (t['image'].fn, scene_id)
-            for (scene_id, t) in
-            input.items()]
+        fn_to_scene_id = dict(
+            [(t["image"].fn, scene_id) for (scene_id, t) in input.items()]
         )
         scene_ids = [fn_to_scene_id[fn] for fn in ds_trajs.image_filename.values]
-        ds_trajs['scene_id'] = 'image_filename', scene_ids
+        ds_trajs["scene_id"] = "image_filename", scene_ids
         ds_trajs = ds_trajs.swap_dims(dict(image_filename="scene_id"))
 
         datasets_posns = []
@@ -265,7 +263,7 @@ class DatasetOpticalFlowTrajectories(luigi.Task):
             i_points = ds_points_scene.i.values
             j_points = ds_points_scene.j.values
 
-            da_imgdata = self.input()[scene_id]['data'].open()
+            da_imgdata = self.input()[scene_id]["data"].open()
             lat_points = da_imgdata.lat.values[i_points, j_points]
             lon_points = da_imgdata.lon.values[i_points, j_points]
             x_points = da_imgdata.x.values[i_points]
@@ -274,14 +272,14 @@ class DatasetOpticalFlowTrajectories(luigi.Task):
             m_nans = np.logical_or(i_points == -1, j_points == -1)
             set_nans = lambda v: np.where(m_nans, np.nan, v)
 
-            ds_points_scene['x'] = ('traj_id',), set_nans(x_points)
-            ds_points_scene['y'] = ('traj_id',), set_nans(y_points)
-            ds_points_scene['lat'] = ('traj_id',), set_nans(lat_points)
-            ds_points_scene['lon'] = ('traj_id',), set_nans(lon_points)
+            ds_points_scene["x"] = ("traj_id",), set_nans(x_points)
+            ds_points_scene["y"] = ("traj_id",), set_nans(y_points)
+            ds_points_scene["lat"] = ("traj_id",), set_nans(lat_points)
+            ds_points_scene["lon"] = ("traj_id",), set_nans(lon_points)
 
             datasets_posns.append(ds_points_scene)
 
-        ds_trajs = xr.concat(datasets_posns, dim='scene_id')
+        ds_trajs = xr.concat(datasets_posns, dim="scene_id")
         for v in ["x", "y", "lat", "lon"]:
             ds_trajs[v].attrs.update(da_imgdata[v].attrs)
         ds_trajs.to_netcdf(self.output().fn)
@@ -306,7 +304,7 @@ class FullDatasetOpticalFlowTrajectories(GroupedSceneBulkProcessingBaseTask):
 
         ds = xr.concat(datasets, dim="scene_id")
         times = [parse_scene_id(scene_id) for scene_id in ds.scene_id.values]
-        ds.coords['time'] = ('scene_id', ), times
+        ds.coords["time"] = ("scene_id",), times
         ds.to_netcdf(self.output().fn)
 
     def output(self):

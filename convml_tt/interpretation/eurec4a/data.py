@@ -18,6 +18,7 @@ IMAGE_TILE_FILENAME_FORMAT = "{i0:05d}_{j0:05d}.png"
 
 N_TILE = (256, 256)
 
+
 class FakeImagesList(list):
     def __init__(self, src_path, id, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -54,7 +55,9 @@ class RectTiler:
     def get_tile_images(self):
         for i in self.i_:
             for j in self.j_:
-                tile_img = self._crop_fastai_im(self.img, i=i, j=j, nx=self.nxt, ny=self.nyt)
+                tile_img = self._crop_fastai_im(
+                    self.img, i=i, j=j, nx=self.nxt, ny=self.nyt
+                )
                 yield (i, j), tile_img
 
     def make_tile_predictions(self, model):
@@ -90,6 +93,7 @@ class ImagePredictionMapData(luigi.Task):
     then the attributes from that will be copied over (for example lat lon
     coordinates)
     """
+
     model_path = luigi.Parameter()
     image_path = luigi.Parameter()
     src_data_path = luigi.OptionalParameter()
@@ -122,8 +126,8 @@ class ImagePredictionMapData(luigi.Task):
             da_pred.attrs["ly_tile"] = float(da_src.y[N_tile[1]] - da_src.y[0])
 
             # make sure the lat lon coords are available later
-            da_pred.coords['lat'] = da_src.lat.sel(x=da_pred.x, y=da_pred.y)
-            da_pred.coords['lon'] = da_src.lon.sel(x=da_pred.x, y=da_pred.y)
+            da_pred.coords["lat"] = da_src.lat.sel(x=da_pred.x, y=da_pred.y)
+            da_pred.coords["lon"] = da_src.lon.sel(x=da_pred.x, y=da_pred.y)
 
         da_pred.attrs["model_path"] = self.model_path
         da_pred.attrs["image_path"] = self.image_path
@@ -155,8 +159,10 @@ class ImagePredictionMapImageTiles(luigi.Task):
 
         for (i, j), tile_img in tiler.get_tile_images():
             nxt, nyt = tiler.nxt, tiler.nyt
-            filename = IMAGE_TILE_FILENAME_FORMAT.format(i0=i + nxt // 2, j0=j + nyt // 2)
-            tile_filepath = Path(self.output().fn).parent/filename
+            filename = IMAGE_TILE_FILENAME_FORMAT.format(
+                i0=i + nxt // 2, j0=j + nyt // 2
+            )
+            tile_filepath = Path(self.output().fn).parent / filename
             tile_img.save(str(tile_filepath))
 
     def output(self):
@@ -201,7 +207,9 @@ class AllDatasetImagePredictionMapImageTiles(SceneBulkProcessingBaseTask):
     TaskClass = DatasetImagePredictionMapImageTiles
 
     def _get_task_class_kwargs(self):
-        return dict(step_size=self.step_size,)
+        return dict(
+            step_size=self.step_size,
+        )
 
 
 class DatasetImagePredictionMapData(ImagePredictionMapData):
@@ -232,7 +240,10 @@ class FullDatasetImagePredictionMapData(SceneBulkProcessingBaseTask):
     TaskClass = DatasetImagePredictionMapData
 
     def _get_task_class_kwargs(self):
-        return dict(model_path=self.model_path, step_size=self.step_size,)
+        return dict(
+            model_path=self.model_path,
+            step_size=self.step_size,
+        )
 
 
 class AggregateFullDatasetImagePredictionMapData(luigi.Task):

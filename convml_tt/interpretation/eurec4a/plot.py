@@ -180,9 +180,7 @@ class ComponentsAnnotationMapImage(luigi.Task):
 
         fn_out = src_fn.replace(
             ".nc",
-            ".map.{}__comp.png".format(
-                "_".join([str(v) for v in self.components])
-            ),
+            ".map.{}__comp.png".format("_".join([str(v) for v in self.components])),
         )
 
         p = Path(src_path) / fn_out
@@ -293,7 +291,7 @@ def plot_scene_image(da, dataset_path, crop_image=True, ax=None):
     def _get_image():
         if "scene_id" in list(da.coords) + list(da.attrs.keys()):
             try:
-                scene_id = da.attrs['scene_id']
+                scene_id = da.attrs["scene_id"]
             except KeyError:
                 scene_id = da.scene_id.item()
                 assert type(scene_id) == str
@@ -317,9 +315,9 @@ def plot_scene_image(da, dataset_path, crop_image=True, ax=None):
     if ax is None:
         lx = img_extent[1] - img_extent[0]
         ly = img_extent[3] - img_extent[2]
-        r = lx/ly
+        r = lx / ly
         fig_height = 3.0
-        fig_width = fig_height*r
+        fig_width = fig_height * r
         fig, ax = plt.subplots(figsize=(fig_width, fig_height))
         ax.set_aspect(1.0)
         ax.set_xlabel(xr.plot.utils.label_from_attrs(da.x))
@@ -329,7 +327,9 @@ def plot_scene_image(da, dataset_path, crop_image=True, ax=None):
     return ax, img_extent
 
 
-def make_rgb_annotation_map_image(da, rgb_components, dataset_path, render_tiles=False, crop_image=True):
+def make_rgb_annotation_map_image(
+    da, rgb_components, dataset_path, render_tiles=False, crop_image=True
+):
     """
     Render the contents of `da` onto the RGB image represented by the scene
     (`scene_id` expected to be defined for `da`).
@@ -347,9 +347,7 @@ def make_rgb_annotation_map_image(da, rgb_components, dataset_path, render_tiles
     # scale distances to km
     if da.x.units == "m" and da.y.units == "m":
         s = 1000.0
-        da = da.copy().assign_coords(
-            dict(x=da.x.values / s, y=da.y.values / s)
-        )
+        da = da.copy().assign_coords(dict(x=da.x.values / s, y=da.y.values / s))
         da.x.attrs["units"] = "km"
         da.y.attrs["units"] = "km"
     else:
@@ -361,9 +359,7 @@ def make_rgb_annotation_map_image(da, rgb_components, dataset_path, render_tiles
         # when we have distinct classes (identified by integers) we just
         # want to map each label to a RGB color
         labels = da.stack(dict(n=da.dims))
-        arr_rgb = skimage.color.label2rgb(
-            label=labels.values, bg_color=(1.0, 1.0, 1.0)
-        )
+        arr_rgb = skimage.color.label2rgb(label=labels.values, bg_color=(1.0, 1.0, 1.0))
         # make an RGBA array so we can apply some alpha blending later
         rgba_shape = list(arr_rgb.shape)
         rgba_shape[-1] += 1
@@ -386,7 +382,9 @@ def make_rgb_annotation_map_image(da, rgb_components, dataset_path, render_tiles
     )
 
     ax = axes[0]
-    _, img_extent = plot_scene_image(da=da, dataset_path=dataset_path, ax=ax, crop_image=crop_image)
+    _, img_extent = plot_scene_image(
+        da=da, dataset_path=dataset_path, ax=ax, crop_image=crop_image
+    )
 
     ax = axes[1]
     plot_scene_image(da=da, dataset_path=dataset_path, ax=ax, crop_image=crop_image)
@@ -396,7 +394,7 @@ def make_rgb_annotation_map_image(da, rgb_components, dataset_path, render_tiles
     da_rgba[3] = 1.0
     da_rgba.plot.imshow(ax=ax, rgb="rgba", y="y", rasterized=True)
 
-    if 'lx_tile' in da.attrs and 'ly_tile' in da.attrs:
+    if "lx_tile" in da.attrs and "ly_tile" in da.attrs:
         if render_tiles:
             x_, y_ = xr.broadcast(da.x, da.y)
             axes[2].scatter(x_, y_, marker="x")
@@ -467,9 +465,10 @@ class RGBAnnotationMapImage(luigi.Task):
 
     def make_plot(self, da_emb):
         return make_rgb_annotation_map_image(
-            da=da_emb, rgb_components=self.rgb_components,
-            dataset_path=self.dataset_path
-            )
+            da=da_emb,
+            rgb_components=self.rgb_components,
+            dataset_path=self.dataset_path,
+        )
 
     def run(self):
         da_emb = xr.open_dataarray(self.input_path)

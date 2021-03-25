@@ -1,43 +1,62 @@
-from fastai.datasets import untar_data
-import fastai.vision
+import pytorch_lightning as pl
 
-from convml_tt.architectures.triplet_trainer import (NPMultiImageItemList,
-                                                     loss_func,
-                                                     monkey_patch_fastai)
+from convml_tt.system import TripletTrainerModel, TripletTrainerDataModule, HeadFineTuner
+from convml_tt.data.examples import (
+    fetch_example_dataset,
+    ExampleData,
+    PretrainedModel,
+    fetch_pretrained_model,
+)
+from convml_tt.data.dataset import TileType, ImageSingletDataset
+from convml_tt.data.transforms import get_transforms
+from convml_tt.utils import get_embeddings
+from convml_tt.external import fastai1_weights_loader
 
-from convml_tt.data.examples import ExampleData
 
-import platform
+def test_train_new():
+    trainer = pl.Trainer(max_epochs=5)
+    arch = "resnet18"
+    model = TripletTrainerModel(pretrained=False, base_arch=arch)
+    data_path = fetch_example_dataset(dataset=ExampleData.TINY10)
+    datamodule = TripletTrainerDataModule(
+        data_dir=data_path, batch_size=2, normalize_for_arch=arch
+    )
+    trainer.fit(model=model, datamodule=datamodule)
 
-def test_load_data_and_train():
-    data_path = untar_data(ExampleData.TINY10)
 
-    monkey_patch_fastai()
+def test_train_new_with_preloading():
+    trainer = pl.Trainer(max_epochs=5)
+    arch = "resnet18"
+    model = TripletTrainerModel(pretrained=False, base_arch=arch)
+    data_path = fetch_example_dataset(dataset=ExampleData.TINY10)
+    datamodule = TripletTrainerDataModule(
+        data_dir=data_path, batch_size=2, normalize_for_arch=arch, preload_data=True
+    )
+    trainer.fit(model=model, datamodule=datamodule)
 
-    tile_path = data_path/"train"
 
-    item_list = NPMultiImageItemList.from_folder(path=tile_path)
+def test_finetune_pretrained():
+    trainer = pl.Trainer(max_epochs=5, callbacks=[HeadFineTuner()])
+    arch = "resnet18"
+    model = TripletTrainerModel(pretrained=True, base_arch=arch)
+    data_path = fetch_example_dataset(dataset=ExampleData.TINY10)
+    datamodule = TripletTrainerDataModule(
+        data_dir=data_path, batch_size=2, normalize_for_arch=arch
+    )
+    trainer.fit(model=model, datamodule=datamodule)
 
-    src = (item_list
-           .random_split_by_pct()
-           .label_empty(embedding_length=100)
-           )
 
-    # fix for not working multi-process training on MacOS
-    # https://github.com/fastai/fastai/issues/1492
-    db_kwargs = {}
-    if platform.system() == "Darwin":
-        db_kwargs['num_workers'] = 0
+def test_load_from_weights():
+    model_path = fetch_pretrained_model(
+        pretrained_model=PretrainedModel.FIXED_NORM_STAGE2
+    )
+    model = fastai1_weights_loader.model_from_saved_weights(path=model_path)
 
-    data = (src
-            .transform(fastai.vision.get_transforms(flip_vert=True,))
-            .databunch(bs=3, **db_kwargs)
-            .normalize(fastai.vision.imagenet_stats)
-            )
-
-    learn = fastai.vision.create_cnn(data=data,
-                                     base_arch=fastai.vision.models.resnet18,
-                                     loss_func=loss_func
-                                     )
-
-    learn.fit_one_cycle(cyc_len=3, max_lr=4.0e-2)
+    data_path = fetch_example_dataset(dataset=ExampleData.TINY10)
+    dataset = ImageSingletDataset(
+        data_dir=data_path,
+        stage="train",
+        tile_type=TileType.ANCHOR,
+        transform=get_transforms(step="predict", normalize_for_arch=model.base_arch),
+    )
+    get_embeddings(tile_dataset=dataset, model=model, prediction_batch_size=16)

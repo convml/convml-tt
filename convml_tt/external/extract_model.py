@@ -42,6 +42,7 @@ def main(fastai_model_filename):
 
 if __name__ == "__main__":
     import argparse
+
     argparser = argparse.ArgumentParser()
     argparser.add_argument("fastai_model_filename")
     args = argparser.parse_args()

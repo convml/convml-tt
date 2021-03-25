@@ -1,15 +1,69 @@
-from fastai.datasets import _checks
+"""
+Example datasets for use with the triplet-trainer
+"""
+import enum
+from pathlib import Path
+from typing import Union
+
+from torchvision.datasets.utils import download_and_extract_archive
+
+_URL_ROOT = "http://homepages.see.leeds.ac.uk/~earlcd/ml-datasets"
 
 
-_URL_ROOT = "http://homepages.see.leeds.ac.uk/~earlcd/ml-datasets/"
+class ExampleData(enum.Enum):
+    TINY10 = "Nx256_s200000.0_N0study_N10train"
+    SMALL100 = "Nx256_s200000.0_N0study_N100train"
+    LARGE2000S500 = "Nx256_s200000.0_N500study_N2000train"
 
-class ExampleData:
-    TINY10 = _URL_ROOT + "Nx256_s200000.0_N0study_N10train"
-    SMALL100 = _URL_ROOT + "Nx256_s200000.0_N0study_N100train"
-    LARGE2000S500 = _URL_ROOT + "Nx256_s200000.0_N500study_N2000train"
 
-# add our own datasets into fastai's datastructure here so we can use fastai's
-# infrastructure for loading them
-_checks[ExampleData.TINY10] = (1144669, 'c599454acb4ff07fbd1551135c350ba9')
-_checks[ExampleData.SMALL100] = (87250439, 'f45f9da7aa77b82e493c3289ea1ea951')
-_checks[ExampleData.LARGE2000S500] = (1092419466, 'bdc6184db155c99411c2d401794a41ec')
+class PretrainedModel(enum.Enum):
+    FIXED_NORM_STAGE2 = "fixednorm-stage-2"
+
+
+# datasets tar-balls with their md5 hash
+_checks = {}
+_checks[ExampleData.TINY10] = "d094cd1b25408517259fc8d8dad63f05"
+_checks[ExampleData.SMALL100] = "75b45c9f368c298685dd88018eeb4f80"
+_checks[ExampleData.LARGE2000S500] = "7a128c930d97059f0796b736164a721f"
+_checks[PretrainedModel.FIXED_NORM_STAGE2] = "eb1558b62b03ba939e9405080669689f"
+
+
+def _fetch_example(item: Union[ExampleData, PretrainedModel], data_dir="data/"):
+    """
+    Downloads example data and returns the path to it
+    """
+    url = f"{_URL_ROOT}/{item.value}.tgz"
+    download_and_extract_archive(
+        url=url,
+        download_root=data_dir,
+        md5=_checks[item],
+    )
+    return Path(data_dir)
+
+
+def fetch_example_dataset(dataset: ExampleData, data_dir="data/"):
+    """
+    Downloads example data and returns the path to it
+    """
+    return _fetch_example(item=dataset, data_dir=data_dir) / dataset.value
+
+
+def fetch_pretrained_model(pretrained_model: PretrainedModel, data_dir="data/"):
+    """
+    Downloads pretrained model and returns the path to it
+    """
+    fname = f"{pretrained_model.value}.torch.pkl"
+    return _fetch_example(item=pretrained_model, data_dir=data_dir) / fname
+
+
+if __name__ == "__main__":
+    import argparse
+
+    argparser = argparse.ArgumentParser()
+    argparser.add_argument("dataset_name", choices=[ds.name for ds in ExampleData])
+    argparser.add_argument("--path", default="data/", type=Path)
+    args = argparser.parse_args()
+    dataset_path = fetch_example_dataset(
+        dataset=ExampleData[args.dataset_name], data_dir=args.path
+    )
+    print(f"Downloaded example dataset `{args.dataset_name}` to `{dataset_path}`")

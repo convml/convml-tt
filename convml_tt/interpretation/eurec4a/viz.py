@@ -39,12 +39,8 @@ def main(da, dataset_path):
     # data = []
 
     # da = da.isel(scene_id=0).stack(dict(tile_id=('x', 'y')))
-    da = (
-        da
-        .sel(x=slice(-1000e3, None))
-        .stack(dict(tile_id=('x', 'y', 'scene_id')))
-    )
-    #sel(tile_id=da.tile_id.values[:100])
+    da = da.sel(x=slice(-1000e3, None)).stack(dict(tile_id=("x", "y", "scene_id")))
+    # sel(tile_id=da.tile_id.values[:100])
 
     # scene_ids = list(da.unstack().scene_id.values)
 
@@ -63,24 +59,23 @@ def main(da, dataset_path):
             # x_.append(tile_id[0])
             # y_.append(tile_id[1])
 
-            fn = _get_tile_image_path(dataset_path=dataset_path, scene_id=scene_id, i0=i0, j0=j0)
+            fn = _get_tile_image_path(
+                dataset_path=dataset_path, scene_id=scene_id, i0=i0, j0=j0
+            )
             # img_str = base64.b64encode(open(fn, "rb").read())
-                # "data:image/png;base64," + str(img_str).replace("b'", "").replace("'", "")
+            # "data:image/png;base64," + str(img_str).replace("b'", "").replace("'", "")
 
             # labels.append(scene_ids.index(scene_id))
             # c = da_.isel(pca_dim=3).values
             # c = 0
             # labels.append(c)
 
-            image_labels.append(
-                "get_image?path=" + str(fn)
-            )
+            image_labels.append("get_image?path=" + str(fn))
 
             # data.append(da_.values)
 
         except FileNotFoundError:
             continue
-
 
     # lf.batch_add(enc.batch_from_weight_array(data))
     # lf.index()
@@ -101,7 +96,13 @@ def main(da, dataset_path):
     # X_embedded = TSNE(n_components=2,).fit_transform(X)
     # x, y = X[:,0], X[:,1]
 
-    f = Faerun(clear_color="#111111", view="front", coords=True, x_title="pca dim 0", y_title="pca dim 1")
+    f = Faerun(
+        clear_color="#111111",
+        view="front",
+        coords=True,
+        x_title="pca dim 0",
+        y_title="pca dim 1",
+    )
     f.add_scatter(
         "EMB",
         {"x": x, "y": y, "z": z, "c": c, "labels": image_labels},
@@ -114,19 +115,20 @@ def main(da, dataset_path):
         categorical=False,
     )
     # f.add_tree(
-        # "EMB_tree", {"from": s, "to": t}, point_helper="EMB", color="#666666"
+    # "EMB_tree", {"from": s, "to": t}, point_helper="EMB", color="#666666"
     # )
 
-    with open('tmap.faerun', 'wb+') as handle:
+    with open("tmap.faerun", "wb+") as handle:
         pickle.dump(f.create_python_data(), handle, protocol=pickle.HIGHEST_PROTOCOL)
     # faerun.plot("tmap", template="url_image")
 
 
 if __name__ == "__main__":
     import argparse
+
     argparser = argparse.ArgumentParser()
-    argparser.add_argument('filename')
-    argparser.add_argument('--view', default=False, action="store_true")
+    argparser.add_argument("filename")
+    argparser.add_argument("--view", default=False, action="store_true")
     args = argparser.parse_args()
 
     if not Path("tmap.faerun").exists():
@@ -134,13 +136,14 @@ if __name__ == "__main__":
         da = xr.open_dataarray(args.filename)
 
         # if "scene_id" in da_emb.coords:
-            # da = da_emb.stack(dict(tile_id=('x', 'y', 'scene_id')))
+        # da = da_emb.stack(dict(tile_id=('x', 'y', 'scene_id')))
         # else:
-            # raise NotImplementedError(da_emb.dims)
+        # raise NotImplementedError(da_emb.dims)
 
         import ipdb
+
         with ipdb.launch_ipdb_on_exception():
             main(da=da, dataset_path=Path("."))
 
     if args.view:
-        host('tmap.faerun', label_type='url_image', theme='dark', view="free")
+        host("tmap.faerun", label_type="url_image", theme="dark", view="free")

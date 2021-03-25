@@ -21,12 +21,12 @@ def _cleanup_composite_da_attrs(da_composite):
 
     def fix_composite_attrs(da):
         fns = [
-            ('start_time', lambda v: v.isoformat()),
-            ('end_time', lambda v: v.isoformat()),
-            ('area', lambda v: None),
-            ('prerequisites', lambda v: None),
-            ('crs', lambda v: str(v)),
-            ('orbital_parameters', lambda v: None),
+            ("start_time", lambda v: v.isoformat()),
+            ("end_time", lambda v: v.isoformat()),
+            ("area", lambda v: None),
+            ("prerequisites", lambda v: None),
+            ("crs", lambda v: str(v)),
+            ("orbital_parameters", lambda v: None),
         ]
 
         for v, fn in fns:
@@ -37,7 +37,7 @@ def _cleanup_composite_da_attrs(da_composite):
 
         to_delete = [k for (k, v) in da.attrs.items() if v is None]
         for k in to_delete:
-            del(da.attrs[k])
+            del da.attrs[k]
 
     fix_composite_attrs(da_composite)
 
@@ -64,10 +64,10 @@ def save_scene_meta(source_fns, fn_meta):
 
     meta_info = dict(
         projection=serialize_attrs(ds.goes_imager_projection.attrs),
-        source_files=[str(p) for p in source_fns]
+        source_files=[str(p) for p in source_fns],
     )
 
-    with open(fn_meta, 'w') as fh:
+    with open(fn_meta, "w") as fh:
         yaml.dump(meta_info, stream=fh, default_flow_style=False)
 
 
@@ -75,52 +75,53 @@ def load_scene_meta(fn_meta):
     with open(fn_meta) as fh:
         meta_info = yaml.load(fh)
 
-    gp = meta_info['projection']
+    gp = meta_info["projection"]
 
     globe = ccrs.Globe(
-        ellipse='sphere', 
-        semimajor_axis=gp['semi_major_axis'],
-        semiminor_axis=gp['semi_minor_axis']
+        ellipse="sphere",
+        semimajor_axis=gp["semi_major_axis"],
+        semiminor_axis=gp["semi_minor_axis"],
     )
 
     crs = ccrs.Geostationary(
-        satellite_height=gp['perspective_point_height'],
-        central_longitude=gp['longitude_of_projection_origin'],
-        globe=globe
+        satellite_height=gp["perspective_point_height"],
+        central_longitude=gp["longitude_of_projection_origin"],
+        globe=globe,
     )
 
-    meta_info['crs'] = crs
-    del(meta_info['projection'])
+    meta_info["crs"] = crs
+    del meta_info["projection"]
     return meta_info
 
+
 def load_rgb_files_and_get_composite_da(scene_fns):
-    scene = satpy.Scene(reader='abi_l1b', filenames=scene_fns)
+    scene = satpy.Scene(reader="abi_l1b", filenames=scene_fns)
 
     # instruct satpy to load the channels necessary for the `true_color`
     # composite
-    scene.load(['true_color'])
+    scene.load(["true_color"])
 
     # it is necessary to "resample" here because the different channels are at
     # different spatial resolution. By not passing in an "area" the highest
     # resolution possible will be used
-    new_scn = scene.resample(resampler='native')
+    new_scn = scene.resample(resampler="native")
 
     # get out a dask-backed DataArray for the composite
-    da_truecolor = new_scn['true_color']
+    da_truecolor = new_scn["true_color"]
 
-    if 'crs' in da_truecolor:
-        da_truecolor = da_truecolor.drop('crs')
+    if "crs" in da_truecolor:
+        da_truecolor = da_truecolor.drop("crs")
 
     # to be able to crop the DataArray to the bounding box we need to set the
     # projection attribute
-    da_truecolor.attrs['crs'] = scene.max_area().to_cartopy_crs()
+    da_truecolor.attrs["crs"] = scene.max_area().to_cartopy_crs()
 
     return da_truecolor
 
 
 def make_composite_filename(scene_fns, bbox_extent):
     key_attrs = Goes16AWS.parse_key(scene_fns[0])
-    t_start_str, t_end_str = key_attrs['start_time'], key_attrs['end_time']
+    t_start_str, t_end_str = key_attrs["start_time"], key_attrs["end_time"]
 
     lon_min, lat_min = bbox_extent[0]
     lon_max, lat_max = bbox_extent[1]
@@ -130,19 +131,17 @@ def make_composite_filename(scene_fns, bbox_extent):
     )
 
 
-def get_rgb_composite_in_bbox(scene_fns, data_path, bbox_extent,
-                              bbox_pad_pct=0.05):
+def get_rgb_composite_in_bbox(scene_fns, data_path, bbox_extent, bbox_pad_pct=0.05):
     """
     scene_fns: filenames for the three files containing the channels needed for
     GOES-16 composites
 
     bbox_extent = (pt_SW, pt_NE)
     """
-    fn_nc = make_composite_filename(scene_fns=scene_fns,
-                                     bbox_extent=bbox_extent)
+    fn_nc = make_composite_filename(scene_fns=scene_fns, bbox_extent=bbox_extent)
 
-    path_nc = data_path/fn_nc
-    path_meta = data_path/fn_nc.replace('.nc', '.meta.yaml')
+    path_nc = data_path / fn_nc
+    path_meta = data_path / fn_nc.replace(".nc", ".meta.yaml")
 
     data_path.mkdir(exist_ok=True, parents=True)
 
@@ -152,16 +151,16 @@ def get_rgb_composite_in_bbox(scene_fns, data_path, bbox_extent,
         da_truecolor = load_rgb_files_and_get_composite_da(scene_fns=scene_fns)
 
         da_truecolor_domain = tiler.crop_field_to_latlon_box(
-            da=da_truecolor, box=np.array(bbox_domain.get_bounds()).T,
-            pad_pct=bbox_pad_pct
+            da=da_truecolor,
+            box=np.array(bbox_domain.get_bounds()).T,
+            pad_pct=bbox_pad_pct,
         )
 
         da_truecolor_domain = _cleanup_composite_da_attrs(da_truecolor_domain)
 
         da_truecolor_domain.to_netcdf(path_nc)
 
-        meta = _save_scene_meta(source_fns=scene_fns,
-                                             fn_meta=path_meta)
+        meta = _save_scene_meta(source_fns=scene_fns, fn_meta=path_meta)
 
     return da
 
@@ -169,5 +168,5 @@ def get_rgb_composite_in_bbox(scene_fns, data_path, bbox_extent,
 def rgb_da_to_img(da):
     # need to sort by y otherize resulting image is flipped... there must be a
     # better way
-    da_ = da.sortby('y', ascending=False)
+    da_ = da.sortby("y", ascending=False)
     return satpy.writers.get_enhanced_image(da_)

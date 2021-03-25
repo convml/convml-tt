@@ -1,21 +1,19 @@
-import numpy as np
-import matplotlib.pyplot as plt
-import mpl_toolkits.axes_grid1.inset_locator as il
-import xarray as xr
-import seaborn as sns
-
 from collections import OrderedDict
+import enum
 
-from ...utils import get_triplets_from_embeddings
+import matplotlib.pyplot as plt
+import numpy as np
+import seaborn as sns
+import xarray as xr
 
+from ...data.dataset import ImageSingletDataset
 from .mpl_autopos_annotation import calc_offset_points
-from .mpl_autopos_annotation.convex_hull import calc_point_offsets as calc_offset_points_ch
+from .mpl_autopos_annotation.convex_hull import (
+    calc_point_offsets as calc_offset_points_ch,
+)
 
-from scipy.spatial import ConvexHull
-from scipy.interpolate import CubicSpline
 
-
-def find_nearest_tile(x_sample, y_sample, x, y, dim='tile_id', scaling=1.0):
+def find_nearest_tile(x_sample, y_sample, x, y, dim="tile_id", scaling=1.0):
     """
     Given the data arrays `x` and `y` which have the dimension `tile_id`, i.e.
     there's a value for each tile, find the nearest `tile_id`s to each point
@@ -24,22 +22,32 @@ def find_nearest_tile(x_sample, y_sample, x, y, dim='tile_id', scaling=1.0):
     """
     # x_sample and y_sample might just be numpy arrays so create data arrays
     # here so we get the correct broadcasting
-    x_sample = xr.DataArray(x_sample, dims=('point',))
-    y_sample = xr.DataArray(y_sample, dims=('point',))
+    x_sample = xr.DataArray(x_sample, dims=("point",))
+    y_sample = xr.DataArray(y_sample, dims=("point",))
 
     dx = x_sample - x
-    dy = (y_sample - y)*scaling
+    dy = (y_sample - y) * scaling
 
-    dl = np.sqrt(dx*dx + dy*dy)
+    dl = np.sqrt(dx * dx + dy * dy)
 
     # can't simply use `argmin` here on `dl` since that would return the index
     # in dl, not the `tile_id`
-    return dl.isel(**{dim:dl.argmin(dim=dim)})[dim]
+    return dl.isel(**{dim: dl.argmin(dim=dim)})[dim]
 
 
-def scatter_annotated(x, y, points, ax=None, size=0.1, autopos_method='forces',
-                      use_closest_point=True, annotation_dist=1.0, hue=None,
-                      hue_palette="hls"):
+def annotated_scatter_plot(
+    x,
+    y,
+    points,
+    ax=None,
+    size=0.1,
+    autopos_method="forces",
+    use_closest_point=True,
+    annotation_dist=1.0,
+    hue=None,
+    hue_palette="hls",
+    tile_dataset: ImageSingletDataset = None,
+):
     """
     create scatter plot from values in `x` and `y` picking out points to
     highlight with a tile-graphic annotation based on what is passed in as
@@ -65,9 +73,25 @@ def scatter_annotated(x, y, points, ax=None, size=0.1, autopos_method='forces',
     else:
         fig = ax.figure
 
-    triplets = get_triplets_from_embeddings(x)
+    required_vars = ["data_dir", "tile_type", "stage"]
+    if tile_dataset is None:
+        kws = None
+        if "data_dir" in x.attrs:
+            kws = {v: x.attrs[v] for v in required_vars}
+        elif "data_dir" in y.attrs:
+            kws = {v: y.attrs[v] for v in required_vars}
 
-    _is_array = lambda v: isinstance(v, np.ndarray)
+        if kws is not None:
+            tile_dataset = ImageSingletDataset(**kws)
+
+    if tile_dataset is None:
+        raise Exception(
+            f"Couldn't find the required values {required_vars} in attr of "
+            "`x` or `y`. Either set these or provide a `tile_dataset`"
+        )
+
+    def _is_array(v):
+        return isinstance(v, np.ndarray) or (type(v) == list and type(v[0]) == int)
 
     x_err, y_err, x_c, y_c = None, None, None, None
     if type(points) == int:
@@ -89,9 +113,8 @@ def scatter_annotated(x, y, points, ax=None, size=0.1, autopos_method='forces',
             raise NotImplementedError(type(points), e)
         xl = x.max() - x.min()
         yl = y.max() - y.min()
-        s = xl/yl
-        tile_ids = find_nearest_tile(x_sample=x_c, y_sample=y_c, x=x, y=y,
-                                     scaling=s)
+        s = xl / yl
+        tile_ids = find_nearest_tile(x_sample=x_c, y_sample=y_c, x=x, y=y, scaling=s)
 
         # For the annotations we want to draw a line to where these tiles
         # actually exist
@@ -100,17 +123,16 @@ def scatter_annotated(x, y, points, ax=None, size=0.1, autopos_method='forces',
     else:
         raise NotImplementedError(type(points))
 
-
     pts = np.array([x_sample, y_sample]).T
     # if tiles are spaced uniformly round a circle, then
     # N*s=2*pi*r
     # => r ~ N*s/6.
     # and we want the radius to be three units relative to the size, so
-    scale = pts.shape[0]*size/2.*annotation_dist
+    scale = pts.shape[0] * size / 2.0 * annotation_dist
 
-    if autopos_method == 'forces':
+    if autopos_method == "forces":
         pts_offset = calc_offset_points(pts, scale=scale)
-    elif autopos_method == 'convex_hull':
+    elif autopos_method == "convex_hull":
         pts_offset = calc_offset_points_ch(pts, scale=scale)
     else:
         raise NotImplementedError(autopos_method)
@@ -127,17 +149,19 @@ def scatter_annotated(x, y, points, ax=None, size=0.1, autopos_method='forces',
     lines = []
 
     if hue is not None:
-        if not isinstance(hue, xr.DataArray) or not 'tile_id' in hue.dims:
-            raise Exception("`hue` should be a data-array with a label for"
-                            " for each tile in `x` and `y` (i.e. have the "
-                            " the same `tile_id`s)")
+        if not isinstance(hue, xr.DataArray) or "tile_id" not in hue.dims:
+            raise Exception(
+                "`hue` should be a data-array with a label for"
+                " for each tile in `x` and `y` (i.e. have the "
+                " the same `tile_id`s)"
+            )
 
         color_palette_name = hue_palette
         hue_unique = np.sort(np.unique(hue))
         color_palette = sns.color_palette(color_palette_name, n_colors=len(hue_unique))
         colormap = OrderedDict(zip(hue_unique, color_palette))
     else:
-        color = 'grey'
+        color = "grey"
 
     for n, tile_id in enumerate(tile_ids):
         x_, y_ = pts_offset[n]
@@ -145,22 +169,28 @@ def scatter_annotated(x, y, points, ax=None, size=0.1, autopos_method='forces',
         pts_connector = np.c_[pts_offset[n], pts[n]]
         if hue is not None:
             color = colormap[hue.sel(tile_id=tile_id).item()]
-        line, = ax.plot(*pts_connector, linestyle='--', marker='.', color=color)
+        (line,) = ax.plot(*pts_connector, linestyle="--", marker=".", color=color)
 
         if x_c is not None and y_c is not None:
             if x_err is not None and y_err is not None:
-                ax.errorbar(x=x_c[n], y=y_c[n], xerr=x_err[n], yerr=y_err[n],
-                            marker='+', color=line.get_color(), capsize=2)
+                ax.errorbar(
+                    x=x_c[n],
+                    y=y_c[n],
+                    xerr=x_err[n],
+                    yerr=y_err[n],
+                    marker="+",
+                    color=line.get_color(),
+                    capsize=2,
+                )
             else:
-                ax.scatter(x=x_c[n], y=y_c[n], marker='+',
-                           color=line.get_color())
+                ax.scatter(x=x_c[n], y=y_c[n], marker="+", color=line.get_color())
 
         # sc = ax.scatter(*pts[n], marker='.', color=line.get_color())
         lines.append(line)
 
         xp, yh = transform((x_, y_))
 
-        ax1=fig.add_axes([xp-0.5*size, yh-size*0.5, size, size])
+        ax1 = fig.add_axes([xp - 0.5 * size, yh - size * 0.5, size, size])
         ax1.set_aspect(1)
         ax1.axison = False
 
@@ -168,11 +198,16 @@ def scatter_annotated(x, y, points, ax=None, size=0.1, autopos_method='forces',
             label_text = hue.sel(tile_id=tile_id).item()
             if isinstance(label_text, xr.DataArray):
                 label_text = label_text.values
-            ax1.text(0.1, 0.15, label_text, transform=ax1.transAxes,
-                     bbox={'facecolor': 'white', 'alpha': 0.6, 'pad': 2})
+            ax1.text(
+                0.1,
+                0.15,
+                label_text,
+                transform=ax1.transAxes,
+                bbox={"facecolor": "white", "alpha": 0.6, "pad": 2},
+            )
 
         img_idx = int(tile_id.values)
-        img = triplets[img_idx]
+        img = tile_dataset.get_image(index=img_idx)
 
         # img = Image.open(tiles_path/"{:05d}_anchor.png".format())
         ax1.imshow(img)
@@ -183,12 +218,19 @@ def scatter_annotated(x, y, points, ax=None, size=0.1, autopos_method='forces',
     ax.set_ylim(ylim)
 
     if hue is not None:
-        sns.scatterplot(x, y, hue=hue.values, ax=ax, alpha=0.4, palette=color_palette,
-                        hue_order=colormap.keys())
+        sns.scatterplot(
+            x,
+            y,
+            hue=hue.values,
+            ax=ax,
+            alpha=0.4,
+            palette=color_palette,
+            hue_order=colormap.keys(),
+        )
     else:
-        ax.scatter(x, y, marker='.', alpha=0.2, color='grey')
+        ax.scatter(x, y, marker=".", alpha=0.2, color="grey")
 
-    ax.set_xlabel(x._title_for_slice() + '\n' + xr.plot.utils.label_from_attrs(x))
-    ax.set_ylabel(y._title_for_slice() + '\n' + xr.plot.utils.label_from_attrs(y))
+    ax.set_xlabel(x._title_for_slice() + "\n" + xr.plot.utils.label_from_attrs(x))
+    ax.set_ylabel(y._title_for_slice() + "\n" + xr.plot.utils.label_from_attrs(y))
 
     return lines, pts

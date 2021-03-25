@@ -272,10 +272,11 @@ def monkey_patch_fastai():
     without having a value for the target `y`
     """
     try:
-        loss_batch_orig is not None # noqa
+        loss_batch_orig is not None  # noqa
     except UnboundLocalError:
         import fastai.basic_train
-        loss_batch_orig = fastai.basic_train.loss_batch # noqa
+
+        loss_batch_orig = fastai.basic_train.loss_batch  # noqa
     fastai.basic_train.loss_batch = loss_batch
 
 
