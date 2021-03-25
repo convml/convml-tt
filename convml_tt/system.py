@@ -241,6 +241,12 @@ class TripletTrainerModel(pl.LightningModule):
         parser.add_argument(
             "--head-type", type=str, default="orig_fastai", help="Model head type"
         )
+        parser.add_argument(
+            "--n-embedding-dims",
+            type=int,
+            default=100,
+            help="Number of embedding dimensions",
+        )
         return parser
 
 
@@ -320,9 +326,26 @@ class TripletTrainerDataModule(pl.LightningDataModule):
     @staticmethod
     def add_data_specific_args(parent_parser):
         parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument("data_dir", type=pathlib.Path)
-        parser.add_argument("--batch-size", type=int, default=32)
-        parser.add_argument("--train-valid-fraction", type=float, default=0.9)
-        parser.add_argument("--num-dataloader-workers", type=int, default=0)
-        parser.add_argument("--preload-data", default=False, action="store_true")
+        parser.add_argument("data_dir", type=pathlib.Path, help="path to dataset")
+        parser.add_argument(
+            "--batch-size",
+            type=int,
+            default=32,
+            help="batch-size to use during training",
+        )
+        parser.add_argument(
+            "--train-valid-fraction", type=float, default=0.9, help="learning-rate"
+        )
+        parser.add_argument(
+            "--num-dataloader-workers",
+            type=int,
+            default=0,
+            help="number of workers to use for data-loader",
+        )
+        parser.add_argument(
+            "--preload-data",
+            default=False,
+            action="store_true",
+            help="preload training data into memory-mapped array to reduce IO latency",
+        )
         return parser

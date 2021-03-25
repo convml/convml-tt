@@ -7,14 +7,15 @@ from pytorch_lightning.loggers import WandbLogger
 from pathlib import Path
 import os
 
-from convml_tt.system import TripletTrainerModel, TripletTrainerDataModule, HeadFineTuner
-import convml_tt
+from .system import TripletTrainerModel, TripletTrainerDataModule, HeadFineTuner
 
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--max-epochs", default=5, type=int)
+    parser.add_argument(
+        "--max-epochs", default=5, type=int, help="number of epochs to train for"
+    )
     parser.add_argument(
         "--log-to-wandb",
         default=False,
@@ -30,6 +31,7 @@ if __name__ == "__main__":
         help="Name of the project this run should belong to in the logger",
         default="convml_tt",
     )
+    print(parser.formatter_class)
 
     if os.environ.get("FROM_CHECKPOINT"):
         parser.add_argument(
@@ -39,11 +41,15 @@ if __name__ == "__main__":
             default=None,
         )
         temp_args, _ = parser.parse_known_args()
-        model = TripletTrainerModel.load_from_checkpoint(temp_args.model_from_checkpoint)
+        model = TripletTrainerModel.load_from_checkpoint(
+            temp_args.model_from_checkpoint
+        )
     else:
         parser = TripletTrainerModel.add_model_specific_args(parser)
 
     parser = TripletTrainerDataModule.add_data_specific_args(parser)
+    # show the default args when showing the usage
+    parser.formatter_class = argparse.ArgumentDefaultsHelpFormatter
     args = parser.parse_args()
 
     trainer_kws = dict()
