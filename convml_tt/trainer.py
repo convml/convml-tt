@@ -8,8 +8,10 @@ from pathlib import Path
 import os
 
 from .system import TripletTrainerModel, TripletTrainerDataModule, HeadFineTuner
+from . import __version__
 
-if __name__ == "__main__":
+
+def main(args=None):
     import argparse
 
     parser = argparse.ArgumentParser()
@@ -46,11 +48,12 @@ if __name__ == "__main__":
         )
     else:
         parser = TripletTrainerModel.add_model_specific_args(parser)
+        model = None
 
     parser = TripletTrainerDataModule.add_data_specific_args(parser)
     # show the default args when showing the usage
     parser.formatter_class = argparse.ArgumentDefaultsHelpFormatter
-    args = parser.parse_args()
+    args = parser.parse_args(args=args)
 
     trainer_kws = dict()
     if args.log_to_wandb:
@@ -79,7 +82,11 @@ if __name__ == "__main__":
     if "logger" in trainer_kws:
         trainer_kws["logger"].experiment.config.update(args)
         trainer_kws["logger"].experiment.config.update(
-            {"convml_tt__version": convml_tt.__version__}
+            {"convml_tt__version": __version__}
         )
 
     trainer.fit(model=model, datamodule=datamodule)
+
+
+if __name__ == "__main__":
+    main()
