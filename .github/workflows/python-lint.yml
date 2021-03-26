@@ -11,8 +11,4 @@ jobs:
 
     steps:
     - name: Check formatting with black
-      run: |
-        echo "$HOME/.local/bin" >> $GITHUB_PATH
-        pip install black==20.8b1
-        # check that formatting is ok with black
-        black --check .
+      uses: jpetrucciani/black-check@20.8b1
