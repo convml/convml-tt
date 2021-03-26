@@ -1,5 +1,17 @@
 # Changelog
 
+## [v0.7.1](https://github.com/convml/convml_tt/tree/HEAD)
+
+Bugfixes and minor improvements
+
+[Full Changelog](https://github.com/convml/convml_tt/compare/v0.7.0...v0.7.1)
+
+**Merged pull requests:**
+
+- Add black code-check to CI [\#25](https://github.com/convml/convml_tt/pull/25) ([leifdenby](https://github.com/leifdenby))
+- CLI bugfixes [\#24](https://github.com/convml/convml_tt/pull/24) ([leifdenby](https://github.com/leifdenby))
+- improvements to CLI [\#23](https://github.com/convml/convml_tt/pull/23) ([leifdenby](https://github.com/leifdenby))
+
 ## [v0.7.0](https://github.com/convml/convml_tt/tree/v0.7.0)
 
 Model architecture and training rewritten to use [pytorch-lightning](https://pytorchlightning.ai/).
