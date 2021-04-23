@@ -1,0 +1,14 @@
+name: black
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.7]
+
+    steps:
+    - name: Check formatting with black
+      uses: jpetrucciani/black-check@20.8b1

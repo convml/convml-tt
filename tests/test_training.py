@@ -1,6 +1,10 @@
 import pytorch_lightning as pl
 
-from convml_tt.system import Tile2Vec, TripletTrainerDataModule, HeadFineTuner
+from convml_tt.system import (
+    TripletTrainerModel,
+    TripletTrainerDataModule,
+    HeadFineTuner,
+)
 from convml_tt.data.examples import (
     fetch_example_dataset,
     ExampleData,
@@ -16,7 +20,7 @@ from convml_tt.external import fastai1_weights_loader
 def test_train_new():
     trainer = pl.Trainer(max_epochs=5)
     arch = "resnet18"
-    model = Tile2Vec(pretrained=False, base_arch=arch)
+    model = TripletTrainerModel(pretrained=False, base_arch=arch)
     data_path = fetch_example_dataset(dataset=ExampleData.TINY10)
     datamodule = TripletTrainerDataModule(
         data_dir=data_path, batch_size=2, normalize_for_arch=arch
@@ -24,10 +28,21 @@ def test_train_new():
     trainer.fit(model=model, datamodule=datamodule)
 
 
+def test_train_new_with_preloading():
+    trainer = pl.Trainer(max_epochs=5)
+    arch = "resnet18"
+    model = TripletTrainerModel(pretrained=False, base_arch=arch)
+    data_path = fetch_example_dataset(dataset=ExampleData.TINY10)
+    datamodule = TripletTrainerDataModule(
+        data_dir=data_path, batch_size=2, normalize_for_arch=arch, preload_data=True
+    )
+    trainer.fit(model=model, datamodule=datamodule)
+
+
 def test_finetune_pretrained():
     trainer = pl.Trainer(max_epochs=5, callbacks=[HeadFineTuner()])
     arch = "resnet18"
-    model = Tile2Vec(pretrained=True, base_arch=arch)
+    model = TripletTrainerModel(pretrained=True, base_arch=arch)
     data_path = fetch_example_dataset(dataset=ExampleData.TINY10)
     datamodule = TripletTrainerDataModule(
         data_dir=data_path, batch_size=2, normalize_for_arch=arch

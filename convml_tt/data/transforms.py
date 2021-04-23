@@ -3,11 +3,6 @@ import kornia.augmentation as kaug
 from torch import nn
 
 
-class RemoveImageAlphaTransform:
-    def __call__(self, x):
-        return x[:3, :, :]
-
-
 class GetItemTransform:
     def __call__(self, x):
         return x[0, :, :, :]
@@ -66,8 +61,6 @@ def get_transforms(step, normalize_for_arch):
     )
 
     transforms = [
-        tv_transforms.ToTensor(),
-        RemoveImageAlphaTransform(),
         arch_norm_transform,
     ]
 

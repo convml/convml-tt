@@ -1,5 +1,5 @@
 """
-Contains the main triplet-trainer architecture (Tile2Vec) and the datamodule to
+Contains the main triplet-trainer architecture (TripletTrainerModel) and the datamodule to
 load triplet-datasets (TripletTrainerDataModule)
 """
 import pathlib
@@ -11,7 +11,7 @@ import torch.nn.functional as F
 from torch import nn
 from torch.utils.data import DataLoader, random_split
 
-from .data.dataset import ImageTripletDataset
+from .data.dataset import ImageTripletDataset, MemoryMappedImageTripletDataset
 from .data.transforms import get_transforms
 from .external.nn_layers import AdaptiveConcatPool2d
 from . import backbones
@@ -41,7 +41,7 @@ class HeadFineTuner(pl.callbacks.BaseFinetuning):
         pass
 
 
-class Tile2Vec(pl.LightningModule):
+class TripletTrainerModel(pl.LightningModule):
     def __init__(
         self,
         base_arch="resnet18",
@@ -230,8 +230,8 @@ class Tile2Vec(pl.LightningModule):
         )
         parser.add_argument(
             "--pretrained",
-            type=bool,
-            default=True,
+            default=False,
+            action="store_true",
             help="Use a pretrained backbone, only 'head' layers are trained",
         )
         parser.add_argument(
@@ -240,6 +240,12 @@ class Tile2Vec(pl.LightningModule):
         parser.add_argument("--lr", type=float, default=1.0e-5, help="learning rate")
         parser.add_argument(
             "--head-type", type=str, default="orig_fastai", help="Model head type"
+        )
+        parser.add_argument(
+            "--n-embedding-dims",
+            type=int,
+            default=100,
+            help="Number of embedding dimensions",
         )
         return parser
 
@@ -252,6 +258,7 @@ class TripletTrainerDataModule(pl.LightningDataModule):
         train_val_fraction=0.9,
         batch_size=32,
         num_dataloader_workers=0,
+        preload_data=False,
     ):
         super().__init__()
         self.data_dir = data_dir
@@ -260,6 +267,7 @@ class TripletTrainerDataModule(pl.LightningDataModule):
         self._train_dataset = None
         self._test_dataset = None
         self.num_dataloader_workers = num_dataloader_workers
+        self.preload_data = preload_data
 
         self._train_transforms = get_transforms(
             step="train", normalize_for_arch=normalize_for_arch
@@ -269,12 +277,19 @@ class TripletTrainerDataModule(pl.LightningDataModule):
         )
 
     def get_dataset(self, stage):
+        if self.preload_data:
+            DatasetClass = MemoryMappedImageTripletDataset
+        else:
+            DatasetClass = ImageTripletDataset
+
         if stage == "fit":
-            return ImageTripletDataset(
-                data_dir=self.data_dir, stage="train", transform=self._train_transforms
+            return DatasetClass(
+                data_dir=self.data_dir,
+                stage="train",
+                transform=self._train_transforms,
             )
         elif stage == "predict":
-            return ImageTripletDataset(
+            return DatasetClass(
                 data_dir=self.data_dir,
                 stage="study",
                 transform=self._predict_transforms,
@@ -311,8 +326,26 @@ class TripletTrainerDataModule(pl.LightningDataModule):
     @staticmethod
     def add_data_specific_args(parent_parser):
         parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument("data_dir", type=pathlib.Path)
-        parser.add_argument("--batch-size", type=int, default=32)
-        parser.add_argument("--train-valid-fraction", type=float, default=0.9)
-        parser.add_argument("--num-dataloader-workers", type=int, default=0)
+        parser.add_argument("data_dir", type=pathlib.Path, help="path to dataset")
+        parser.add_argument(
+            "--batch-size",
+            type=int,
+            default=32,
+            help="batch-size to use during training",
+        )
+        parser.add_argument(
+            "--train-valid-fraction", type=float, default=0.9, help="learning-rate"
+        )
+        parser.add_argument(
+            "--num-dataloader-workers",
+            type=int,
+            default=0,
+            help="number of workers to use for data-loader",
+        )
+        parser.add_argument(
+            "--preload-data",
+            default=False,
+            action="store_true",
+            help="preload training data into memory-mapped array to reduce IO latency",
+        )
         return parser

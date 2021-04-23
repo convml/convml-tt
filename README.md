@@ -3,15 +3,16 @@
 This repository contains code to generate training data, train and interprete
 the neural network used in [L. Denby
 (2020)](https://agupubs.onlinelibrary.wiley.com/doi/10.1029/2019GL085190)
-collected in a python module called `convml_tt`.
+collected in a python module called `convml_tt`. From version `v0.7.0` it
+was rewritten to use [pytorch-lightning](https://pytorchlightning.ai/) rather
+than [fastai v1](https://fastai1.fast.ai/) to adopt best-practices and make it
+easier to modify and carry out further research on the technique.
 
 ## Getting started
 
 The easiest way to work with `convml_tt` is to set up a conda environment with
 the necessary dependencies and then install `convml_tt` into this environment
-with pip. If you are planning on modifying `convml_tt` itself have a look in
-[README.dev.md](README.dev.md) for some suggestions about how to organise your
-workflow.
+with pip.
 
 **1. Check out `convml_tt` from github**
 
@@ -28,10 +29,10 @@ modules which are needed. All the necessary dependencies can be installed with
 can create an environment depending on whether you will be doing GPU or
 CPU-based training
 
-For GPU-based training (with CUDA `v9`):
+For GPU-based training:
 
 ```bash
-conda env create -f environment-gpu-cuda9.yml
+conda env create -f environment-gpu.yml
 conda activate convml_tt
 ```
 
@@ -51,29 +52,37 @@ Once you have a conda environment set up and **activated** you can install
 pip install .
 ```
 
-Now you will have `convml_tt` available whenever you activate the
-`convml_tt` conda environment. You will have the *base* components of
-`convml_tt` installed which enable training the model on a existing
-triplet-dataset and making predictions with a trained model. To produce
-training data for `convml_tt` more dependecies are required depending on
-the kind of input data you want to use (see "Creating training data"
-below).
+You will now have `convml_tt` available whenever you activate the `convml_tt`
+conda environment. You will have the *base* components of `convml_tt`
+installed which enable training the model on a existing triplet-dataset
+and making predictions with a trained model. To produce training data for
+`convml_tt` more dependecies are required depending on the kind of input
+data you want to use (see "Creating training data" below).
+
+**NOTE ON DEVELOPING `convml_tt`**: if you plan on modifying the `convml_tt`
+code yourself you add the `-e` flag above (i.e. use `pip install -e .`) so that
+any changes you make are automatically picked up.
 
 
 ## Training
+
+Below are details on how to obtain training data and how to train the model
 
 ### Training data
 
 #### Example dataset
 
-A small example training dataset (2000 triplets for training and 500 for study)
-can be download
-[here](https://leeds365-my.sharepoint.com/:u:/g/personal/earlcd_leeds_ac_uk/Ee-_nQExD9VCpWYEj8oBA1UBQ0XA6X8GlrXNdBVNe06jQg?e=s1cEBY).
-**NOTE**: it's 1.10GB in size(!) To use the directory structure above this
-tar-ball should be extracted into `~/ml_project/data/storage/tiles/goes16/`
+A few example training datasets can be downloaded using the following
+command
+
+```bash
+python -m convml_tt.data.examples
+```
 
 
 #### Creating training data from GOES-16 satellite observations
+
+**NB**: dataset creation doesn't currently work as it is being refactored
 
 To work with satellite data you will need packages that kind read this
 data, reproject it and plot it on maps. These requires some system
@@ -87,61 +96,32 @@ conda install -c conda-forge xesmf cartopy
 And then use pip to install the matching python packages
 
 ```bash
-pip install .[sattiles]
+pip install ".[sattiles]"
 ```
 
 **TODO**: complete rest of guide talking about processing pipeline and
 downloading satellite data
 
-An example of how to generate a dataset can be see in
-`training_gen_examples/goes16_training_and_study.py`. This script attempts to
-store training and study triplets in `data/storage/triplets/` and attempts to
-read from `data/storage/sources/goes16` to create composites for the analysis
-domain. The example will fetch GOES-16 data from Amazon S3 if it isn't found
-locally.
+### Model training
 
-
-### Training on ARC3
-
-First log in to ARC3
+You can use the CLI (Command Line Interface) to train the model
 
 ```bash
-[earlcd@cloud9 ~]$ ssh arc3.leeds.ac.uk
+python -m convml_tt.trainer data_dir
 ```
 
-Request a node with a GPU attached
+where `data_dir` is the path of the dataset you want to use. There are a number
+of optional command flags available, for example to train with one GPU use
+the training process to [weights & biases](https://wandb.ai) use
+`--log-to-wandb`. For a list of all the available flags use the `-h`.
 
-```bash
-[earlcd@login1.arc3 ~]$ qrsh -l coproc_k80=1,h_rt=1:0:0 -pty y /bin/bash -i
-```
+Training can also be done interactively in for example a jupyter notebook, you
+can see some simple examples how what commands to use by looking at the
+automated tests in [tests/](tests/).
 
-Once the node has spun up and the prompt is again available you will notice the
-hostname has now changed (to something containing "gpu", here `db12gpu1`). Now
-activate your conda environment (installed as above) and start a jupyter
-notebook
-
-```bash
-[earlcd@db12gpu1.arc3 ~]$ conda activate fastai
-[earlcd@db12gpu1.arc3 ~]$ jupyter notebook --no-browser --port 8888 --ip=0.0.0.0
-```
-
-Finally from your workstation start a second ssh connection to ARC3, this time
-forwarding the local port `8888` to port `8888` on the GPU node (here
-`db12gpu1`) you have been allocated on ARC3:
-
-```bash
-[earlcd@cloud9 ~]$ ssh arc3 -L 8888:db12gpu1.arc3.leeds.ac.uk:8888
-```
-
-Open up a local browser on your workstation and browse to
-`http://localhost:8888`
-
-### Training example
-
-There is an example jupyter notebook of how to load the training data and train
-the model in `example_notebooks/model_training`. The notebook expects the
-directory layout mentioned above, but you can just modify it for your own
-needs.
+Finally there detailed notes on how to train on the ARC3 HPC cluster at
+University of Leeds are in [doc/README.ARC3.md](doc/README.ARC3.md) and on the
+[JASMIN](doc/README.JASMIN.md) analysis cluster.
 
 # Model interpretation
 
