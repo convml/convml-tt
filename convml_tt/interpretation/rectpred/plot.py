@@ -5,6 +5,52 @@ import numpy as np
 import xarray as xr
 
 
+def make_rgb(da, alpha=0.5, **coord_components):
+    """
+    turn three components along a particular coordinate into RGB values by
+    scaling each by its max and min-values in the dataset
+
+    >> make_rgb(da, emb_dim=[0,1,2])
+    """
+    if len(coord_components) != 1:
+        raise Exception(
+            "You should provide exactly one coordinate to turn into RGB values"
+        )
+
+    v_dim, dim_idxs = list(coord_components.items())[0]
+
+    if len(dim_idxs) != 3:
+        raise Exception(
+            f"You should provide exactly three indexes of the `{v_dim}` coordinate to turn into RGB"
+        )
+    elif v_dim not in da.dims:
+        raise Exception(f"The `{v_dim}` coordinate wasn't found the provided DataArray")
+
+    def scale_zero_one(v):
+        return (v - v.min()) / (v.max() - v.min())
+
+    scale = scale_zero_one
+
+    all_dims = da.dims
+    x_dim, y_dim = list(filter(lambda d: d != v_dim, all_dims))
+
+    da_rgba = xr.DataArray(
+        np.zeros((4, len(da[x_dim]), len(da[y_dim]))),
+        dims=("rgba", x_dim, y_dim),
+        coords={"rgba": np.arange(4), x_dim: da[x_dim], y_dim: da[y_dim]},
+    )
+
+    def _make_component(da_):
+        if da_.rgba == 3:
+            return alpha * np.ones_like(da_)
+        else:
+            return scale(da.sel({v_dim: dim_idxs[da_.rgba.item()]}).values)
+
+    da_rgba = da_rgba.groupby("rgba").apply(_make_component)
+
+    return da_rgba
+
+
 def _get_img_with_extent_cropped(da_emb, img_fn):
     """
     Load the image in `img_fn`, clip the image and return the
@@ -108,32 +154,6 @@ def plot_scene_image(da, dataset_path, crop_image=True, ax=None):
     ax.imshow(img, extent=img_extent, rasterized=True)
 
     return ax, img_extent
-
-
-def _make_rgb(da, dims, alpha=0.5):
-    def scale_zero_one(v):
-        return (v - v.min()) / (v.max() - v.min())
-
-    scale = scale_zero_one
-
-    d0, d1, d2 = da.dims
-    assert d1 == "x" and d2 == "y"
-
-    da_rgba = xr.DataArray(
-        np.zeros((4, len(da.x), len(da.y))),
-        dims=("rgba", "x", "y"),
-        coords=dict(rgba=np.arange(4), x=da.x, y=da.y),
-    )
-
-    def _make_component(da_):
-        if da_.rgba == 3:
-            return alpha * np.ones_like(da_)
-        else:
-            return scale(da.sel({d0: dims[da_.rgba.item()]}).values)
-
-    da_rgba = da_rgba.groupby("rgba").apply(_make_component)
-
-    return da_rgba
 
 
 def make_rgb_annotation_map_image(
