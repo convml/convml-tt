@@ -7,6 +7,15 @@ from .nn_layers import AdaptiveConcatPool2d
 from ..system import TripletTrainerModel
 
 
+class ScalingLayer(torch.nn.Module):
+    def __init__(self, scale):
+        super().__init__()
+        self.scale = scale
+
+    def forward(self, x):
+        return x * self.scale
+
+
 def model_from_saved_weights(path):
     """
     This routine is only here so that models which were trained with
@@ -26,15 +35,37 @@ def model_from_saved_weights(path):
 
     # before we can run the model we need to add the adaptive-pooling layer and
     # the flattening layer in again because these couldn't be pickled (they
-    # weren't part of pytorch 1.0.1 that the old model was created in)
+    # weren't part of pytorch 1.0.1 that the old model was created in). We also
+    # introduce a scaling layer because the fastai v1 network created values
+    # that we're very small
     head = loaded_encoder[-1]
-    new_head = nn.Sequential(AdaptiveConcatPool2d(size=1), nn.Flatten(), *head)
-    loaded_encoder = nn.Sequential(*loaded_encoder[:-1], new_head)
+    new_head = nn.Sequential(
+        AdaptiveConcatPool2d(size=1), nn.Flatten(), *head, ScalingLayer(1.0e3)
+    )
+    # we use the backbone as-is
+    backbone = loaded_encoder[:-1]
 
     rand_batch = torch.rand((batch_size, n_input_channels, nx, ny))
     try:
         # check that the model accepts data shaped like a batch and produces the expected output
-        result_batch = loaded_encoder(rand_batch)
+        # all we know is the weights, so this model won't be possible to train further
+        model = TripletTrainerModel(
+            base_arch="unknown",
+            margin="unknown",
+            lr="unknown",
+            l2_regularisation="unknown",
+        )
+        # when passing in `base_arch="unknown"` above the backbone and head
+        # won't be set on the model and we can set them directly here
+        model.backbone = backbone
+        model.head = new_head
+        # we finally set the `base_arch` attribute manually as this is used for
+        # working out the image normalization transform
+        model.base_arch = "resnet18"
+        # finally we set a flag which ensure the output is scaled by 1.0e3 (for some reason the model I trained
+        setattr(model, "from_fastai_v1", True)
+
+        result_batch = model.forward(rand_batch)
         n_embedding_dims = result_batch.shape[-1]
         expected_shape = (batch_size, n_embedding_dims)
         if result_batch.shape != expected_shape:
@@ -42,14 +73,6 @@ def model_from_saved_weights(path):
                 "The shape of the output of the loaded encoder doesn't have "
                 f"the expected shape, {result_batch.shape} != {expected_shape}"
             )
-        # all we know is the weights, so this model won't be possible to train further
-        model = TripletTrainerModel(
-            base_arch="resnet18",
-            margin="unknown",
-            lr="unknown",
-            l2_regularisation="unknown",
-        )
-        model.encoder = loaded_encoder
         print(f"Weights loaded from `{path}`")
         return model
     except Exception as e:  # noqa

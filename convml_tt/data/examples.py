@@ -56,6 +56,22 @@ def fetch_pretrained_model(pretrained_model: PretrainedModel, data_dir="data/"):
     return _fetch_example(item=pretrained_model, data_dir=data_dir) / fname
 
 
+def load_pretrained_model(pretrained_model: PretrainedModel, data_dir="data/"):
+    """
+    Downloads pretrained model and returns the path to it
+    """
+    model_path = fetch_pretrained_model(
+        pretrained_model=pretrained_model, data_dir=data_dir
+    )
+    if pretrained_model == PretrainedModel.FIXED_NORM_STAGE2:
+        from ..external import fastai1_weights_loader
+
+        model = fastai1_weights_loader.model_from_saved_weights(path=model_path)
+    else:
+        raise NotImplementedError(pretrained_model)
+    return model
+
+
 def main(args=None):
     """
     CLI interface for downloading data examples
