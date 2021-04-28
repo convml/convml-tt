@@ -1,7 +1,12 @@
+"""
+luigi Tasks for producing embeddings with a trained neural network across a
+whole dataset
+
+NB: not currently working. Needs more refactoring
+"""
 from pathlib import Path
 
 import luigi
-import numpy as np
 import xarray as xr
 
 from fastai.basic_train import load_learner
@@ -15,75 +20,6 @@ from ...architectures.triplet_trainer import monkey_patch_fastai
 monkey_patch_fastai()  # noqa
 
 IMAGE_TILE_FILENAME_FORMAT = "{i0:05d}_{j0:05d}.png"
-
-N_TILE = (256, 256)
-
-
-class FakeImagesList(list):
-    def __init__(self, src_path, id, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.id = id
-        self.src_path = src_path
-
-    @property
-    def size(self):
-        return self[0].size
-
-    def apply_tfms(self, tfms, **kwargs):
-        items = []
-        for item in self:
-            items.append(item.apply_tfms(tfms, **kwargs))
-        return items
-
-
-class RectTiler:
-    def __init__(self, img, N_tile, step):
-        self.img = img
-        self.ny, self.nx = img.size
-        self.nxt, self.nyt = N_tile
-        self.x_step, self.y_step = step
-
-        self.i_ = np.arange(0, self.nx - self.nxt + 1, self.x_step)
-        self.j_ = np.arange(0, self.ny - self.nyt + 1, self.y_step)
-
-    @staticmethod
-    def _crop_fastai_im(img, i, j, nx=256, ny=256):
-        img_copy = img.__class__(img._px[:, j : j + ny, i : i + nx])
-        # From PIL docs: The crop rectangle, as a (left, upper, right, lower)-tuple.
-        return img_copy
-
-    def get_tile_images(self):
-        for i in self.i_:
-            for j in self.j_:
-                tile_img = self._crop_fastai_im(
-                    self.img, i=i, j=j, nx=self.nxt, ny=self.nyt
-                )
-                yield (i, j), tile_img
-
-    def make_tile_predictions(self, model):
-        """
-        Produce moving-window prediction array from `img` with `model` with
-        step-size defined by `step` and tile-size `N_tile`.
-
-        NB: j-indexing is from "top_left" i.e. is likely in the opposite order to
-        what would be expected for y-axis of original image (positive being up)
-
-        i0 and j0 coordinates denote center of each prediction tile
-        """
-        il = FakeImagesList(None, None)
-
-        for tile_img in self.get_tile_images():
-            il.append(tile_img)
-
-        final_shape = (len(self.i_), len(self.j_), -1)
-        result = np.stack(model.predict(il)[1]).reshape(final_shape)
-
-        return xr.DataArray(
-            result,
-            dims=("i0", "j0", "emb_dim"),
-            coords=dict(i0=self.i_ + self.nxt // 2, j0=self.j_ + self.nyt // 2),
-            attrs=dict(tile_nx=self.nxt, tile_ny=self.nyt),
-        )
 
 
 class ImagePredictionMapData(luigi.Task):
