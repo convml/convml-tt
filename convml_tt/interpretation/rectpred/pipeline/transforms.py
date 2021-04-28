@@ -1,111 +1,16 @@
+"""
+luigi Tasks for putting embedding predictions on a rectangular domain through
+transforms on the embedding dimensions
+
+NB: currently untested
+"""
 from pathlib import Path
 
-import xarray as xr
-import luigi
-import sklearn.cluster
-import hdbscan
 import joblib
+import luigi
 
 from ...pipeline import XArrayTarget
 from .data import AggregateFullDatasetImagePredictionMapData
-
-
-def _apply_transform_function(da, fn, transform_name):
-    # stack all other dims apart from the `emb_dim`
-    dims = list(da.dims)
-    if "emb_dim" in dims:
-        dims.remove("emb_dim")
-    elif "pca_dim" in dims:
-        dims.remove("pca_dim")
-    else:
-        raise NotImplementedError(da.dims)
-    da_stacked = da.stack(dict(n=dims))
-    arr = fn(X=da_stacked.T)
-    if len(arr.shape) == 2:
-        dims = ("n", "{}_dim".format(transform_name))
-    else:
-        dims = ("n",)
-    return xr.DataArray(arr, dims=dims, coords=dict(n=da_stacked.n)).unstack("n")
-
-
-def apply_transform(da, transform_type, pretrained_model=None, **kwargs):
-    add_meta = None
-    model = None
-
-    if transform_type == "kmeans":
-        fn_transform = sklearn.cluster.KMeans(**kwargs).fit_predict
-    elif transform_type in ["pca", "pca_clipped"]:
-        if pretrained_model is not None:
-            model = pretrained_model
-            fn_transform = model.transform
-        else:
-            model = sklearn.decomposition.PCA(**kwargs)
-            fn_transform = model.fit_transform
-
-        def add_meta(da):
-            da["explained_variance"] = (
-                "{}_dim".format(transform_type),
-                model.explained_variance_ratio_,
-            )
-
-        if transform_type == "pca_clipped":
-            da = da.isel(x=slice(1, -1), y=slice(1, -1))
-
-    elif transform_type == "hdbscan":
-        model = hdbscan.HDBSCAN(core_dist_n_jobs=-1, **kwargs)
-
-        def fn_transform(X):
-            return model.fit(X).labels_
-
-        def add_meta(da):
-            return xr.DataArray(
-                model.probabilities_,
-                dims=("n"),
-                coords=dict(n=da.stack(dict(n=da.dims)).n),
-            ).unstack("n")
-
-    elif transform_type == "pca_hdbscan":
-        try:
-            pca__n_components = kwargs.pop("pca__n_components")
-        except KeyError:
-            raise Exception(
-                "To use HDBSCAN with PCA analysis first you need"
-                " provide the number of PCA components to keep with"
-                " the `pca__n_components` argument"
-            )
-        pca_model = sklearn.decomposition.PCA(n_components=pca__n_components)
-        hdbscan_model = hdbscan.HDBSCAN(core_dist_n_jobs=-1, **kwargs)
-        model = hdbscan_model
-
-        def fn_transform(X):
-            X1 = pca_model.fit_transform(X)
-            return hdbscan_model.fit(X1).labels_
-
-        def add_meta(da):
-            da.attrs["notes"] = "used PCA before HDBSCAN"
-
-    else:
-        raise NotImplementedError(transform_type)
-
-    da_cluster = _apply_transform_function(
-        da=da, fn=fn_transform, transform_name=transform_type
-    )
-
-    da_cluster.attrs.update(da.attrs)
-
-    if add_meta is not None:
-        add_meta(da_cluster)
-
-    da_cluster.attrs.update(da.attrs)
-    da_cluster.name = "emb"
-    for v in ["i0", "j0"]:
-        if v in da:
-            da_cluster[v] = da[v]
-    da_cluster.attrs["transform_type"] = transform_type
-    if kwargs:
-        s = ",".join([f"{k}={v}" for (k, v) in kwargs])
-        da_cluster.attrs["transform_extra_args"] = s
-    return da_cluster, model
 
 
 class EmbeddingTransform(luigi.Task):

@@ -3,10 +3,11 @@ import numpy as np
 
 from ...data.dataset import ImageSingletDataset, get_load_transforms
 from ...utils import get_embeddings
+from ...data.transforms import get_transforms
 
 
 class MovingWindowImageTilingDataset(ImageSingletDataset):
-    def __init__(self, img, step, N_tile):
+    def __init__(self, img, step, N_tile, transform):
         super(ImageSingletDataset).__init__()
         self.nx, self.ny = img.size
         self.nxt, self.nyt = N_tile
@@ -26,6 +27,7 @@ class MovingWindowImageTilingDataset(ImageSingletDataset):
 
         image_load_transforms = get_load_transforms()
         self.img_data = image_load_transforms(self.img)
+        self.transform = transform
 
     def index_to_img_ij(self, index):
         """
@@ -48,7 +50,7 @@ class MovingWindowImageTilingDataset(ImageSingletDataset):
         y_slice = slice(j_img, j_img + self.nyt)
         img_data_tile = self.img_data[:, y_slice, x_slice]
 
-        return img_data_tile
+        return self.transform(img_data_tile)
 
 
 def make_sliding_tile_model_predictions(
@@ -66,7 +68,12 @@ def make_sliding_tile_model_predictions(
     # TODO: make `N_tile` a parameter of the model the dataset is used with
     N_tile = (256, 256)
 
-    dataset = MovingWindowImageTilingDataset(img=img, step=step, N_tile=N_tile)
+    # need to ensure the image-tiles that are sampled are transformed to match
+    # the base-architecture (in case we're using a pretrained network)
+    transform = get_transforms(step="predict", normalize_for_arch=model.base_arch)
+    dataset = MovingWindowImageTilingDataset(
+        img=img, step=step, N_tile=N_tile, transform=transform
+    )
 
     da_emb = get_embeddings(
         tile_dataset=dataset, model=model, prediction_batch_size=prediction_batch_size
