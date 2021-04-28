@@ -18,6 +18,11 @@ def get_embeddings(tile_dataset: ImageSingletDataset, model, prediction_batch_si
     reduce the `prediction_batch_size` (you may also increase it to generate
     predictions faster while using more RAM).
     """
+    # ensure model is in evaluation mode, pytorch-lightning claim this isn't
+    # necessary when calling `.forward()` on the model, but without it we get
+    # an error raised if a batch ends up having just a single item
+    model.eval()
+
     tile_dataloader = DataLoader(dataset=tile_dataset, batch_size=prediction_batch_size)
     batched_results = []
     for x_batch in tqdm(tile_dataloader):
@@ -36,10 +41,13 @@ def get_embeddings(tile_dataset: ImageSingletDataset, model, prediction_batch_si
 
     dims = ("tile_id", "emb_dim")
     coords = dict(tile_id=tile_ids)
-    attrs = dict(
-        data_dir=str(Path(tile_dataset.data_dir).absolute()),
-        tile_type=tile_dataset.tile_type.name,
-        stage=tile_dataset.stage,
-    )
+
+    attrs = {}
+    if hasattr(tile_dataset, "tile_type"):
+        attrs["tile_type"] = tile_dataset.tile_type.name
+    if hasattr(tile_dataset, "stage"):
+        attrs["stage"] = tile_dataset.stage
+    if hasattr(tile_dataset, "data_dir"):
+        attrs["data_dir"] = str(Path(tile_dataset.data_dir).absolute())
 
     return xr.DataArray(embeddings, dims=dims, coords=coords, attrs=attrs)
