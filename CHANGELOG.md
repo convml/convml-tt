@@ -1,6 +1,16 @@
 # Changelog
 
-## [v0.7.1](https://github.com/convml/convml_tt/tree/HEAD)
+## [v0.8.0](https://github.com/convml/convml_tt/tree/v0.8.0)
+
+[Full Changelog](https://github.com/convml/convml_tt/compare/v0.7.1...v0.8.0)
+
+**Merged pull requests:**
+
+- Add support for anti-aliased backbones [\#28](https://github.com/convml/convml_tt/pull/28) ([leifdenby](https://github.com/leifdenby))
+- Rectpred refactor [\#27](https://github.com/convml/convml_tt/pull/27) ([leifdenby](https://github.com/leifdenby))
+- Bugfix for load of fastai v1 trained model [\#26](https://github.com/convml/convml_tt/pull/26) ([leifdenby](https://github.com/leifdenby))
+
+## [v0.7.1](https://github.com/convml/convml_tt/tree/v0.7.1)
 
 Bugfixes and minor improvements
 
