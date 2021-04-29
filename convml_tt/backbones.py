@@ -16,8 +16,9 @@ don't have to install all of lightning-flash
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any, Optional, Tuple
+from typing import Tuple
 
+import antialiased_cnns
 import torchvision
 from pytorch_lightning.utilities import _BOLTS_AVAILABLE, rank_zero_warn
 from pytorch_lightning.utilities.exceptions import MisconfigurationException
@@ -51,6 +52,7 @@ def backbone_and_num_features(
     fpn: bool = False,
     pretrained: bool = True,
     trainable_backbone_layers: int = 3,
+    anti_aliased=False,
     **kwargs,
 ) -> Tuple[nn.Module, int]:
     """
@@ -59,6 +61,7 @@ def backbone_and_num_features(
         fpn: If True, creates a Feature Pyramind Network on top of Resnet based CNNs.
         pretrained: if true, returns a model with backbone pre-trained on Imagenet
         trainable_backbone_layers: number of trainable resnet layers starting from final block.
+        anti_alised: if True, loads an anti-aliased version of the the backbone (where supported)
 
     >>> backbone_and_num_features('mobilenet_v2')  # doctest: +ELLIPSIS
     (Sequential(...), 1280)
@@ -68,6 +71,10 @@ def backbone_and_num_features(
     (Sequential(...), 2048)
     """
     if fpn:
+        if anti_aliased:
+            raise NotImplementedError(
+                "anti-aliased versions of feature-pyramid models aren't currently available"
+            )
         if model_name in RESNET_MODELS:
             backbone = resnet_fpn_backbone(
                 model_name,
@@ -83,10 +90,16 @@ def backbone_and_num_features(
             )
 
     if model_name in BOLTS_MODELS:
+        if anti_aliased:
+            raise NotImplementedError(
+                "anti-aliased versions of bolts models aren't currently available"
+            )
         return bolts_backbone_and_num_features(model_name)
 
     if model_name in TORCHVISION_MODELS:
-        return torchvision_backbone_and_num_features(model_name, pretrained)
+        return torchvision_backbone_and_num_features(
+            model_name, pretrained, anti_aliased=anti_aliased
+        )
 
     raise ValueError(f"{model_name} is not supported yet.")
 
@@ -132,7 +145,7 @@ def bolts_backbone_and_num_features(model_name: str) -> Tuple[nn.Module, int]:
 
 
 def torchvision_backbone_and_num_features(
-    model_name: str, pretrained: bool = True
+    model_name: str, pretrained: bool = True, anti_aliased=False
 ) -> Tuple[nn.Module, int]:
     """
     >>> torchvision_backbone_and_num_features('mobilenet_v2')  # doctest: +ELLIPSIS
@@ -142,9 +155,18 @@ def torchvision_backbone_and_num_features(
     >>> torchvision_backbone_and_num_features('densenet121')  # doctest: +ELLIPSIS
     (Sequential(...), 1024)
     """
-    model = getattr(torchvision.models, model_name, None)
-    if model is None:
-        raise MisconfigurationException(f"{model_name} is not supported by torchvision")
+    if anti_aliased:
+        model = getattr(antialiased_cnns, model_name, None)
+        if model is None:
+            raise MisconfigurationException(
+                f"an anti-alised version of {model_name} doesn't yet exist"
+            )
+    else:
+        model = getattr(torchvision.models, model_name, None)
+        if model is None:
+            raise MisconfigurationException(
+                f"{model_name} is not supported by torchvision"
+            )
 
     if model_name in MOBILENET_MODELS + VGG_MODELS:
         model = model(pretrained=pretrained)
