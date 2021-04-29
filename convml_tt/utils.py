@@ -18,11 +18,6 @@ def get_embeddings(tile_dataset: ImageSingletDataset, model, prediction_batch_si
     reduce the `prediction_batch_size` (you may also increase it to generate
     predictions faster while using more RAM).
     """
-    # ensure model is in evaluation mode, pytorch-lightning claim this isn't
-    # necessary when calling `.forward()` on the model, but without it we get
-    # an error raised if a batch ends up having just a single item
-    model.eval()
-
     tile_dataloader = DataLoader(dataset=tile_dataset, batch_size=prediction_batch_size)
     batched_results = []
     for x_batch in tqdm(tile_dataloader):
