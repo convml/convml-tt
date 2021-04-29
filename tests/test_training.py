@@ -29,6 +29,19 @@ def test_train_new():
     trainer.fit(model=model, datamodule=datamodule)
 
 
+def test_train_new_anti_aliased():
+    trainer = pl.Trainer(max_epochs=5)
+    arch = "resnet18"
+    model = TripletTrainerModel(
+        pretrained=False, base_arch=arch, anti_aliased_backbone=True
+    )
+    data_path = fetch_example_dataset(dataset=ExampleData.TINY10)
+    datamodule = TripletTrainerDataModule(
+        data_dir=data_path, batch_size=2, normalize_for_arch=arch
+    )
+    trainer.fit(model=model, datamodule=datamodule)
+
+
 def test_train_new_with_preloading():
     trainer = pl.Trainer(max_epochs=5)
     arch = "resnet18"

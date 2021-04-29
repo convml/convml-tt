@@ -45,6 +45,7 @@ class TripletTrainerModel(pl.LightningModule):
     def __init__(
         self,
         base_arch="resnet18",
+        anti_aliased_backbone=False,
         pretrained=False,
         margin=1.0,
         lr=1.0e-5,
@@ -67,6 +68,7 @@ class TripletTrainerModel(pl.LightningModule):
         self.pretrained = pretrained
         self.save_hyperparameters()
         self.head_type = head_type
+        self.anti_aliased_backbone = anti_aliased_backbone
         self.__build_model()
 
     def __build_model(self):
@@ -78,6 +80,7 @@ class TripletTrainerModel(pl.LightningModule):
                 n_input_channels=self.hparams.n_input_channels,
                 base_arch=self.hparams.base_arch,
                 pretrained=self.hparams.pretrained,
+                anti_aliased=self.anti_aliased_backbone,
             )
 
             self.head = self._create_head_layers(
@@ -139,10 +142,12 @@ class TripletTrainerModel(pl.LightningModule):
         return head
 
     def _create_backbone_layers(
-        self, n_input_channels, base_arch=None, pretrained=False
+        self, n_input_channels, base_arch=None, pretrained=False, anti_aliased=False
     ):
         backbone, n_features_backbone = backbones.backbone_and_num_features(
-            model_name=base_arch, pretrained=pretrained
+            model_name=base_arch,
+            pretrained=pretrained,
+            anti_aliased=anti_aliased,
         )
 
         # We need to ensure the number of input channels matches the number of
@@ -233,6 +238,15 @@ class TripletTrainerModel(pl.LightningModule):
             default=False,
             action="store_true",
             help="Use a pretrained backbone, only 'head' layers are trained",
+        )
+        parser.add_argument(
+            "--anti-aliased-backbone",
+            default=False,
+            action="store_true",
+            help=(
+                "Use a anti-aliased backbone to make predictions more stable to"
+                " spatial-shifts in the input"
+            ),
         )
         parser.add_argument(
             "--margin", type=float, default=1.0, help="margin to distant tile"
