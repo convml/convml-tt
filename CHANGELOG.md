@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased](https://github.com/convml/convml_tt/tree/HEAD)
+
+[Full Changelog](https://github.com/convml/convml_tt/compare/v0.8.0...HEAD)
+
+*new features*
+
+- Add rectpred sample plot function (#30)
+
 ## [v0.8.0](https://github.com/convml/convml_tt/tree/v0.8.0)
 
 [Full Changelog](https://github.com/convml/convml_tt/compare/v0.7.1...v0.8.0)
