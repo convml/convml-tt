@@ -41,6 +41,13 @@ class HeadFineTuner(pl.callbacks.BaseFinetuning):
         pass
 
 
+# NB: these default values were found to work well with a batch-size of 50 (as
+# the original fastai v1 model). They may need changing for different
+# batch-size
+DEFAULT_LEARNING_RATE = 1.0e-2
+DEFAULT_WEIGHT_DECAY = 0.01
+
+
 class TripletTrainerModel(pl.LightningModule):
     def __init__(
         self,
@@ -48,16 +55,13 @@ class TripletTrainerModel(pl.LightningModule):
         anti_aliased_backbone=False,
         pretrained=False,
         margin=1.0,
-        lr=1.0e-5,
-        l2_regularisation=None,
+        lr=DEFAULT_LEARNING_RATE,
+        l2_regularisation=DEFAULT_WEIGHT_DECAY,
         n_input_channels=3,
         n_embedding_dims=100,
         head_type="orig_fastai",
     ):
         super().__init__()
-
-        if l2_regularisation not in [None, "unknown"]:
-            raise NotImplementedError()
 
         self.lr = lr
         self.margin = margin
@@ -224,7 +228,9 @@ class TripletTrainerModel(pl.LightningModule):
         return loss
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
+        optimizer = torch.optim.Adam(
+            self.parameters(), lr=self.lr, weight_decay=self.l2_regularisation
+        )
         return optimizer
 
     @staticmethod
@@ -251,7 +257,9 @@ class TripletTrainerModel(pl.LightningModule):
         parser.add_argument(
             "--margin", type=float, default=1.0, help="margin to distant tile"
         )
-        parser.add_argument("--lr", type=float, default=1.0e-5, help="learning rate")
+        parser.add_argument(
+            "--lr", type=float, default=DEFAULT_LEARNING_RATE, help="learning rate"
+        )
         parser.add_argument(
             "--head-type", type=str, default="orig_fastai", help="Model head type"
         )
