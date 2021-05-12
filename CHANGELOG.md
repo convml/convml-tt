@@ -6,7 +6,19 @@
 
 *new features*
 
-- Add rectpred sample plot function (#30)
+- Add rectpred sample plot function [\#30](https://github.com/convml/convml_tt/pull/30)
+
+*changed default*
+
+- Weight decay (L2-regularisation) is now enabled by default (set to
+  `0.01`) and the learning-rate has been increased to `1.0e-2` to match
+  the values used when training the fastai v1 based model. Note this
+  learning-rate was optimised for for a batch-size of `50` using the
+  `resnet18` architecture. For different batch-size, weight-decay or
+  architecture a new learning may be needed (use the [pytorch lightning
+  learning rate
+  finder](https://pytorch-lightning.readthedocs.io/en/latest/advanced/lr_finder.html))
+  [\#30](https://github.com/convml/convml_tt/pull/30)
 
 ## [v0.8.0](https://github.com/convml/convml_tt/tree/v0.8.0)
 
