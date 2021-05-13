@@ -94,9 +94,9 @@ def main(args=None):
         # https://pytorch-lightning.readthedocs.io/en/stable/advanced/multi_gpu.html#distributed-data-parallel
         trainer_kws["accelerator"] = "ddp"
 
-    if args["use_one_cycle_training"]:
+    if args.use_one_cycle_training:
         TrainerClass = OneCycleTrainer
-        lr_monitor = pl.callbacks.LearningRateMonitor(logging_interval="step")
+        lr_monitor = pl.callbacks.LearningRateMonitor(logging_interval="epoch")
         trainer_kws["callbacks"] = [lr_monitor]
     else:
         TrainerClass = pl.Trainer
