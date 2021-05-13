@@ -9,6 +9,7 @@ import os
 
 from .system import TripletTrainerModel, TripletTrainerDataModule, HeadFineTuner
 from . import __version__
+from .trainer_onecycle import OneCycleTrainer
 
 
 def main(args=None):
@@ -33,7 +34,12 @@ def main(args=None):
         help="Name of the project this run should belong to in the logger",
         default="convml_tt",
     )
-    print(parser.formatter_class)
+    parser.add_argument(
+        "--use-one-cycle-training",
+        default=False,
+        action="store_true",
+        help="Use one-cycle learning rate scheduling",
+    )
 
     if os.environ.get("FROM_CHECKPOINT"):
         parser.add_argument(
@@ -67,7 +73,14 @@ def main(args=None):
         # https://pytorch-lightning.readthedocs.io/en/stable/advanced/multi_gpu.html#distributed-data-parallel
         trainer_kws["accelerator"] = "ddp"
 
-    trainer = pl.Trainer.from_argparse_args(args, **trainer_kws)
+    if args["use_one_cycle_training"]:
+        TrainerClass = OneCycleTrainer
+        lr_monitor = pl.callbacks.LearningRateMonitor(logging_interval="step")
+        trainer_kws["callbacks"] = [lr_monitor]
+    else:
+        TrainerClass = pl.Trainer
+
+    trainer = TrainerClass.from_argparse_args(args, **trainer_kws)
     # pl.Lightningmodule doesn't have a `from_argparse_args` yet, so we call it
     # here ourselves
     if model is None:
