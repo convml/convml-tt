@@ -44,7 +44,12 @@ class AddOneCycleSchedulerCallback(pl.Callback):
 
         # this will be the new `configure_optimizers` function on `pl_module`
         def configure_optimizers():
-            return dict(optimizer=optimizer, lr_scheduler=scheduler)
+            # the scheduler expects to be called on each training step, so we
+            # need to ensure that
+            return dict(
+                optimizer=optimizer,
+                lr_scheduler=dict(scheduler=scheduler, interval="step"),
+            )
 
         setattr(pl_module, "configure_optimizers", configure_optimizers)
 
