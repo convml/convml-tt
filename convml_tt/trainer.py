@@ -6,7 +6,6 @@ import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger
 from pathlib import Path
 import os
-import wandb
 
 from .system import TripletTrainerModel, TripletTrainerDataModule, HeadFineTuner
 from .interpretation.rectpred.sample import make_plot as rectpred_sample_plot
