@@ -46,9 +46,9 @@ def grid_overview(
         ax = axes.flatten()[n]
         ax.axison = False
         if isinstance(tile_dataset, ImageTripletDataset):
-            tile_image = tile_dataset.get_image(index=n, tile_type=tile_type)
+            tile_image = tile_dataset.get_image(index=i, tile_type=tile_type)
         elif isinstance(tile_dataset, ImageSingletDataset):
-            tile_image = tile_dataset.get_image(index=n)
+            tile_image = tile_dataset.get_image(index=i)
         else:
             raise NotImplementedError(tile_dataset)
 
