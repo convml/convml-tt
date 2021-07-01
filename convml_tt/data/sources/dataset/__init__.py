@@ -9,6 +9,17 @@ import numpy as np
 from datetime import datetime
 
 
+def load_meta(dataset_path):
+    path_abs = Path(dataset_path).expanduser().absolute()
+    p = path_abs / "meta.yaml"
+    name = p.parent.name
+    with open(str(p)) as fh:
+        meta = yaml.load(fh.read())
+    meta["name"] = name
+    meta["data_path"] = path_abs
+    return meta
+
+
 class GenericDataset:
     def __init__(self, data_path, name, extra={}):
         self.data_path = data_path
