@@ -42,8 +42,8 @@ def get_embeddings(
             ys_batch = [apply_model(x_batch) for x_batch in xs_batch]
             triplet_batch.append(ys_batch)
         batched_results.append(np.hstack(triplet_batch))
-        dims = ("triplet_part", "tile_id", "emb_dim")
-        coords["triplet_part"] = ["anchor", "neighbor", "distant"]
+        dims = ("tile_type", "tile_id", "emb_dim")
+        coords["tile_type"] = ["anchor", "neighbor", "distant"]
 
     embeddings = np.vstack(batched_results)
 
