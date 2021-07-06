@@ -3,7 +3,7 @@ from pathlib import Path
 import itertools
 import datetime
 
-from ..satellite.pipeline import GOES16Query
+from ..goes16.pipeline import GOES16Query
 from .. import DataSource
 from ....pipeline import YAMLTarget
 
@@ -162,6 +162,18 @@ class AllSceneIDs(luigi.Task):
         fn = "scene_ids.yml"
         return YAMLTarget(str(p / fn))
 
+
+class DownloadAllSourceFiles(luigi.Task):
+    """
+    Download all source files for all scenes in the dataset
+    """
+
+    @property
+    def data_source(self):
+        return DataSource.load(path=self.data_path)
+
+    def requires(self):
+        return AllSceneIDs(data_path=self.data_path)
 
 class GenerateAllScenes(luigi.Task):
     data_path = luigi.Parameter(default=".")

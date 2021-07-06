@@ -33,9 +33,12 @@ class XArrayTarget(luigi.target.FileSystemTarget):
 
 class YAMLTarget(luigi.LocalTarget):
     def write(self, obj):
-        with self.open("w") as fh:
+        with super().open("w") as fh:
             yaml.dump(obj, fh)
 
     def read(self):
-        with self.open() as fh:
+        with super().open() as fh:
             return yaml.load(fh)
+
+    def open(self):
+        return self.read()

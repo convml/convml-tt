@@ -4,6 +4,8 @@ import yaml
 import dateutil.parser
 import datetime
 
+from .sampling.domain import LocalCartesianDomain, CartesianDomain
+
 
 def load_meta(dataset_path):
     path_abs = Path(dataset_path).expanduser().absolute()
@@ -27,6 +29,45 @@ class DataSource:
     def __init__(self, *args, **kwargs):
         self._meta = kwargs
 
+        self._parse_time_meta()
+        self._parse_sampling_meta()
+        self._parse_domain_meta()
+
+        assert "source" in self._meta
+        assert "type" in self._meta
+
+    def _parse_domain_meta(self):
+        domain_meta = self._meta["domain"]
+        local_cart_reqd_fields = [
+            "central_latitude",
+            "central_longitude",
+            "l_zonal",
+            "l_meridional"
+        ]
+
+        if all([field in domain_meta for field in local_cart_reqd_fields]):
+            kwargs = {field: domain_meta[field] for field in local_cart_reqd_fields}
+            domain = LocalCartesianDomain(**kwargs)
+        else:
+            raise NotImplementedError(domain_meta)
+
+        self.domain = domain
+
+    def _parse_sampling_meta(self):
+        sampling_meta = self._meta.get("sampling", {})
+
+        if "triplets" in sampling_meta:
+            triplets_meta = sampling_meta["triplets"]
+            N_triplets = triplets_meta.get("N_triplets", {})
+            assert "study" in N_triplets and "train" in N_triplets
+            assert "tile_N" in triplets_meta
+            assert "tile_size" in triplets_meta
+            assert "scene_collections_splitting" in triplets_meta
+            assert sum(N_triplets.values()) > 0
+
+        self.sampling = sampling_meta
+
+    def _parse_time_meta(self):
         time_meta = self._meta["time"]
         self.t_start = _parse_datetime(time_meta["t_start"])
         if "N_days" in time_meta:
@@ -36,9 +77,6 @@ class DataSource:
             self.t_end = _parse_datetime(time_meta["t_end"])
         else:
             raise NotImplementedError(time_meta["time"])
-
-        assert "source" in self._meta
-        assert "type" in self._meta
 
     @classmethod
     def load(cls, path):

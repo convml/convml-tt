@@ -5,14 +5,9 @@ import luigi
 import dateutil.parser
 import xarray as xr
 import numpy as np
-import datetime
 import isodate
 
-#from . import processing, satpy_rgb, tiler, bbox
 from ....pipeline import YAMLTarget
-
-SOURCE_DIR = Path("source_data")
-
 
 
 class DatetimeListParameter(luigi.Parameter):
@@ -54,28 +49,22 @@ class GOES16Query(luigi.Task):
 
 
 class GOES16Fetch(luigi.Task):
-    keys = luigi.ListParameter()
+    key = luigi.ListParameter()
     data_path = luigi.Parameter()
     offline_cli = luigi.BoolParameter(default=False)
 
-    def run(self):
-        local_storage_dir = Path(self.data_path).expanduser() / SOURCE_DIR
-        cli = satdata.Goes16AWS(
+    @property
+    def cli(self):
+        local_storage_dir = Path(self.data_path).expanduser()
+        return satdata.Goes16AWS(
             offline=self.offline_cli, local_storage_dir=local_storage_dir
         )
 
-        print("Downloading channel files...")
-        cli.download(self.keys)
+    def run(self):
+        self.cli.download(self.key)
 
-        scenes_files = [list(a) for a in zip(*files_per_channel.values())]
-
-        indexed_scenes_files = {
-            self._make_scene_id(scene_files): scene_files
-            for scene_files in scenes_files
-        }
-
-        Path(self.output().fn).parent.mkdir(exist_ok=True)
-        self.output().write(indexed_scenes_files)
+    def output(self):
+        return luigi.LocalTarget(str(Path(self.data_path) / self.key))
 
 
 class StudyTrainSplit(luigi.Task):
