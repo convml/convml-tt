@@ -49,7 +49,7 @@ class GOES16Query(luigi.Task):
 
 
 class GOES16Fetch(luigi.Task):
-    key = luigi.ListParameter()
+    keys = luigi.ListParameter()
     data_path = luigi.Parameter()
     offline_cli = luigi.BoolParameter(default=False)
 
@@ -61,10 +61,14 @@ class GOES16Fetch(luigi.Task):
         )
 
     def run(self):
-        self.cli.download(self.key)
+        self.cli.download(list(self.keys))
 
     def output(self):
-        return luigi.LocalTarget(str(Path(self.data_path) / self.key))
+        targets = [
+            luigi.LocalTarget(str(Path(self.data_path) / key))
+            for key in self.keys
+        ]
+        return targets
 
 
 class StudyTrainSplit(luigi.Task):

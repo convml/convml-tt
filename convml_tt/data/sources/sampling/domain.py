@@ -128,7 +128,7 @@ class LocalCartesianDomain(CartesianDomain):
         The spatial distance bounds of the domain represented by the (lat,lon)
         position (in degrees) of the four corners of the domain
         """
-        corners = self.get_bounds()
+        corners = self.spatial_bounds
         latlon_pts = ccrs.PlateCarree().transform_points(
             x=corners[..., 0], y=corners[..., 1], src_crs=self.crs,
             z=np.zeros_like(corners[..., 0])

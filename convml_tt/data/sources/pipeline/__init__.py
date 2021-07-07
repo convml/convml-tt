@@ -174,6 +174,3 @@ class DownloadAllSourceFiles(luigi.Task):
 
     def requires(self):
         return AllSceneIDs(data_path=self.data_path)
-
-class GenerateAllScenes(luigi.Task):
-    data_path = luigi.Parameter(default=".")

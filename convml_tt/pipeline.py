@@ -1,6 +1,8 @@
 import luigi
 import xarray as xr
 import yaml
+from pathlib import Path
+from PIL import Image
 
 import coloredlogs
 
@@ -30,6 +32,9 @@ class XArrayTarget(luigi.target.FileSystemTarget):
     def fn(self):
         return self.path
 
+    def write(self, ds):
+        ds.to_netcdf(self.fn)
+
 
 class YAMLTarget(luigi.LocalTarget):
     def write(self, obj):
@@ -42,3 +47,20 @@ class YAMLTarget(luigi.LocalTarget):
 
     def open(self):
         return self.read()
+
+    def exists(self):
+        return Path(self.path).exists()
+
+
+class ImageTarget(luigi.LocalTarget):
+    def write(self, img):
+        img.save(self.fn)
+
+    def read(self):
+        return Image.open(self.fn)
+
+    def open(self):
+        return self.read()
+
+    def exists(self):
+        return Path(self.path).exists()
