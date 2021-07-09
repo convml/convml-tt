@@ -37,13 +37,25 @@ def _has_spatial_coord(da, c):
     return c in da and da[c].attrs.get("units") == "m"
 
 
+def _latlon_box_to_integer_values(bbox):
+    """
+    Round bounding-box lat/lon values to nearest integer values in direction
+    that ensure that original area is contained with the new bounding box
+    """
+    # bbox: [W, E, S, N]
+    fns = [np.floor, np.ceil, np.floor, np.ceil]
+    bbox_truncated = np.array([fn(v) for (fn, v) in zip(fns, bbox)])
+    return bbox_truncated
+
+
 def crop_field_to_domain(domain, da, pad_pct=0.1):
     if _has_spatial_coord(da=da, c="x") and _has_spatial_coord(da=da, c="y"):
         raise NotImplementedError
     elif "lat" in da.coords and "lon" in da.coords:
         x_dim, y_dim = "lon", "lat"
-        xs = domain.latlon_bounds[..., 0]
-        ys = domain.latlon_bounds[..., 1]
+        latlon_box = _latlon_box_to_integer_values(domain.latlon_bounds)
+        xs = latlon_box[..., 0]
+        ys = latlon_box[..., 1]
         x_min, x_max = np.min(xs), np.max(xs)
         y_min, y_max = np.min(ys), np.max(ys)
         if da[x_dim][-1] > 180.0:
@@ -59,7 +71,7 @@ def crop_field_to_domain(domain, da, pad_pct=0.1):
         crs = parse_cf_crs(da)
         # the source data is stored in its own projection and so we want to
         # crop using the coordinates of this projection
-        latlon_box = domain.latlon_bounds
+        latlon_box = _latlon_box_to_integer_values(domain.latlon_bounds)
         xs, ys, _ = crs.transform_points(ccrs.PlateCarree(), *latlon_box.T).T
         x_min, x_max = np.min(xs), np.max(xs)
         y_min, y_max = np.min(ys), np.max(ys)
