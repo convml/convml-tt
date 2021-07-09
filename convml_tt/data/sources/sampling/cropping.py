@@ -4,7 +4,7 @@ import cartopy.crs as ccrs
 from ..sampling.crs import parse_cf as parse_cf_crs
 
 
-def crop_field_to_bbox(da, x_range, y_range, pad_pct=0.1, xdim="x", ydim="y"):
+def crop_field_to_bbox(da, x_range, y_range, pad_pct=0.1, x_dim="x", y_dim="y"):
     x_min, x_max = x_range
     y_min, y_max = y_range
 
@@ -16,17 +16,17 @@ def crop_field_to_bbox(da, x_range, y_range, pad_pct=0.1, xdim="x", ydim="y"):
     x_max += pad_pct * lx
     y_max += pad_pct * ly
 
-    if da.x[0] > da.x[-1]:
+    if da[x_dim][0] > da[x_dim][-1]:
         x_slice = slice(x_max, x_min)
     else:
         x_slice = slice(x_min, x_max)
 
-    if da.y[0] > da.y[-1]:
+    if da[y_dim][0] > da[y_dim][-1]:
         y_slice = slice(y_max, y_min)
     else:
         y_slice = slice(y_min, y_max)
 
-    return da.sel({xdim: x_slice, ydim: y_slice})
+    return da.sel({x_dim: x_slice, y_dim: y_slice})
 
 
 class DomainBoundsOutsideOfInputException(Exception):
@@ -41,8 +41,21 @@ def crop_field_to_domain(domain, da, pad_pct=0.1):
     if _has_spatial_coord(da=da, c="x") and _has_spatial_coord(da=da, c="y"):
         raise NotImplementedError
     elif "lat" in da.coords and "lon" in da.coords:
-        raise NotImplementedError
+        x_dim, y_dim = "lon", "lat"
+        xs = domain.latlon_bounds[..., 0]
+        ys = domain.latlon_bounds[..., 1]
+        x_min, x_max = np.min(xs), np.max(xs)
+        y_min, y_max = np.min(ys), np.max(ys)
+        if da[x_dim][-1] > 180.0:
+            if x_max < 0.0:
+                x_min += 360.0
+                x_max += 360.0
+            else:
+                raise NotImplementedError
+        x_range = [x_min, x_max]
+        y_range = [y_min, y_max]
     elif "grid_mapping" in da.attrs:
+        x_dim, y_dim = "x", "y"
         crs = parse_cf_crs(da)
         # the source data is stored in its own projection and so we want to
         # crop using the coordinates of this projection
@@ -55,9 +68,16 @@ def crop_field_to_domain(domain, da, pad_pct=0.1):
     else:
         raise NotImplementedError(da)
 
-    da_cropped = crop_field_to_bbox(da=da, x_range=x_range, y_range=y_range, pad_pct=pad_pct)
+    da_cropped = crop_field_to_bbox(
+        da=da,
+        x_range=x_range,
+        y_range=y_range,
+        pad_pct=pad_pct,
+        x_dim=x_dim,
+        y_dim=y_dim,
+    )
 
-    if da_cropped.x.count() == 0 or da_cropped.y.count() == 0:
+    if da_cropped[x_dim].count() == 0 or da_cropped[y_dim].count() == 0:
         raise DomainBoundsOutsideOfInputException
 
     return da_cropped
