@@ -8,6 +8,8 @@
 
 - Add rectpred sample plot function [\#30](https://github.com/convml/convml_tt/pull/30)
 
+- Enable dendrogram plots for triplets [\#35](https://github.com/convml/convml_tt/pull/35)
+
 *changed default*
 
 - Weight decay (L2-regularisation) is now enabled by default (set to
