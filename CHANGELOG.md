@@ -8,6 +8,8 @@
 
 - Add rectpred sample plot function [\#30](https://github.com/convml/convml_tt/pull/30)
 
+- Enable dendrogram plots for triplets [\#35](https://github.com/convml/convml_tt/pull/35)
+
 - Add interactive rect plot for visualising embedding distance to
   a selected part of the domain [\#34](https://github.com/convml/convml_tt/pull/34)
 
