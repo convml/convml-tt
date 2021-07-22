@@ -169,7 +169,12 @@ def annotated_scatter_plot(
         pts_connector = np.c_[pts_offset[n], pts[n]]
         if hue is not None:
             color = colormap[hue.sel(tile_id=tile_id).item()]
-        (line,) = ax.plot(*pts_connector, linestyle="--", marker=".", color=color)
+            color_connector = color
+        else:
+            color_connector = "black"
+        (line,) = ax.plot(
+            *pts_connector, linestyle="--", marker=".", color=color_connector
+        )
 
         if x_c is not None and y_c is not None:
             if x_err is not None and y_err is not None:
