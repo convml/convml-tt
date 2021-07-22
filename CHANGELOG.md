@@ -13,6 +13,9 @@
 - Add interactive rect plot for visualising embedding distance to
   a selected part of the domain [\#34](https://github.com/convml/convml_tt/pull/34)
 
+- Add one-cycle learning rate scheduler
+  [\#32](https://github.com/convml/convml_tt/pull/32)
+
 *changed default*
 
 - Weight decay (L2-regularisation) is now enabled by default (set to
