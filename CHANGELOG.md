@@ -23,6 +23,10 @@
   finder](https://pytorch-lightning.readthedocs.io/en/latest/advanced/lr_finder.html))
   [\#30](https://github.com/convml/convml_tt/pull/30)
 
+*bugfixes*
+
+- Fix for grid-overview plot always showing same set of tiles rather than tiles with indecies provided [\#36](https://github.com/convml/convml_tt/pull/36)
+
 ## [v0.8.0](https://github.com/convml/convml_tt/tree/v0.8.0)
 
 [Full Changelog](https://github.com/convml/convml_tt/compare/v0.7.1...v0.8.0)
