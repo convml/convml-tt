@@ -1,7 +1,7 @@
 import numpy as np
 from torch.utils.data import DataLoader
 
-from convml_tt.data.dataset import TileType, ImageSingletDataset
+from convml_tt.data.dataset import TileType, ImageSingletDataset, ImageTripletDataset
 from convml_tt.data.examples import ExampleData, fetch_example_dataset
 from convml_tt.data.transforms import get_transforms
 from convml_tt.interpretation import plots as interpretation_plot
@@ -45,7 +45,7 @@ def test_grid_overview_plot():
     interpretation_plot.grid_overview(tile_dataset=tile_dataset, points=10)
 
 
-def test_dendrogram_plot():
+def test_dendrogram_plot_single_tiles():
     # use a model with default resnet weights to generate some embedding
     # vectors to plot with
     backbone_arch = "resnet18"
@@ -62,7 +62,33 @@ def test_dendrogram_plot():
     da_embeddings = get_embeddings(
         tile_dataset=tile_dataset, model=model, prediction_batch_size=16
     )
-    interpretation_plot.dendrogram(da_embeddings=da_embeddings)
+    for sampling_method in ["random", "center_dist"]:
+        interpretation_plot.dendrogram(
+            da_embeddings=da_embeddings, sampling_method=sampling_method
+        )
+
+
+def test_dendrogram_plot_triplets():
+    # use a model with default resnet weights to generate some embedding
+    # vectors to plot with
+    backbone_arch = "resnet18"
+    model = TripletTrainerModel(pretrained=True, base_arch=backbone_arch)
+
+    data_path = fetch_example_dataset(dataset=ExampleData.SMALL100)
+    tile_dataset = ImageTripletDataset(
+        data_dir=data_path,
+        stage="train",
+        transform=get_transforms(step="predict", normalize_for_arch=backbone_arch),
+    )
+
+    da_embeddings = get_embeddings(
+        tile_dataset=tile_dataset, model=model, prediction_batch_size=16
+    )
+    for sampling_method in ["random", "center_dist", "best_triplets", "worst_triplets"]:
+        interpretation_plot.dendrogram(
+            da_embeddings=da_embeddings, sampling_method=sampling_method,
+            tile_type="anchor"
+        )
 
 
 def test_annotated_scatter_plot():

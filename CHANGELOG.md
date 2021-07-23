@@ -6,6 +6,10 @@
 
 *new features*
 
+- Add "best triplet" option to tile sampling method for dendrogram plot
+  which uses triplets for which anchor-neighbor are the closest
+  [\#38](https://github.com/convml/convml_tt/pull/38)
+
 - Add rectpred sample plot function [\#30](https://github.com/convml/convml_tt/pull/30)
 
 - Enable dendrogram plots for triplets [\#35](https://github.com/convml/convml_tt/pull/35)
