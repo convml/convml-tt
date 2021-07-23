@@ -86,7 +86,8 @@ def test_dendrogram_plot_triplets():
     )
     for sampling_method in ["random", "center_dist", "best_triplets", "worst_triplets"]:
         interpretation_plot.dendrogram(
-            da_embeddings=da_embeddings, sampling_method=sampling_method
+            da_embeddings=da_embeddings, sampling_method=sampling_method,
+            tile_type="anchor"
         )
 
 
