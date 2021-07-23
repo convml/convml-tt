@@ -111,6 +111,8 @@ class AllSceneIDs(luigi.Task):
         ds = self.data_source
         if ds.source == "goes16":
             return GOES16Query.get_time(filename=filename)
+        elif ds.source == "LES":
+            return FindLESFiles.get_time(filename=filename)
         else:
             raise NotImplementedError(ds.source)
 
@@ -147,7 +149,7 @@ class AllSceneIDs(luigi.Task):
             for scene_filename in scene_filenames:
                 t_scene = self.get_time_for_filename(filename=scene_filename)
                 scene_id = make_scene_id(source=ds.source, t_scene=t_scene)
-                scenes[scene_id] = scene_filenames
+                scenes[scene_id] = scene_filename
         else:
             raise NotImplementedError(input)
 
