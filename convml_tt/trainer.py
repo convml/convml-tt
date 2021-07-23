@@ -8,22 +8,8 @@ from pathlib import Path
 import os
 
 from .system import TripletTrainerModel, TripletTrainerDataModule, HeadFineTuner
-from .interpretation.rectpred.sample import make_plot as rectpred_sample_plot
-from . import __version__
+from . import __version__, trainer_logging
 from .trainer_onecycle import OneCycleTrainer
-
-
-def _make_rectpred_logger(image_path):
-    if image_path is None:
-        return lambda *args, **kwargs: None
-
-    import wandb
-
-    def _logger(model, stage):
-        fig = rectpred_sample_plot(model=model, image_path=image_path)
-        wandb.log({f"{stage}_rectpred": fig})
-
-    return _logger
 
 
 def main(args=None):
@@ -44,6 +30,12 @@ def main(args=None):
         default=None,
         type=Path,
         help="Use this image to produce a rectpred example at the beginning and end of training",
+    )
+    parser.add_argument(
+        "--log-dendrogram",
+        default=False,
+        action="store_true",
+        help="Log dendrogram plot before and after training",
     )
     parser.add_argument(
         "--gpus", type=int, help="Number of GPUs to use for training", default=0
@@ -118,12 +110,24 @@ def main(args=None):
             {"convml_tt__version": __version__}
         )
 
-    rectpred_logger = _make_rectpred_logger(args.sample_rectpred_plot_image_path)
-    rectpred_logger(model=model, stage="start")
+    rectpred_logger = None
+    if args.sample_rectpred_plot_image_path:
+        rectpred_logger = trainer_logging.make_rectpred_logger(
+            args.sample_rectpred_plot_image_path
+        )
+        rectpred_logger(model=model, stage="start")
+
+    dendrogram_logger = None
+    if args.log_dendrogram:
+        rectpred_logger = trainer_logging.make_dendrogram_logger(datamodule=datamodule)
+        rectpred_logger(model=model, stage="start")
 
     trainer.fit(model=model, datamodule=datamodule)
 
-    rectpred_logger(model=model, stage="end")
+    if rectpred_logger:
+        rectpred_logger(model=model, stage="end")
+    if dendrogram_logger:
+        dendrogram_logger(model=model, stage="end")
 
 
 if __name__ == "__main__":
