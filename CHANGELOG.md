@@ -6,6 +6,9 @@
 
 *new features*
 
+- Add before and after training logger for producing a dendrogram plot
+  [\#40](https://github.com/convml/convml_tt/pull/40)
+
 - Add "best triplet" option to tile sampling method for dendrogram plot
   which uses triplets for which anchor-neighbor are the closest
   [\#38](https://github.com/convml/convml_tt/pull/38)
