@@ -1,10 +1,10 @@
-
 import luigi
 from pathlib import Path
 import datetime
 import logging
 
 from ..goes16.pipeline import GOES16Query
+from ..les import FindLESFiles
 from .. import DataSource
 from ....pipeline import YAMLTarget
 from collections import OrderedDict
@@ -44,9 +44,9 @@ def merge_multichannel_sources(files_per_channel, time_fn):
         timestamp_files = channel_files_by_timestamp[timestamp]
 
         if len(timestamp_files) == N_channels:
-            scene_filesets.append([
-                timestamp_files[channel] for channel in files_per_channel.keys()
-            ])
+            scene_filesets.append(
+                [timestamp_files[channel] for channel in files_per_channel.keys()]
+            )
         else:
             log.warn(
                 "Only {len(timestamp_files)} were found for timestamp {timestamp}"
@@ -92,6 +92,16 @@ class AllSceneIDs(luigi.Task):
                     tasks[channel] = t
             else:
                 raise NotImplementedError(ds.type)
+        elif ds.source == "LES":
+            kind, *variables = ds.type.split("__")
+            if not kind == "singlechannel":
+                raise NotImplementedError(ds.type)
+            else:
+                source_variable = variables[0]
+
+            tasks = FindLESFiles(
+                data_path=source_data_path, source_variable=source_variable
+            )
         else:
             raise NotImplementedError(ds.source)
 
@@ -108,19 +118,21 @@ class AllSceneIDs(luigi.Task):
         ds = self.data_source
         scenes = {}
 
-        inputs = {
-            input_name: input_item.open()
-            for (input_name, input_item) in self.input().items()
-        }
-        if type(inputs) == dict:
+        input = self.input()
+        if type(input) == dict:
             channels_and_filenames = OrderedDict()
             if ds.type == "truecolor_rgb":
                 channel_order = [1, 2, 3]
             else:
                 raise NotImplementedError(ds.type)
 
+            opened_inputs = {
+                input_name: input_item.open()
+                for (input_name, input_item) in input.items()
+            }
+
             for channel in channel_order:
-                channels_and_filenames[channel] = inputs[channel]
+                channels_and_filenames[channel] = opened_inputs[channel]
 
             scene_sets = merge_multichannel_sources(
                 channels_and_filenames, time_fn=self.get_time_for_filename
@@ -130,8 +142,14 @@ class AllSceneIDs(luigi.Task):
                 t_scene = self.get_time_for_filename(filename=scene_filenames[0])
                 scene_id = make_scene_id(source=ds.source, t_scene=t_scene)
                 scenes[scene_id] = scene_filenames
+        elif isinstance(input, YAMLTarget):
+            scene_filenames = input.open()
+            for scene_filename in scene_filenames:
+                t_scene = self.get_time_for_filename(filename=scene_filename)
+                scene_id = make_scene_id(source=ds.source, t_scene=t_scene)
+                scenes[scene_id] = scene_filenames
         else:
-            raise NotImplementedError(inputs)
+            raise NotImplementedError(input)
 
         Path(self.output().fn).parent.mkdir(exist_ok=True, parents=True)
         self.output().write(scenes)
