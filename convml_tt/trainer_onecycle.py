@@ -14,6 +14,8 @@ class AddOneCycleSchedulerCallback(pl.Callback):
 
         # TODO: this doesn't handle the case where the data is associated with
         # `pl_module`
+        datamodule = trainer.datamodule
+        datamodule.setup(stage="fit")  # need to do this to ensure data-loader has been initiated
         n_steps_per_epoch = len(trainer.datamodule.train_dataloader())
 
         # TODO: take into account `max_steps` value for the scheduler
