@@ -6,10 +6,19 @@
 
 *new features*
 
+- Add "best triplet" option to tile sampling method for dendrogram plot
+  which uses triplets for which anchor-neighbor are the closest
+  [\#38](https://github.com/convml/convml_tt/pull/38)
+
 - Add rectpred sample plot function [\#30](https://github.com/convml/convml_tt/pull/30)
+
+- Enable dendrogram plots for triplets [\#35](https://github.com/convml/convml_tt/pull/35)
 
 - Add interactive rect plot for visualising embedding distance to
   a selected part of the domain [\#34](https://github.com/convml/convml_tt/pull/34)
+
+- Add one-cycle learning rate scheduler
+  [\#32](https://github.com/convml/convml_tt/pull/32)
 
 *changed default*
 
@@ -22,6 +31,10 @@
   learning rate
   finder](https://pytorch-lightning.readthedocs.io/en/latest/advanced/lr_finder.html))
   [\#30](https://github.com/convml/convml_tt/pull/30)
+
+*bugfixes*
+
+- Fix for grid-overview plot always showing same set of tiles rather than tiles with indecies provided [\#36](https://github.com/convml/convml_tt/pull/36)
 
 ## [v0.8.0](https://github.com/convml/convml_tt/tree/v0.8.0)
 

@@ -24,7 +24,7 @@ def _get_tile_image_path(dataset_path, scene_id, i0, j0):
 
 
 def main(da, dataset_path):
-    """ Main function """
+    """Main function"""
 
     # Initialize and configure tmap
     # dims = 2048

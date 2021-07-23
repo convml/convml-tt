@@ -1,20 +1,22 @@
-import pytorch_lightning as pl
 import numpy as np
+import pytorch_lightning as pl
 import torch
+from pytorch_lightning.callbacks import LearningRateMonitor
 
-from convml_tt.system import (
-    TripletTrainerModel,
-    TripletTrainerDataModule,
-    HeadFineTuner,
-)
+from convml_tt.data.dataset import ImageSingletDataset, TileType
 from convml_tt.data.examples import (
-    fetch_example_dataset,
     ExampleData,
     PretrainedModel,
+    fetch_example_dataset,
     load_pretrained_model,
 )
-from convml_tt.data.dataset import TileType, ImageSingletDataset
 from convml_tt.data.transforms import get_transforms
+from convml_tt.system import (
+    HeadFineTuner,
+    TripletTrainerDataModule,
+    TripletTrainerModel,
+)
+from convml_tt.trainer_onecycle import OneCycleTrainer
 from convml_tt.utils import get_embeddings
 
 
@@ -115,3 +117,15 @@ def test_load_from_weights():
     )
 
     np.testing.assert_allclose(da_emb, da_emb2)
+
+
+def test_train_new_onecycle():
+    lr_monitor = LearningRateMonitor(logging_interval="step")
+    trainer = OneCycleTrainer(max_epochs=5, callbacks=[lr_monitor])
+    arch = "resnet18"
+    model = TripletTrainerModel(pretrained=False, base_arch=arch)
+    data_path = fetch_example_dataset(dataset=ExampleData.TINY10)
+    datamodule = TripletTrainerDataModule(
+        data_dir=data_path, batch_size=2, normalize_for_arch=arch
+    )
+    trainer.fit(model=model, datamodule=datamodule)
