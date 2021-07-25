@@ -280,7 +280,6 @@ def dendrogram(
     # the x-positions match the cluster indecies (0, 1, ... n_max_clusters-1)
     # we can then join this with the axes below where we will render the tiles
     # and the x-positioning becomes much easier
-    ax_tiles.set_aspect(1.0)
     secax = ax_dendrogram.secondary_xaxis(
         "bottom", functions=(xposn2clusterid, clusterid2xposn)
     )
