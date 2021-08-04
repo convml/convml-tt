@@ -22,10 +22,11 @@ def make_dendrogram_logger(datamodule):
         except FileNotFoundError:
             dataset = datamodule.get_dataset(stage="fit")
         da_embeddings = get_embeddings(tile_dataset=dataset, model=model)
-        ax = dendrogram(
-            da_embeddings=da_embeddings, tile_type="anchor", sampling="best_triplets"
+        fig = dendrogram(
+            da_embeddings=da_embeddings,
+            tile_type="anchor",
+            sampling_method="best_triplets",
         )
-        fig = ax.figure
-        wandb.log({f"{stage}_dendrogram": fig})
+        wandb.log({f"{stage}_dendrogram": wandb.Image(fig)})
 
     return _logger
