@@ -1,5 +1,24 @@
 # Changelog
 
+## [Unreleased](https://github.com/convml/convml_tt/tree/HEAD)
+
+[Full Changelog](https://github.com/convml/convml_tt/compare/v0.8.0...HEAD)
+
+*new features*
+
+- Add writer for tensorboard projector visualizer to enable exploration of
+  tiles in embedding space
+  [\#43](https://github.com/convml/convml_tt/pull/43)
+
+- support for z-order and zero-offset annotations in annotated scatterplot
+  [\#44](https://github.com/convml/convml_tt/pull/44)
+
+*changed default*
+
+- annotated scatterplot now sets equal x/y-axis
+  [\#44](https://github.com/convml/convml_tt/pull/44)
+
+
 ## [v0.9.0](https://github.com/convml/convml_tt/tree/v0.9.0)
 
 [Full Changelog](https://github.com/convml/convml_tt/compare/v0.8.0...v0.9.0)
