@@ -9,6 +9,7 @@ import os
 
 from xesmf.backend import esmf_regrid_build, esmf_regrid_finalize
 from pathlib import Path
+from ..sampling.domain import LocalCartesianDomain
 
 
 class SilentRegridder(xesmf.Regridder):
@@ -25,43 +26,47 @@ class SilentRegridder(xesmf.Regridder):
         esmf_regrid_finalize(regrid)  # only need weights, not regrid object
 
 
-def resample(domain, da, dx, method="bilinear", crop_pad_pct=0.1, keep_attrs=False, regridder_tmpdir=Path("/tmp/regridding")):
+def resample(
+    domain,
+    da,
+    dx,
+    method="bilinear",
+    crop_pad_pct=0.1,
+    keep_attrs=False,
+    regridder_tmpdir=Path("/tmp/regridding"),
+):
     """
     Resample a xarray DataArray onto this tile with grid made of NxN points
     """
     old_grid = xr.Dataset(coords=da.coords)
 
-    if not hasattr(da, "crs"):
-        raise Exception(
-            "The provided DataArray doesn't have a "
-            "projection provided. Please set the `crs` "
-            "attribute to contain a cartopy projection"
-        )
+    if isinstance(domain, LocalCartesianDomain):
+        if not hasattr(da, "crs"):
+            raise Exception(
+                "The provided DataArray doesn't have a "
+                "projection provided. Please set the `crs` "
+                "attribute to contain a cartopy projection"
+            )
 
-    latlon_old = ccrs.PlateCarree().transform_points(
-        da.crs,
-        *np.meshgrid(da.x.values, da.y.values),
-    )[:, :, :2]
+        latlon_old = ccrs.PlateCarree().transform_points(
+            da.crs,
+            *np.meshgrid(da.x.values, da.y.values),
+        )[:, :, :2]
 
-    old_grid["lat"] = (("y", "x"), latlon_old[..., 1])
-    old_grid["lon"] = (("y", "x"), latlon_old[..., 0])
+        old_grid["lat"] = (("y", "x"), latlon_old[..., 1])
+        old_grid["lon"] = (("y", "x"), latlon_old[..., 0])
 
     new_grid = domain.get_grid(dx=dx)
 
     Nx_in, Ny_in = da.x.shape[0], da.y.shape[0]
     Nx_out, Ny_out = int(new_grid.x.count()), int(new_grid.y.count())
 
-    regridder_weights_fn = (
-        "{method}_{Ny_in}x{Nx_in}_{Ny_out}x{Nx_out}"
-        "__{lat0}_{lon0}.nc".format(
-            lon0=domain.lon0,
-            lat0=domain.lat0,
-            method=method,
-            Ny_in=Ny_in,
-            Nx_in=Nx_in,
-            Nx_out=Nx_out,
-            Ny_out=Ny_out,
-        )
+    regridder_weights_fn = "{method}_{Ny_in}x{Nx_in}_{Ny_out}x{Nx_out}" ".nc".format(
+        method=method,
+        Ny_in=Ny_in,
+        Nx_in=Nx_in,
+        Nx_out=Nx_out,
+        Ny_out=Ny_out,
     )
 
     regridder_weights_fn = str(regridder_tmpdir / regridder_weights_fn)

@@ -117,8 +117,7 @@ def create_true_color_img(tile, da_scene, resampling_dx):
     else:
         if not HAS_SATPY:
             raise Exception(
-                "Must have satpy installed to be able to "
-                "RGB composites with satpy"
+                "Must have satpy installed to be able to " "RGB composites with satpy"
             )
 
         da_tile_rgb = tile.resample(da=da_scene, dx=resampling_dx, keep_attrs=True)

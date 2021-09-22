@@ -4,7 +4,7 @@ import yaml
 import dateutil.parser
 import datetime
 
-from .sampling.domain import LocalCartesianDomain, CartesianDomain
+from .sampling.domain import LocalCartesianDomain, SourceDataDomain
 
 
 def load_meta(dataset_path):
@@ -42,12 +42,14 @@ class DataSource:
             "central_latitude",
             "central_longitude",
             "l_zonal",
-            "l_meridional"
+            "l_meridional",
         ]
 
         if all([field in domain_meta for field in local_cart_reqd_fields]):
             kwargs = {field: domain_meta[field] for field in local_cart_reqd_fields}
             domain = LocalCartesianDomain(**kwargs)
+        elif domain_meta.get("kind") == "as_source":
+            domain = SourceDataDomain()
         else:
             raise NotImplementedError(domain_meta)
 
@@ -96,6 +98,10 @@ class DataSource:
     @property
     def type(self):
         return self._meta["type"]
+
+    @property
+    def files(self):
+        return self._meta.get("files", None)
 
     def __repr__(self):
         return pprint.pformat(

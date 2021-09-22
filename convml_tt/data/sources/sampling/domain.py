@@ -31,8 +31,8 @@ class CartesianDomain:
             corners_dir
         )
 
-        corners[..., 0] -= self.x_c
-        corners[..., 1] -= self.y_c
+        corners[..., 0] += self.x_c
+        corners[..., 1] += self.y_c
 
         return corners
 
@@ -73,23 +73,21 @@ class CartesianDomain:
         [x0 ,x1, y0, y1] in Cartesian coordinates
         """
         return [
-            self.x_c-self.l_zonal / 2.0,
-            self.x_c+self.l_zonal / 2.0,
-            self.y_c-self.l_meridional / 2.0,
-            self.y_c+self.l_meridional / 2.0,
+            self.x_c - self.l_zonal / 2.0,
+            self.x_c + self.l_zonal / 2.0,
+            self.y_c - self.l_meridional / 2.0,
+            self.y_c + self.l_meridional / 2.0,
         ]
 
     def plot_outline(self, ax=None, alpha=0.6, **kwargs):
         if ax is None:
             fig_height = 4
             fig_width = fig_height * self.l_zonal / self.l_meridional
-            fig, ax = plt.subplots(
-                figsize=(fig_width, fig_height)
-            )
+            fig, ax = plt.subplots(figsize=(fig_width, fig_height))
             ax.margins(0.5)
 
         bounds_patch = mpatches.Rectangle(
-            xy=[self.x_c-self.l_zonal / 2.0, self.y_c-self.l_meridional / 2.0],
+            xy=[self.x_c - self.l_zonal / 2.0, self.y_c - self.l_meridional / 2.0],
             width=self.l_zonal,
             height=self.l_meridional,
             alpha=alpha,
@@ -103,9 +101,17 @@ class CartesianDomain:
             x_c=float(self.x_c),
             y_c=float(self.y_c),
             l_zonal=float(self.l_zonal),
-            l_meridional=float(self.l_meridional)
+            l_meridional=float(self.l_meridional),
         )
         return data
+
+    def validate_dataset(self, ds):
+        """
+        Ensure the required coordinates exist in the dataset for it to map
+        to the defined domain
+        """
+        # TODO: might want to check for some cartesian coordinates here
+        pass
 
 
 class LocalCartesianDomain(CartesianDomain):
@@ -113,7 +119,16 @@ class LocalCartesianDomain(CartesianDomain):
     Domain representing the tangent plane projection centered at specific
     latitude and longitude
     """
-    def __init__(self, central_latitude, central_longitude, l_meridional, l_zonal, x_c=0.0, y_c=0.0):
+
+    def __init__(
+        self,
+        central_latitude,
+        central_longitude,
+        l_meridional,
+        l_zonal,
+        x_c=0.0,
+        y_c=0.0,
+    ):
         super().__init__(l_meridional=l_meridional, l_zonal=l_zonal, x_c=x_c, y_c=y_c)
         self.central_latitude = central_latitude
         self.central_longitude = central_longitude
@@ -130,8 +145,10 @@ class LocalCartesianDomain(CartesianDomain):
         """
         corners = self.spatial_bounds
         latlon_pts = ccrs.PlateCarree().transform_points(
-            x=corners[..., 0], y=corners[..., 1], src_crs=self.crs,
-            z=np.zeros_like(corners[..., 0])
+            x=corners[..., 0],
+            y=corners[..., 1],
+            src_crs=self.crs,
+            z=np.zeros_like(corners[..., 0]),
         )
 
         return latlon_pts
@@ -145,8 +162,8 @@ class LocalCartesianDomain(CartesianDomain):
 
         ds_grid = ds_grid_cart.copy()
 
-        ds_grid['x'] = ds_grid.x - self.x_c
-        ds_grid['y'] = ds_grid.y - self.y_c
+        ds_grid["x"] = ds_grid.x - self.x_c
+        ds_grid["y"] = ds_grid.y - self.y_c
 
         for c in "xy":
             ds_grid[c].attrs.update(ds_grid_cart[c].attrs)
@@ -171,7 +188,9 @@ class LocalCartesianDomain(CartesianDomain):
 
         # the (x,y)-positions are only approximate with the projection
         for c in ["x", "y"]:
-            ds_grid[c].attrs["long_name"] = "approximate " + ds_grid[c].attrs["long_name"]
+            ds_grid[c].attrs["long_name"] = (
+                "approximate " + ds_grid[c].attrs["long_name"]
+            )
 
         ds_grid.attrs["crs"] = self.crs
 
@@ -182,8 +201,7 @@ class LocalCartesianDomain(CartesianDomain):
             fig_height = 4
             fig_width = fig_height * self.l_zonal / self.l_meridional
             fig, ax = plt.subplots(
-                figsize=(fig_width, fig_height),
-                subplot_kw=dict(projection=self.crs)
+                figsize=(fig_width, fig_height), subplot_kw=dict(projection=self.crs)
             )
             ax.gridlines(linestyle="--", draw_labels=True)
             ax.coastlines(resolution="10m", color="grey")
@@ -214,6 +232,20 @@ class LocalCartesianDomain(CartesianDomain):
         data["central_longitude"] = float(self.central_longitude)
         return data
 
+    def validate_dataset(self, ds):
+        """
+        Ensure the required coordinates exist in the dataset for it to map
+        to the defined domain
+        """
+        required_coords = ["lat", "lon"]
+        missing_coords = list(filter(lambda c: c not in ds.coords, required_coords))
+        if len(missing_coords) > 0:
+            raise Exception(
+                "The provided dataset is missing the following coordinates "
+                f"`{', '.join(missing_coords)}` which are required to make the "
+                f" dataset valid for a{self.__class__.__name__} domain"
+            )
+
 
 class LocalCartesianSquareTileDomain(LocalCartesianDomain):
     def __init__(self, central_latitude, central_longitude, size, x_c=0.0, y_c=0.0):
@@ -221,7 +253,14 @@ class LocalCartesianSquareTileDomain(LocalCartesianDomain):
         Create a locally Cartesian square tile with `size` (in meters)
         """
         self.size = size
-        super().__init__(central_latitude=central_latitude, central_longitude=central_longitude, l_meridional=size, l_zonal=size, x_c=x_c, y_c=y_c)
+        super().__init__(
+            central_latitude=central_latitude,
+            central_longitude=central_longitude,
+            l_meridional=size,
+            l_zonal=size,
+            x_c=x_c,
+            y_c=y_c,
+        )
 
     def get_grid(self, N):
         dx = self.size / N
@@ -257,6 +296,42 @@ class CartesianSquareTileDomain(CartesianDomain):
             x=self.x_c, y=self.y_c, src_crs=domain.crs
         )
         return LocalCartesianSquareTileDomain(
-            central_latitude=tile_latlon[1], central_longitude=tile_latlon[0], size=self.size,
-            x_c=self.x_c, y_c=self.y_c
+            central_latitude=tile_latlon[1],
+            central_longitude=tile_latlon[0],
+            size=self.size,
+            x_c=self.x_c,
+            y_c=self.y_c,
         )
+
+
+class SourceDataDomain:
+    """
+    Represents that the domain information should be extracted from a source dataset
+    """
+
+    def generate_from_dataset(self, ds):
+        """
+        Create an actual domain instance from the provided dataset
+        """
+        if "x" in ds.coords and "y" in ds.coords:
+            x_min, x_max = ds.x.min().data, ds.x.max().data
+            y_min, y_max = ds.y.min().data, ds.y.max().data
+
+            l_zonal = x_max - x_min
+            l_meridinonal = y_max - y_min
+            x_c = 0.5 * (x_min + x_max)
+            y_c = 0.5 * (y_min + y_max)
+            return CartesianDomain(
+                l_meridional=l_meridinonal, l_zonal=l_zonal, x_c=x_c, y_c=y_c
+            )
+        elif "lat" in ds.coords and "lon" in ds.coords:
+            raise NotImplementedError(LocalCartesianDomain.__name__)
+        else:
+            raise NotImplementedError(ds.coords)
+
+
+def deserialise_domain(data):
+    if "central_longitude" in data and "central_latitude" in data:
+        return LocalCartesianDomain(**data)
+    else:
+        return CartesianDomain(**data)

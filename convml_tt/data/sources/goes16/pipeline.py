@@ -43,7 +43,9 @@ class GOES16Query(luigi.Task):
         self.output().write(filenames)
 
     def output(self):
-        fn = "ch{}_keys_{}_{}.yaml".format(self.channel, self.time.isoformat(), isodate.duration_isoformat(self.dt_max))
+        fn = "ch{}_keys_{}_{}.yaml".format(
+            self.channel, self.time.isoformat(), isodate.duration_isoformat(self.dt_max)
+        )
         p = Path(self.data_path) / fn
         return YAMLTarget(str(p))
 
@@ -65,8 +67,7 @@ class GOES16Fetch(luigi.Task):
 
     def output(self):
         targets = [
-            luigi.LocalTarget(str(Path(self.data_path) / key))
-            for key in self.keys
+            luigi.LocalTarget(str(Path(self.data_path) / key)) for key in self.keys
         ]
         return targets
 

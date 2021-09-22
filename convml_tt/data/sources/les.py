@@ -14,7 +14,10 @@ class LESDataFile(luigi.Task):
 
 
 def _dt64_to_datetime(dt64):
-    return datetime.datetime.utcfromtimestamp(dt64.astype("O") / 1e9)
+    import ipdb
+
+    with ipdb.launch_ipdb_on_exception():
+        return datetime.datetime.utcfromtimestamp(dt64.astype("O") / 1e9)
 
 
 class FindLESFiles(luigi.Task):

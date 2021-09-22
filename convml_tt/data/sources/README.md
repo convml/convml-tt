@@ -1,5 +1,7 @@
 # dataset generation from `convml_tt`
 
+## dataset `meta.yaml`
+
 Producing triplets for training and study:
 
 ```yaml
@@ -50,5 +52,6 @@ projection:
 
 
 ```bash
-$> python -m luigi --module convml_tt.data.sources.pipeline GenerateAllScenes
+$> python -m luigi --module convml_tt.data.sources.pipeline GenerateSceneIDs
+$> python -m luigi --module convml_tt.data.sources.pipeline TripletTileDate
 ```

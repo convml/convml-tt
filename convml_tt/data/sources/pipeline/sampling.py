@@ -6,9 +6,11 @@ import luigi
 
 from ....pipeline import XArrayTarget, ImageTarget
 from .. import goes16
-from . import AllSceneIDs
+from . import GenerateSceneIDs
 from .. import DataSource
 from ..sampling.cropping import crop_field_to_domain
+from ..sampling.domain import LocalCartesianDomain
+from ..les import LESDataFile
 
 
 class SceneSourceFiles(luigi.Task):
@@ -20,7 +22,7 @@ class SceneSourceFiles(luigi.Task):
         return DataSource.load(path=self.data_path)
 
     def requires(self):
-        return AllSceneIDs(data_path=self.data_path)
+        return GenerateSceneIDs(data_path=self.data_path)
 
     def _build_fetch_tasks(self):
         task = None
@@ -31,14 +33,21 @@ class SceneSourceFiles(luigi.Task):
             all_source_files = self.input().open()
             scene_source_files = all_source_files[self.scene_id]
             if ds.source == "goes16":
-                task = goes16.pipeline.GOES16Fetch(keys=scene_source_files, data_path=source_data_path)
+                task = goes16.pipeline.GOES16Fetch(
+                    keys=scene_source_files, data_path=source_data_path
+                )
+            elif ds.source == "LES":
+                # assume that these files already exist
+                task = LESDataFile(file_path=scene_source_files)
             else:
                 raise NotImplementedError(ds.source)
 
         return task
 
     def run(self):
-        yield self._build_fetch_tasks()
+        fetch_tasks = self._build_fetch_tasks()
+        if fetch_tasks is not None:
+            yield fetch_tasks
 
     def output(self):
         source_task = self._build_fetch_tasks()
@@ -61,11 +70,11 @@ class CropSceneSourceFiles(luigi.Task):
         return SceneSourceFiles(data_path=self.data_path, scene_id=self.scene_id)
 
     def run(self):
-        ds = self.data_source
-        inputs = self.input()
+        data_source = self.data_source
 
-        if ds.source == "goes16":
-            if ds.type == "truecolor_rgb":
+        if data_source.source == "goes16":
+            inputs = self.input()
+            if data_source.type == "truecolor_rgb":
                 if not len(inputs) == 3:
                     raise Exception(
                         "To create TrueColor RGB images for GOES-16 the first"
@@ -77,11 +86,20 @@ class CropSceneSourceFiles(luigi.Task):
                     scene_fns=scene_fns
                 )
             else:
-                raise NotImplementedError(ds.type)
+                raise NotImplementedError(data_source.type)
+        elif data_source.source == "LES":
+            domain = data_source.domain
+            ds_input = self.input().open()
+            if isinstance(domain, LocalCartesianDomain):
+                domain.validate_dataset(ds=ds_input)
+
+            raise NotADirectoryError(42)
         else:
             raise NotImplementedError(ds.source)
 
-        da_cropped = crop_field_to_domain(domain=ds.domain, da=da_full, pad_pct=self.pad_ptc)
+        da_cropped = crop_field_to_domain(
+            domain=ds.domain, da=da_full, pad_pct=self.pad_ptc
+        )
 
         if ds.source == "goes16" and ds.type == "truecolor_rgb":
             img_cropped = goes16.satpy_rgb.rgb_da_to_img(da=da_cropped)
@@ -112,25 +130,23 @@ class _SceneRectSampleBase(luigi.Task):
     This task represents the creation of scene data to feed into a neural
     network, either the data for an entire rectangular domain or a single tile
     """
+
     scene_id = luigi.Parameter()
     data_path = luigi.Parameter(default=".")
     crop_pad_ptc = luigi.Parameter(default=0.1)
 
     def requires(self):
-        t_scene_ids = AllSceneIDs(data_path=self.data_path)
+        t_scene_ids = GenerateSceneIDs(data_path=self.data_path)
         if not t_scene_ids.output().exists():
             raise Exception(
                 "Scene IDs haven't been defined for this dataset yet "
-                "Please run the `AllSceneIDs task first`"
+                "Please run the `GenerateSceneIDs task first`"
             )
-        all_scenes = t_scene_ids.output().open()
-        source_channels = all_scenes[self.scene_id]
+        # all_scenes = t_scene_ids.output().open()
+        # source_channels = all_scenes[self.scene_id]
 
-        return CropSceneSourceChannels(
-            scene_id=self.scene_id,
-            data_path=self.data_path,
-            source_channels=source_channels,
-            pad_ptc=self.crop_pad_ptc
+        return CropSceneSourceFiles(
+            scene_id=self.scene_id, data_path=self.data_path, pad_ptc=self.crop_pad_ptc
         )
 
 

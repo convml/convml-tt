@@ -56,7 +56,7 @@ def merge_multichannel_sources(files_per_channel, time_fn):
     return scene_filesets
 
 
-class AllSceneIDs(luigi.Task):
+class GenerateSceneIDs(luigi.Task):
     """
     Construct a "database" (actually a yaml-file) of all scene IDs in a dataset
     given the source, type and time-span of the dataset. Database contains a list
@@ -99,8 +99,11 @@ class AllSceneIDs(luigi.Task):
             else:
                 source_variable = variables[0]
 
+            filename_glob = ds.files is not None and ds.files or "*.nc"
             tasks = FindLESFiles(
-                data_path=source_data_path, source_variable=source_variable
+                data_path=source_data_path,
+                source_variable=source_variable,
+                filename_glob=filename_glob,
             )
         else:
             raise NotImplementedError(ds.source)

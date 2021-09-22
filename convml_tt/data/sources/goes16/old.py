@@ -16,7 +16,10 @@ from .tiler import RectTile
 def _ensure_task_run(t):
     if not t.output().exists():
         luigi.build(
-            [t,], local_scheduler=True,
+            [
+                t,
+            ],
+            local_scheduler=True,
         )
     if not t.output().exists():
         raise Exception("Task didn't complete")
@@ -225,9 +228,18 @@ class FixedTimeRangeSatelliteTripletDataset(SatelliteTripletDataset):
         def draw_box(geom, color, face_alpha=0.5, label=None):
             lines.append(Line2D([0], [0], color=color, lw=1, label=label))
             kwargs = dict(crs=ccrs.PlateCarree(), edgecolor=color)
-            ax.add_geometries([geom,], alpha=face_alpha, facecolor=color, **kwargs)
             ax.add_geometries(
-                [geom,],
+                [
+                    geom,
+                ],
+                alpha=face_alpha,
+                facecolor=color,
+                **kwargs
+            )
+            ax.add_geometries(
+                [
+                    geom,
+                ],
                 alpha=face_alpha * 2.0,
                 facecolor="none",
                 linewidth=1.0,
