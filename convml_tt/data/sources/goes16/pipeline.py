@@ -175,7 +175,7 @@ class CreateRGBScene(luigi.Task):
         return t
 
 
-class GenerateTriplets(luigi.Task):
+class GenerateTripletsOld(luigi.Task):
     dt_max = luigi.FloatParameter()
     channels = luigi.ListParameter()
     times = DatetimeListParameter()
