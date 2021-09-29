@@ -7,17 +7,6 @@ import datetime
 from .sampling.domain import LocalCartesianDomain, SourceDataDomain
 
 
-def load_meta(dataset_path):
-    path_abs = Path(dataset_path).expanduser().absolute()
-    p = path_abs / "meta.yaml"
-    name = p.parent.name
-    with open(str(p)) as fh:
-        meta = yaml.load(fh.read())
-    meta["name"] = name
-    meta["data_path"] = path_abs
-    return meta
-
-
 def _parse_datetime(o):
     if not type(o) == datetime.datetime:
         return dateutil.parser.parse(o)
@@ -59,15 +48,19 @@ class DataSource:
         sampling_meta = self._meta.get("sampling", {})
 
         if "triplets" in sampling_meta:
-            required_vars = ["tile_N", "tile_size", "N_triplets"]
+            required_vars = ["tile_size", "N_triplets"]
             triplets_meta = sampling_meta["triplets"]
             if triplets_meta is None:
                 triplets_meta = {}
 
-            if not "scene_collections_splitting" in triplets_meta:
+            if "scene_collections_splitting" not in triplets_meta:
                 triplets_meta[
                     "scene_collections_splitting"
                 ] = "random_by_relative_sample_size"
+
+            # default tile is 256x256 pixels
+            if "tile_N" not in triplets_meta:
+                triplets_meta["tile_N"] = 256
 
             missing_vars = list(filter(lambda v: v not in triplets_meta, required_vars))
             if len(missing_vars) > 0:
@@ -77,17 +70,28 @@ class DataSource:
                 )
 
             N_triplets = triplets_meta.get("N_triplets", {})
-            assert "study" in N_triplets and "train" in N_triplets
+
+            # the default triplets collection is called "train"
+            if type(N_triplets) == int:
+                triplets_meta["N_triplets"] = dict(train=N_triplets)
+
+            assert "train" in triplets_meta["N_triplets"]
             assert "tile_N" in triplets_meta
             assert "tile_size" in triplets_meta
             assert "scene_collections_splitting" in triplets_meta
-            assert sum(N_triplets.values()) > 0
+            assert sum(triplets_meta["N_triplets"].values()) > 0
 
         self.sampling = sampling_meta
 
     def _parse_time_meta(self):
         time_meta = self._meta.get("time")
         if time_meta is None:
+            if self.source == "goes16":
+                raise Exception(
+                    "The goes16 data source requires that you define the start "
+                    "time (t_start) and either end time (t_end) or number of days "
+                    "(N_days) in a `time` section of `meta.yaml`"
+                )
             return
 
         self.t_start = _parse_datetime(time_meta["t_start"])

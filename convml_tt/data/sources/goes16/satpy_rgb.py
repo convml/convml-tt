@@ -53,7 +53,7 @@ def load_rgb_files_and_get_composite_da(scene_fns):
     # get out a dask-backed DataArray for the composite
     da_truecolor = new_scn["true_color"]
 
-    if "crs" in da_truecolor:
+    if "crs" in da_truecolor.coords:
         da_truecolor = da_truecolor.drop("crs")
 
     # save the grid-mapping information for the first radiance channel (they
