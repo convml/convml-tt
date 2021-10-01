@@ -37,7 +37,7 @@ class DataSource:
         assert "type" in self._meta
 
     def _parse_domain_meta(self):
-        domain_meta = self._meta["domain"]
+        domain_meta = self._meta.get("domain", dict(kind="as_source"))
         local_cart_reqd_fields = [
             "central_latitude",
             "central_longitude",
@@ -59,7 +59,23 @@ class DataSource:
         sampling_meta = self._meta.get("sampling", {})
 
         if "triplets" in sampling_meta:
+            required_vars = ["tile_N", "tile_size", "N_triplets"]
             triplets_meta = sampling_meta["triplets"]
+            if triplets_meta is None:
+                triplets_meta = {}
+
+            if not "scene_collections_splitting" in triplets_meta:
+                triplets_meta[
+                    "scene_collections_splitting"
+                ] = "random_by_relative_sample_size"
+
+            missing_vars = list(filter(lambda v: v not in triplets_meta, required_vars))
+            if len(missing_vars) > 0:
+                raise Exception(
+                    f"To make triplet samplings you must also define the following variables "
+                    f" {', '.join(missing_vars)}"
+                )
+
             N_triplets = triplets_meta.get("N_triplets", {})
             assert "study" in N_triplets and "train" in N_triplets
             assert "tile_N" in triplets_meta
@@ -70,7 +86,10 @@ class DataSource:
         self.sampling = sampling_meta
 
     def _parse_time_meta(self):
-        time_meta = self._meta["time"]
+        time_meta = self._meta.get("time")
+        if time_meta is None:
+            return
+
         self.t_start = _parse_datetime(time_meta["t_start"])
         if "N_days" in time_meta:
             duration = datetime.timedelta(days=time_meta["N_days"])
@@ -86,7 +105,12 @@ class DataSource:
         p = path_abs / "meta.yaml"
         name = p.parent.name
         with open(str(p)) as fh:
-            meta = yaml.load(fh.read())
+            meta = yaml.load(fh.read(), Loader=yaml.FullLoader)
+        if meta is None:
+            raise Exception(
+                "Please as minimum define the `source` and `type` of this "
+                "datasource in `meta.yaml`"
+            )
         meta["name"] = name
         meta["data_path"] = path_abs
         return cls(**meta)

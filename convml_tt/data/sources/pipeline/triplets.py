@@ -1,9 +1,10 @@
 from pathlib import Path
 import luigi
 import numpy as np
+from PIL import Image
 
 from .sampling import _SceneRectSampleBase, CropSceneSourceFiles, SceneSourceFiles
-from ...dataset import TILE_FILENAME_FORMAT
+from ...dataset import TILE_IDENTIFIER_FORMAT
 from ....pipeline import XArrayTarget, YAMLTarget
 from ..sampling import triplets as triplet_sampling, domain as sampling_domain
 from ..sampling.interpolation import resample
@@ -77,11 +78,10 @@ class TripletTileLocations(luigi.Task):
             N_triplets=N_triplets,
         )
 
-        triplet_locations = {}
+        tile_locations = []
 
         for triplet_collection, n_triplets in N_triplets.items():
             collection_scene_ids = scene_ids_by_collection[triplet_collection]
-            triplet_collection_locations = []
             for n in range(n_triplets):
                 tile_types = ["anchor", "neighbor", "distant"]
 
@@ -109,20 +109,20 @@ class TripletTileLocations(luigi.Task):
                     neigh_dist_scaling=neigh_dist_scaling,
                 )
 
-                triplet_meta = dict()
                 for (tile_type, scene_id, tile_domain) in zip(
                     tile_types, scene_ids_triplet, triplet_location
                 ):
-                    triplet_meta[tile_type] = dict(
-                        scene_id=str(scene_id), loc=tile_domain.serialize()
+                    tile_meta = dict(
+                        scene_id=str(scene_id),
+                        loc=tile_domain.serialize(),
+                        tile_type=tile_type,
+                        triplet_id=n,
+                        triplet_collection=triplet_collection,
                     )
-                triplet_meta["n"] = n
-
-                triplet_collection_locations.append(triplet_meta)
-            triplet_locations[triplet_collection] = triplet_collection_locations
+                    tile_locations.append(tile_meta)
 
         Path(self.output().fn).parent.mkdir(exist_ok=True, parents=True)
-        self.output().write(triplet_locations)
+        self.output().write(tile_locations)
 
     def output(self):
         fn = "triplet_locations.yaml"
@@ -130,10 +130,8 @@ class TripletTileLocations(luigi.Task):
         return YAMLTarget(str(p))
 
 
-class TripletTileData(_SceneRectSampleBase):
-    tile_type = luigi.Parameter()
-    triplet_id = luigi.IntParameter()
-    triplet_collection_id = luigi.Parameter()
+class SceneTripletsTileData(_SceneRectSampleBase):
+    tiles_meta = luigi.DictParameter()
 
     @property
     def data_source(self):
@@ -164,7 +162,6 @@ class TripletTileData(_SceneRectSampleBase):
     def run(self):
         inputs = self.input()
         da_src = inputs["source_data"].open()
-        triplet_locs = inputs["triplet_locations"].open()
 
         domain = self.data_source.domain
         if isinstance(domain, sampling_domain.SourceDataDomain):
@@ -173,31 +170,74 @@ class TripletTileData(_SceneRectSampleBase):
         triplets_meta = self.data_source.sampling["triplets"]
         tile_size = triplets_meta["tile_size"]
         tile_N = triplets_meta["tile_N"]
-
         dx = tile_size / tile_N
 
-        import pprint
+        for tile_meta in self.tiles_meta:
+            tile_identifier = TILE_IDENTIFIER_FORMAT.format(**tile_meta)
 
-        pprint.pprint(triplet_locs)
-        tile_domain_data = triplet_locs[self.triplet_id][self.tile_type]
-        tile_domain = sampling_domain.deserialise_domain(**tile_domain_data)
+            tile_domain = sampling_domain.deserialise_domain(tile_meta["loc"])
+            da_tile = resample(domain=tile_domain, da=da_src, dx=dx)
+            tile_output = self.output()[tile_identifier]
+            tile_output["data"].write(da_tile)
 
-        da_tile = resample(domain=tile_domain, da=da_src, dx=dx)
-
-        self.output()["data"].save(da_tile)
+            # TODO: make a more generic image generation function
+            img_data = da_tile.data
+            img_data = (img_data - img_data.min()) / (img_data.max() - img_data.min())
+            img_data = (img_data * 255).astype(np.uint8)
+            tile_img = Image.fromarray(img_data)
+            tile_img.save(str(tile_output["image"].fn))
 
     def output(self):
-        tile_data_path = Path(self.data_path) / "triplets" / self.triplet_collection_id
-        tile_id = TILE_FILENAME_FORMAT.format(
-            triplet_id=self.triplet_id, tile_type=self.tile_type
-        )
-        fn_data = f"{tile_id}.nc"
-        fn_image = f"{tile_id}.png"
-        return dict(
-            data=XArrayTarget(str(tile_data_path / fn_data)),
-            image=XArrayTarget(str(tile_data_path / fn_image)),
-        )
+        tile_data_path = Path(self.data_path) / "triplets"
+
+        outputs = {}
+
+        for tile_meta in self.tiles_meta:
+            tile_identifier = TILE_IDENTIFIER_FORMAT.format(**tile_meta)
+            fn_data = f"{tile_identifier}.nc"
+            fn_image = f"{tile_identifier}.png"
+            outputs[tile_identifier] = dict(
+                data=XArrayTarget(str(tile_data_path / fn_data)),
+                image=luigi.LocalTarget(str(tile_data_path / fn_image)),
+            )
+        return outputs
 
 
 class GenerateTriplets(luigi.Task):
-    pass
+    data_path = luigi.Parameter(default=".")
+
+    @property
+    def data_source(self):
+        return DataSource.load(path=self.data_path)
+
+    def requires(self):
+        reqs = {}
+        reqs["tile_locations"] = TripletTileLocations(
+            data_path=self.data_path,
+        )
+
+        return reqs
+
+    def run(self):
+        inputs = self.input()
+        tile_locs = inputs["tile_locations"].open()
+
+        tile_locs_by_scene = {}
+        for tile_meta in tile_locs:
+            scene_id = tile_meta.pop("scene_id")
+            tile_locs_by_scene.setdefault(scene_id, []).append(tile_meta)
+
+        tasks_tiles = {}
+        for scene_id, tiles_meta in tile_locs_by_scene.items():
+            tasks_tiles[scene_id] = SceneTripletsTileData(
+                scene_id=scene_id, tiles_meta=tiles_meta
+            )
+
+        yield tasks_tiles
+
+        self.output().write(tile_locs_by_scene)
+
+    def output(self):
+        fn_output = "tiles_by_scene.yaml"
+        p = Path(self.data_path) / "triplets" / fn_output
+        return YAMLTarget(str(p))

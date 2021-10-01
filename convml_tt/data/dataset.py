@@ -13,7 +13,7 @@ from torch.utils.data.dataset import Dataset
 from torchvision import transforms as tv_transforms
 
 
-TILE_FILENAME_FORMAT = "{triplet_id:05d}_{tile_type}.png"
+TILE_IDENTIFIER_FORMAT = "{triplet_id:05d}_{tile_type}"
 
 
 def get_load_transforms():
@@ -38,14 +38,13 @@ class TileType(enum.Enum):
     DISTANT = 2
 
 
-def _find_tile_files(data_dir, stage):
+def _find_tile_files(data_dir, stage, ext="png"):
     # dictionary to hold lists with filepaths for each tile type
     file_paths = {tile_type: [] for tile_type in TileType}
 
-    ext = TILE_FILENAME_FORMAT.split(".")[-1]
     full_path = Path(data_dir) / stage
     for f_path in sorted(full_path.glob(f"*.{ext}"), key=lambda p: p.name):
-        file_info = parse.parse(TILE_FILENAME_FORMAT, f_path.name)
+        file_info = parse.parse(TILE_IDENTIFIER_FORMAT + f".{ext}", f_path.name)
         tile_name = file_info["tile_type"]
         try:
             tile_type = TileType[tile_name.upper()]
