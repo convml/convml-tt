@@ -47,6 +47,7 @@ def annotated_scatter_plot(
     hue=None,
     hue_palette="hls",
     tile_dataset: ImageSingletDataset = None,
+    zorder=None,
 ):
     """
     create scatter plot from values in `x` and `y` picking out points to
@@ -69,7 +70,8 @@ def annotated_scatter_plot(
             provided will be plotted with `+` markers
     """
     if ax is None:
-        fig, ax = plt.subplots(figsize=(14, 10))
+        fig, ax = plt.subplots(figsize=(14, 14))
+        ax.set_aspect(1.0)
     else:
         fig = ax.figure
 
@@ -134,6 +136,8 @@ def annotated_scatter_plot(
         pts_offset = calc_offset_points(pts, scale=scale)
     elif autopos_method == "convex_hull":
         pts_offset = calc_offset_points_ch(pts, scale=scale)
+    elif autopos_method is None:
+        pts_offset = pts
     else:
         raise NotImplementedError(autopos_method)
 
@@ -142,6 +146,12 @@ def annotated_scatter_plot(
     ax.scatter(*pts_offset.T, alpha=0.0)
     ax.margins(0.2)
     xlim, ylim = ax.get_xlim(), ax.get_ylim()
+
+    lim_min = min(xlim[0], ylim[0])
+    lim_max = max(xlim[1], ylim[1])
+    xlim = ylim = (lim_min, lim_max)
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
 
     def transform(coord):
         return (ax.transData + fig.transFigure.inverted()).transform(coord)
@@ -195,7 +205,11 @@ def annotated_scatter_plot(
 
         xp, yh = transform((x_, y_))
 
-        ax1 = fig.add_axes([xp - 0.5 * size, yh - size * 0.5, size, size])
+        ax_kwargs = dict()
+        if zorder is not None:
+            ax_zorder = zorder.sel(tile_id=tile_id)
+            ax_kwargs["zorder"] = ax_zorder
+        ax1 = fig.add_axes([xp - 0.5 * size, yh - size * 0.5, size, size], **ax_kwargs)
         ax1.set_aspect(1)
         ax1.axison = False
 
