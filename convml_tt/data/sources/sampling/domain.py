@@ -79,7 +79,7 @@ class CartesianDomain:
             self.y_c + self.l_meridional / 2.0,
         ]
 
-    def plot_outline(self, ax=None, alpha=0.6, **kwargs):
+    def plot_outline(self, ax=None, alpha=0.6, set_ax_extent=False, **kwargs):
         if ax is None:
             fig_height = 4
             fig_width = fig_height * self.l_zonal / self.l_meridional
@@ -94,6 +94,14 @@ class CartesianDomain:
             **kwargs,
         )
         ax.add_patch(bounds_patch)
+        if set_ax_extent:
+            extent = [
+                self.x_c - self.l_zonal / 2.0,
+                self.x_c + self.l_zonal / 2.0,
+                self.y_c - self.l_meridional / 2.0,
+                self.y_c + self.l_meridional / 2.0,
+            ]
+            ax.set_extent(extent)
         return ax
 
     def serialize(self):
@@ -196,7 +204,7 @@ class LocalCartesianDomain(CartesianDomain):
 
         return ds_grid
 
-    def plot_outline(self, ax=None, alpha=0.6, **kwargs):
+    def plot_outline(self, ax=None, alpha=0.6, set_ax_extent=False, **kwargs):
         if ax is None:
             fig_height = 4
             fig_width = fig_height * self.l_zonal / self.l_meridional
@@ -224,6 +232,15 @@ class LocalCartesianDomain(CartesianDomain):
             **kwargs,
         )
         ax.add_patch(bounds_patch)
+        if set_ax_extent:
+            pad = 1.2
+            extent = [
+                self.x_c - pad * self.l_zonal / 2.0,
+                self.x_c + pad * self.l_zonal / 2.0,
+                self.y_c - pad * self.l_meridional / 2.0,
+                self.y_c + pad * self.l_meridional / 2.0,
+            ]
+            ax.set_extent(extent, crs=self.crs)
         return ax
 
     def serialize(self):
