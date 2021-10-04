@@ -2,6 +2,7 @@ import luigi
 from pathlib import Path
 import datetime
 import logging
+import itertools
 
 from ..goes16.pipeline import GOES16Query
 from ..les import FindLESFiles
@@ -49,7 +50,7 @@ def merge_multichannel_sources(files_per_channel, time_fn):
             )
         else:
             log.warn(
-                "Only {len(timestamp_files)} were found for timestamp {timestamp}"
+                f"Only {len(timestamp_files)} were found for timestamp {timestamp}"
                 " so this timestamp will be excluded"
             )
 
@@ -70,43 +71,44 @@ class GenerateSceneIDs(luigi.Task):
         return DataSource.load(path=self.data_path)
 
     def requires(self):
-        ds = self.data_source
-        source_data_path = Path(self.data_path) / "source_data" / ds.source
+        data_source = self.data_source
+        source_data_path = Path(self.data_path) / "source_data" / data_source.source
 
         tasks = None
-        if ds.source == "goes16":
-            if ds.type == "truecolor_rgb":
+        if data_source.source == "goes16":
+            if data_source.type == "truecolor_rgb":
                 tasks = {}
-                t_start = ds.t_start
-                t_end = ds.t_end
-                dt_total = t_end - t_start
-                t_center = t_start + dt_total / 2.0
+                for t_start, t_end in data_source.time_intervals:
+                    dt_total = t_end - t_start
+                    t_center = t_start + dt_total / 2.0
 
-                for channel in [1, 2, 3]:
-                    t = GOES16Query(
-                        data_path=source_data_path,
-                        time=t_center,
-                        dt_max=dt_total / 2.0,
-                        channel=channel,
-                    )
-                    tasks[channel] = t
+                    for channel in [1, 2, 3]:
+                        t = GOES16Query(
+                            data_path=source_data_path,
+                            time=t_center,
+                            dt_max=dt_total / 2.0,
+                            channel=channel,
+                        )
+                        tasks.setdefault(channel, []).append(t)
             else:
-                raise NotImplementedError(ds.type)
-        elif ds.source == "LES":
-            kind, *variables = ds.type.split("__")
+                raise NotImplementedError(data_source.type)
+        elif data_source.source == "LES":
+            kind, *variables = data_source.type.split("__")
             if not kind == "singlechannel":
-                raise NotImplementedError(ds.type)
+                raise NotImplementedError(data_source.type)
             else:
                 source_variable = variables[0]
 
-            filename_glob = ds.files is not None and ds.files or "*.nc"
+            filename_glob = (
+                data_source.files is not None and data_source.files or "*.nc"
+            )
             tasks = FindLESFiles(
                 data_path=source_data_path,
                 source_variable=source_variable,
                 filename_glob=filename_glob,
             )
         else:
-            raise NotImplementedError(ds.source)
+            raise NotImplementedError(data_source.source)
 
         return tasks
 
@@ -131,10 +133,11 @@ class GenerateSceneIDs(luigi.Task):
             else:
                 raise NotImplementedError(data_source.type)
 
-            opened_inputs = {
-                input_name: input_item.open()
-                for (input_name, input_item) in input.items()
-            }
+            opened_inputs = {}
+            for input_name, input_parts in input.items():
+                opened_inputs[input_name] = list(
+                    itertools.chain(*[input_part.open() for input_part in input_parts])
+                )
 
             for channel in channel_order:
                 channels_and_filenames[channel] = opened_inputs[channel]

@@ -1,8 +1,29 @@
 import satdata
+import types
+import datetime
 
 
-def within_months(time, months):
-    return time.month in months
+DATETIME_ATTRS = [
+    attr_name
+    for (attr_name, attr) in vars(datetime.datetime).items()
+    if isinstance(attr, types.GetSetDescriptorType)
+] + [
+    attr_name
+    for (attr_name, attr) in vars(datetime.date).items()
+    if isinstance(attr, types.GetSetDescriptorType)
+]
+
+
+def within_attr_values(time, **attr_values):
+    """
+    Check that a give datetime attribute's value is in a list of provided values
+
+    >> with_attr_values(time, month=[11,12])
+    """
+    for attr, values in attr_values.items():
+        if not getattr(time, attr) in values:
+            return False
+    return True
 
 
 def within_dt_from_zenith(time, dt_zenith_max, lon_zenith):

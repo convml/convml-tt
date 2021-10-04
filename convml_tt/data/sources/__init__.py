@@ -28,6 +28,24 @@ def _parse_datetime(o):
         return o
 
 
+def _parse_time_intervals(time_meta):
+    if "intervals" in time_meta:
+        for time_interval_meta in time_meta["intervals"]:
+            for time_interval in _parse_time_intervals(time_meta=time_interval_meta):
+                yield time_interval
+    else:
+        t_start = _parse_datetime(time_meta["t_start"])
+        if "N_days" in time_meta:
+            duration = datetime.timedelta(days=time_meta["N_days"])
+            t_end = t_start + duration
+        elif "t_end" in time_meta:
+            t_end = _parse_datetime(time_meta["t_end"])
+        else:
+            raise NotImplementedError(time_meta["time"])
+
+        yield (t_start, t_end)
+
+
 class DataSource:
     def __init__(self, *args, **kwargs):
         self._meta = kwargs
@@ -92,15 +110,12 @@ class DataSource:
         time_meta = self._meta.get("time")
         if time_meta is None:
             return
-
-        self.t_start = _parse_datetime(time_meta["t_start"])
-        if "N_days" in time_meta:
-            duration = datetime.timedelta(days=time_meta["N_days"])
-            self.t_end = self.t_start + duration
-        elif "t_end" in time_meta:
-            self.t_end = _parse_datetime(time_meta["t_end"])
         else:
-            raise NotImplementedError(time_meta["time"])
+            self._time_intervals = list(_parse_time_intervals(time_meta=time_meta))
+
+    @property
+    def time_intervals(self):
+        return self._time_intervals
 
     @classmethod
     def load(cls, path):
@@ -150,9 +165,9 @@ class DataSource:
                     dt_zenith_max=datetime.timedelta(hours=filter_value),
                     lon_zenith=lon_zenith,
                 )
-            elif filter_kind == "month":
+            elif filter_kind == time_filters.DATETIME_ATTRS:
                 filter_fn = functools.partial(
-                    time_filters.with_months, months=filter_value
+                    time_filters.within_attr_values, **{filter_kind: filter_value}
                 )
             else:
                 raise NotImplementedError(filter_kind)
