@@ -3,8 +3,11 @@ from pathlib import Path
 import yaml
 import dateutil.parser
 import datetime
+import numpy as np
+import functools
 
 from .sampling.domain import LocalCartesianDomain, SourceDataDomain
+from .utils import time_filters
 
 
 def load_meta(dataset_path):
@@ -64,7 +67,7 @@ class DataSource:
             if triplets_meta is None:
                 triplets_meta = {}
 
-            if not "scene_collections_splitting" in triplets_meta:
+            if "scene_collections_splitting" not in triplets_meta:
                 triplets_meta[
                     "scene_collections_splitting"
                 ] = "random_by_relative_sample_size"
@@ -132,11 +135,26 @@ class DataSource:
             {k: v for k, v in self._meta.items() if not k.startswith("_")}
         )
 
-    def filter_scenes_by_time(self, scene_times):
+    def filter_scene_times(self, scene_times):
         """
         Apply the time filtering specified for this source dataset if one is specified
         """
-        if "N_hours_from_zenith" in self._meta["time"]:
-            # TODO: implement filtering here
-            pass
-        return scene_times
+
+        scene_times = np.atleast_1d(scene_times)
+        filters = self._meta["time"].get("filters", {})
+        for filter_kind, filter_value in filters.items():
+            if filter_kind == "N_hours_from_zenith":
+                lon_zenith = self.domain.central_longitude
+                filter_fn = functools.partial(
+                    time_filters.within_dt_from_zenith,
+                    dt_zenith_max=datetime.timedelta(hours=filter_value),
+                    lon_zenith=lon_zenith,
+                )
+            elif filter_kind == "month":
+                filter_fn = functools.partial(
+                    time_filters.with_months, months=filter_value
+                )
+            else:
+                raise NotImplementedError(filter_kind)
+            scene_times = list(filter(filter_fn, scene_times))
+        return np.squeeze(scene_times)

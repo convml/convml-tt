@@ -120,16 +120,16 @@ class GenerateSceneIDs(luigi.Task):
             raise NotImplementedError(ds.source)
 
     def run(self):
-        ds = self.data_source
+        data_source = self.data_source
         scenes = {}
 
         input = self.input()
         if type(input) == dict:
             channels_and_filenames = OrderedDict()
-            if ds.type == "truecolor_rgb":
+            if data_source.type == "truecolor_rgb":
                 channel_order = [1, 2, 3]
             else:
-                raise NotImplementedError(ds.type)
+                raise NotImplementedError(data_source.type)
 
             opened_inputs = {
                 input_name: input_item.open()
@@ -145,14 +145,16 @@ class GenerateSceneIDs(luigi.Task):
 
             for scene_filenames in scene_sets:
                 t_scene = self.get_time_for_filename(filename=scene_filenames[0])
-                scene_id = make_scene_id(source=ds.source, t_scene=t_scene)
-                scenes[scene_id] = scene_filenames
+                if data_source.filter_scene_times(t_scene):
+                    scene_id = make_scene_id(source=data_source.source, t_scene=t_scene)
+                    scenes[scene_id] = scene_filenames
         elif isinstance(input, YAMLTarget):
             scene_filenames = input.open()
             for scene_filename in scene_filenames:
                 t_scene = self.get_time_for_filename(filename=scene_filename)
-                scene_id = make_scene_id(source=ds.source, t_scene=t_scene)
-                scenes[scene_id] = scene_filename
+                if data_source.filter_scene_times(t_scene):
+                    scene_id = make_scene_id(source=data_source.source, t_scene=t_scene)
+                    scenes[scene_id] = scene_filename
         else:
             raise NotImplementedError(input)
 
@@ -176,4 +178,4 @@ class DownloadAllSourceFiles(luigi.Task):
         return DataSource.load(path=self.data_path)
 
     def requires(self):
-        return AllSceneIDs(data_path=self.data_path)
+        return GenerateSceneIDs(data_path=self.data_path)
