@@ -166,9 +166,9 @@ class GenerateSceneIDs(luigi.Task):
 
     def output(self):
         ds = self.data_source
-        p = Path("source_data") / ds.source / ds.type
         fn = "scene_ids.yml"
-        return YAMLTarget(str(p / fn))
+        p = Path("source_data") / ds.source / ds.type / fn
+        return YAMLTarget(str(p))
 
 
 class DownloadAllSourceFiles(luigi.Task):

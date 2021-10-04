@@ -60,7 +60,7 @@ class SceneSourceFiles(luigi.Task):
 class CropSceneSourceFiles(luigi.Task):
     scene_id = luigi.Parameter()
     data_path = luigi.Parameter(default=".")
-    pad_ptc = luigi.Parameter(default=0.1)
+    pad_ptc = luigi.FloatParameter(default=0.1)
 
     @property
     def data_source(self):
@@ -95,16 +95,19 @@ class CropSceneSourceFiles(luigi.Task):
 
             raise NotADirectoryError(42)
         else:
-            raise NotImplementedError(ds.source)
+            raise NotImplementedError(data_source.source)
 
+        # import ipdb
+        # with ipdb.launch_ipdb_on_exception():
         da_cropped = crop_field_to_domain(
-            domain=ds.domain, da=da_full, pad_pct=self.pad_ptc
+            domain=data_source.domain, da=da_full, pad_pct=self.pad_ptc
         )
 
-        if ds.source == "goes16" and ds.type == "truecolor_rgb":
+        if data_source.source == "goes16" and data_source.type == "truecolor_rgb":
             img_cropped = goes16.satpy_rgb.rgb_da_to_img(da=da_cropped)
+            del da_cropped.attrs["_satpy_id"]
         else:
-            raise NotImplementedError(ds.source)
+            raise NotImplementedError(data_source.source)
 
         self.output_path.mkdir(exist_ok=True, parents=True)
         self.output()["data"].write(da_cropped)
@@ -133,7 +136,7 @@ class _SceneRectSampleBase(luigi.Task):
 
     scene_id = luigi.Parameter()
     data_path = luigi.Parameter(default=".")
-    crop_pad_ptc = luigi.Parameter(default=0.1)
+    crop_pad_ptc = luigi.FloatParameter(default=0.1)
 
     def requires(self):
         t_scene_ids = GenerateSceneIDs(data_path=self.data_path)

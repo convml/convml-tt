@@ -37,27 +37,40 @@ def resample(
 ):
     """
     Resample a xarray DataArray onto this tile with grid made of NxN points
+
+    cartesian -> cartsian
+    latlon with crs -> latlon
+    latlon -> latlon
     """
-    if "lat" in da.coords and "lon" in da.coords:
-        old_grid = xr.Dataset(coords=da.coords)
+    old_grid = xr.Dataset(coords=da.coords)
+    new_grid = domain.get_grid(dx=dx)
 
-        if isinstance(domain, LocalCartesianDomain):
-            if not hasattr(da, "crs"):
-                raise Exception(
-                    "The provided DataArray doesn't have a "
-                    "projection provided. Please set the `crs` "
-                    "attribute to contain a cartopy projection"
-                )
+    crs = getattr(da.rio, "crs")
 
-            latlon_old = ccrs.PlateCarree().transform_points(
-                da.crs,
-                *np.meshgrid(da.x.values, da.y.values),
-            )[:, :, :2]
+    if isinstance(domain, LocalCartesianDomain) and crs is None:
+        raise Exception(
+            "The provided DataArray doesn't have a "
+            "projection provided. Please set the `crs` "
+            "attribute to contain a cartopy projection"
+        )
 
-            old_grid["lat"] = (("y", "x"), latlon_old[..., 1])
-            old_grid["lon"] = (("y", "x"), latlon_old[..., 0])
+    if crs is not None:
+        if not ("lat" in new_grid and "lon" in new_grid):
+            raise Exception(
+                "The provided source-data is on a lat/lon grid. "
+                "Please define a new local Cartesian domain to project this "
+                "into by defining `l_zonal`, `l_meridional`, `central_latitude` "
+                "and `central_longitude` in the `domain` section of the meta "
+                "information."
+            )
 
-        new_grid = domain.get_grid(dx=dx)
+        latlon_old = ccrs.PlateCarree().transform_points(
+            crs,
+            *np.meshgrid(da.x.values, da.y.values),
+        )[:, :, :2]
+
+        old_grid["lat"] = (("y", "x"), latlon_old[..., 1])
+        old_grid["lon"] = (("y", "x"), latlon_old[..., 0])
 
         Nx_in, Ny_in = da.x.shape[0], da.y.shape[0]
         Nx_out, Ny_out = int(new_grid.x.count()), int(new_grid.y.count())
@@ -73,13 +86,14 @@ def resample(
             )
         )
 
+        Path(regridder_tmpdir).mkdir(exist_ok=True, parents=True)
         regridder_weights_fn = str(regridder_tmpdir / regridder_weights_fn)
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             regridder = SilentRegridder(
-                filename=regridder_weights_fn,
-                reuse_weights=True,
+                # filename=regridder_weights_fn,
+                # reuse_weights=True,
                 ds_in=old_grid,
                 ds_out=new_grid,
                 method=method,

@@ -228,7 +228,7 @@ class ProcessedTile(tiler.Tile):
     @classmethod
     def load(cls, meta_fn):
         tile_id = meta_fn.name.split("_")[0]
-        meta = yaml.load(open(meta_fn))
+        meta = yaml.load(open(meta_fn), Loader=yaml.FullLoader)
         anchor_meta = meta["target"]["anchor"]
         tile = cls(
             lat0=anchor_meta["lat"], lon0=anchor_meta["lon"], size=anchor_meta["size"]

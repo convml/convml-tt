@@ -43,7 +43,7 @@ class YAMLTarget(luigi.LocalTarget):
 
     def read(self):
         with super().open() as fh:
-            return yaml.load(fh)
+            return yaml.load(fh, Loader=yaml.FullLoader)
 
     def open(self):
         return self.read()
