@@ -97,15 +97,14 @@ class CropSceneSourceFiles(luigi.Task):
         else:
             raise NotImplementedError(data_source.source)
 
-        # import ipdb
-        # with ipdb.launch_ipdb_on_exception():
         da_cropped = crop_field_to_domain(
             domain=data_source.domain, da=da_full, pad_pct=self.pad_ptc
         )
 
         if data_source.source == "goes16" and data_source.type == "truecolor_rgb":
             img_cropped = goes16.satpy_rgb.rgb_da_to_img(da=da_cropped)
-            del da_cropped.attrs["_satpy_id"]
+            if "_satpy_id" in da_cropped.attrs:
+                del da_cropped.attrs["_satpy_id"]
         else:
             raise NotImplementedError(data_source.source)
 
