@@ -11,9 +11,7 @@ import parse
 from PIL import Image
 from torch.utils.data.dataset import Dataset
 from torchvision import transforms as tv_transforms
-
-
-TILE_IDENTIFIER_FORMAT = "{triplet_id:05d}_{tile_type}"
+from .common import TILE_IDENTIFIER_FORMAT
 
 
 def get_load_transforms():

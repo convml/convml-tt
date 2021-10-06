@@ -4,14 +4,15 @@ import luigi
 import numpy as np
 
 from ....pipeline import XArrayTarget, YAMLTarget
-from ...dataset import TILE_IDENTIFIER_FORMAT
-from .. import DataSource
+from ...common import TILE_IDENTIFIER_FORMAT
+from .. import DataSource, goes16
 from ..sampling import domain as sampling_domain
 from ..sampling import triplets as triplet_sampling
 from ..sampling.interpolation import resample
 from ..utils.domain_images import rgb_image_from_scene_data
 from . import GenerateSceneIDs
-from .sampling import CropSceneSourceFiles, SceneSourceFiles, _SceneRectSampleBase
+from .sampling import (CropSceneSourceFiles, SceneSourceFiles,
+                       _SceneRectSampleBase)
 
 
 class TripletSceneSplits(luigi.Task):
