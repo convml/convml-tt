@@ -40,6 +40,9 @@ jobs:
       - name: install luigi (for data generation pipeline tests)
         run: |
           pip install luigi
+      - name: install satpy, cartopy, xesmf (for data generation pipeline tasks)
+        run: |
+          conda install -c conda-forge satpy cartopy xesmf
       - name: Test with pytest
         run: |
           conda install pytest
