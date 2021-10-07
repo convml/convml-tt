@@ -14,7 +14,6 @@ from collections import OrderedDict
 import xarray as xr
 import numpy as np
 from numpy.ma.core import MaskedArray
-import matplotlib.pyplot as plt
 import cv2
 from PIL import Image
 from skimage.color import rgb2gray, rgba2rgb
@@ -270,7 +269,9 @@ class DatasetOpticalFlowTrajectories(luigi.Task):
             y_points = da_imgdata.y.values[j_points]
 
             m_nans = np.logical_or(i_points == -1, j_points == -1)
-            set_nans = lambda v: np.where(m_nans, np.nan, v)
+
+            def set_nans(v):
+                return np.where(m_nans, np.nan, v)
 
             ds_points_scene["x"] = ("traj_id",), set_nans(x_points)
             ds_points_scene["y"] = ("traj_id",), set_nans(y_points)

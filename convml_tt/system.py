@@ -271,6 +271,26 @@ class TripletTrainerModel(pl.LightningModule):
         )
         return parser
 
+    @classmethod
+    def load_from_checkpoint(cls, checkpoint_path, *args, **kwargs):
+        """
+        Load a trained model from a checkpoint-file. We wrap
+        pytorch-lightning's default .load_from_checkpoint so that we can
+        load models trained with fastai v1
+        """
+        # conveniently pytorch-lightning wraps its checkpoints as a zip-file
+        # where fastai v1 simply pickled the weights
+        import zipfile
+
+        if zipfile.is_zipfile(checkpoint_path):
+            return super().load_from_checkpoint(
+                checkpoint_path=checkpoint_path, *args, **kwargs
+            )
+        else:
+            from .external import fastai1_weights_loader
+
+            return fastai1_weights_loader.model_from_saved_weights(path=checkpoint_path)
+
 
 class TripletTrainerDataModule(pl.LightningDataModule):
     def __init__(

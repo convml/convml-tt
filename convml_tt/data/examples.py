@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Union
 
 from torchvision.datasets.utils import download_and_extract_archive
+from ..system import TripletTrainerModel
 
 _URL_ROOT = "http://homepages.see.leeds.ac.uk/~earlcd/ml-datasets"
 
@@ -63,13 +64,7 @@ def load_pretrained_model(pretrained_model: PretrainedModel, data_dir="data/"):
     model_path = fetch_pretrained_model(
         pretrained_model=pretrained_model, data_dir=data_dir
     )
-    if pretrained_model == PretrainedModel.FIXED_NORM_STAGE2:
-        from ..external import fastai1_weights_loader
-
-        model = fastai1_weights_loader.model_from_saved_weights(path=model_path)
-    else:
-        raise NotImplementedError(pretrained_model)
-    return model
+    return TripletTrainerModel.load_from_checkpoint(model_path)
 
 
 def main(args=None):
