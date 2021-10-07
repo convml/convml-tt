@@ -238,7 +238,7 @@ class MovingWindowImageTilingDataset(ImageSingletDataset):
         self.num_items = self.nt_x * self.nt_y
 
         image_load_transforms = get_load_transforms()
-        self.img_data = image_load_transforms(self.img)
+        self.img_data_normed = image_load_transforms(self.img)
         self.transform = transform
 
     def index_to_img_ij(self, index):
@@ -255,11 +255,23 @@ class MovingWindowImageTilingDataset(ImageSingletDataset):
         j_img = self.img_idx_tile_j[j]
         return i_img, j_img
 
-    def __getitem__(self, index):
+    def get_image(self, index):
+        x_slice, y_slice = self._get_image_tiling_slices(index=index)
+        # for a PIL image we need the unnormalized image data
+        img_data = np.array(self.img)
+        # PIL images have shape [height, width, #channels]
+        img_data_tile = img_data[y_slice, x_slice, :]
+        return Image.fromarray(img_data_tile)
+
+    def _get_image_tiling_slices(self, index):
         i_img, j_img = self.index_to_img_ij(index=index)
 
         x_slice = slice(i_img, i_img + self.nxt)
         y_slice = slice(j_img, j_img + self.nyt)
-        img_data_tile = self.img_data[:, y_slice, x_slice]
+        return (x_slice, y_slice)
+
+    def __getitem__(self, index):
+        x_slice, y_slice = self._get_image_tiling_slices(index=index)
+        img_data_tile = self.img_data_normed[:, y_slice, x_slice]
 
         return self.transform(img_data_tile)
