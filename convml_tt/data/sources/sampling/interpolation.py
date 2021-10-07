@@ -93,8 +93,8 @@ def resample(
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             regridder = SilentRegridder(
-                filename=regridder_weights_fn,
-                reuse_weights=True,
+                # filename=regridder_weights_fn,
+                # reuse_weights=True,
                 ds_in=old_grid,
                 ds_out=new_grid,
                 method=method,
