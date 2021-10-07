@@ -39,7 +39,7 @@ jobs:
 #          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
       - name: install luigi (for data generation pipeline tests)
         run: |
-          pip install luigi
+          pip install luigi isodate
       - name: install satpy, cartopy, xesmf (for data generation pipeline tasks)
         run: |
           conda install -c conda-forge satpy cartopy xesmf
