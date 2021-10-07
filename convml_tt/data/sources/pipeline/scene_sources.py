@@ -167,7 +167,7 @@ class GenerateSceneIDs(luigi.Task):
     def output(self):
         ds = self.data_source
         fn = "scene_ids.yml"
-        p = Path("source_data") / ds.source / ds.type / fn
+        p = Path(self.data_path) / "source_data" / ds.source / ds.type / fn
         return YAMLTarget(str(p))
 
 
