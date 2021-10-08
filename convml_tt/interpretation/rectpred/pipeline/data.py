@@ -243,17 +243,18 @@ class AggregateFullDatasetImagePredictionMapData(luigi.Task):
         for scene_id, input in self.input()["data"].items():
             da = input.open()
             da["scene_id"] = scene_id
+
+            # turn attributes we want to keep into extra coordinates so that
+            # we'll have them later
+            for v in ["src_data_path", "image_path"]:
+                value = da.attrs.pop(v)
+                da[v] = value
             das.append(da)
 
         da_all = xr.concat(das, dim="scene_id")
         da_all.name = "emb"
         da_all.attrs["step_size"] = self.step_size
         da_all.attrs["model_path"] = self.model_path
-
-        # remove attributes that only applies to one source image
-        if "src_data_path" in da_all.attrs:
-            del da_all.attrs["src_data_path"]
-        del da_all.attrs["image_path"]
 
         Path(self.output().fn).parent.mkdir(exist_ok=True, parents=True)
         da_all.to_netcdf(self.output().fn)

@@ -5,16 +5,14 @@ from pathlib import Path
 
 import luigi
 import matplotlib.pyplot as plt
-import numpy as np
 import xarray as xr
 
 from ....data.sources import DataSource
-from ....data.sources.pipeline import SceneBulkProcessingBaseTask, SceneRegriddedData
+from ....data.sources.pipeline import SceneBulkProcessingBaseTask
 from ....pipeline import XArrayTarget
 from ..plot import (
-    get_img_with_extent,
-    get_img_with_extent_cropped,
     make_rgb_annotation_map_image,
+    make_components_annotation_map_image,
 )
 from .data import DatasetImagePredictionMapData
 from .transforms import DatasetEmbeddingTransform
@@ -29,64 +27,8 @@ class ComponentsAnnotationMapImage(luigi.Task):
     def run(self):
         da_emb = xr.open_dataarray(self.input_path)
 
-        da_emb.coords["pca_dim"] = np.arange(da_emb.pca_dim.count())
-
-        da_emb = da_emb.assign_coords(
-            x=da_emb.x / 1000.0,
-            y=da_emb.y / 1000.0,
-            explained_variance=np.round(da_emb.explained_variance, 2),
-        )
-        da_emb.x.attrs["units"] = "km"
-        da_emb.y.attrs["units"] = "km"
-
-        img, img_extent = self.get_image(da_emb=da_emb)
-
-        img_extent = np.array(img_extent) / 1000.0
-
-        # find non-xy dim
-        d_not_xy = next(filter(lambda d: d not in ["x", "y"], da_emb.dims))
-
-        N_subplots = len(self.components) + 1
-        data_r = 3.0
-        ncols = self.col_wrap
-        size = 3.0
-
-        nrows = int(np.ceil(N_subplots / ncols))
-        figsize = (int(size * data_r * ncols), int(size * nrows))
-
-        fig, axes = plt.subplots(
-            figsize=figsize,
-            nrows=nrows,
-            ncols=ncols,
-            subplot_kw=dict(aspect=1),
-            sharex=True,
-        )
-
-        ax = axes.flatten()[0]
-        ax.imshow(img, extent=img_extent)
-        ax.set_title(da_emb.scene_id.item())
-
-        for n, ax in zip(self.components, axes.flatten()[1:]):
-            ax.imshow(img, extent=img_extent)
-            da_ = da_emb.sel(**{d_not_xy: n})
-            da_ = da_.drop(["i0", "j0", "scene_id"])
-
-            da_.plot.imshow(ax=ax, y="y", alpha=0.5, add_colorbar=False)
-
-            ax.set_xlim(*img_extent[:2])
-            ax.set_ylim(*img_extent[2:])
-
-        [ax.set_aspect(1) for ax in axes.flatten()]
-        [ax.set_xlabel("") for ax in axes[:-1, :].flatten()]
-
-        plt.tight_layout()
-
-        fig.text(
-            0.0,
-            -0.02,
-            "cum. explained variance: {}".format(
-                np.cumsum(da_emb.explained_variance.values)
-            ),
+        fig, axes = make_components_annotation_map_image(
+            da_emb=da_emb, components=self.components, col_wrap=self.col_wrap
         )
 
         Path(self.output().fn).parent.mkdir(exist_ok=True, parents=True)
@@ -148,20 +90,6 @@ class DatasetComponentsAnnotationMapImage(ComponentsAnnotationMapImage):
     def src_data_path(self):
         return self.data_path
 
-    def get_image(self, da_emb):
-        img_path = (
-            SceneRegriddedData(data_path=self.data_path, scene_id=self.scene_id)
-            .output()["image"]
-            .fn
-        )
-
-        if self.crop_img:
-            return get_img_with_extent_cropped(da_emb, img_path)
-        else:
-            return get_img_with_extent(
-                da_emb=da_emb, img_fn=img_path, data_path=self.data_path
-            )
-
     def output(self):
         model_name = Path(self.model_path).name.replace(".pkl", "")
 
@@ -201,17 +129,24 @@ class AllDatasetComponentAnnotationMapImages(SceneBulkProcessingBaseTask):
 
 
 class RGBAnnotationMapImage(luigi.Task):
+    """
+    Create RGB overlay plot from embeddings on Cartesian domain reading the
+    embeddings from `input_path`
+    """
+
     input_path = luigi.Parameter()
     rgb_components = luigi.ListParameter(default=[0, 1, 2])
     src_data_path = luigi.Parameter()
     render_tiles = luigi.BoolParameter(default=False)
 
     def make_plot(self, da_emb):
-        return make_rgb_annotation_map_image(
-            da=da_emb,
-            rgb_components=self.rgb_components,
-            data_path=self.data_path,
-        )
+        import ipdb
+
+        with ipdb.launch_ipdb_on_exception():
+            return make_rgb_annotation_map_image(
+                da_emb=da_emb,
+                rgb_components=self.rgb_components,
+            )
 
     def run(self):
         da_emb = xr.open_dataarray(self.input_path)
@@ -264,7 +199,6 @@ class DatasetRGBAnnotationMapImage(RGBAnnotationMapImage):
                 transform_type=self.transform_type,
                 transform_extra_args=self.transform_extra_args,
                 pretrained_model=self.pretrained_transform_model,
-                # n_clusters=max(self.rgb_components)+1, TODO: put into transform_extra_args
             )
 
     def run(self):

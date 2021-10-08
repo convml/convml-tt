@@ -142,13 +142,22 @@ class DatasetEmbeddingTransform(EmbeddingTransform):
             transform_extra_args=self.transform_extra_args,
         )
 
-        import ipdb
+        da_emb_all = parent_output["transformed_data"].open()
+        Path(self.output().fn).parent.mkdir(exist_ok=True, parents=True)
+        da_emb = da_emb_all.sel(scene_id=self.scene_id)
 
-        with ipdb.launch_ipdb_on_exception():
-            da_emb_all = parent_output["transformed_data"].open()
-            Path(self.output().fn).parent.mkdir(exist_ok=True, parents=True)
-            da_emb = da_emb_all.sel(scene_id=self.scene_id)
-            da_emb.to_netcdf(self.output().fn)
+        # turn values that were previously attributes (but have been stored
+        # as extra coordinates when we stacked) as attributes again
+        for c in ["image_path", "src_data_path"]:
+            value = da_emb[c].item()
+            da_emb = da_emb.reset_coords(c, drop=True)
+            da_emb.attrs[c] = value
+        # not sure why this is necessary, but for some reason xarray doesn't
+        # overwrite this variable and then thinks the old coordinates still
+        # exist when we load the file again
+        del da_emb.encoding["coordinates"]
+
+        da_emb.to_netcdf(self.output().fn)
 
     @property
     def input_path(self):
@@ -200,11 +209,7 @@ class CreateAllPredictionMapsDataTransformed(EmbeddingTransform):
             self._build_transform_identifier(),
         )
         p_root = (
-            Path(self.data_path)
-            / "embeddings"
-            / "rect"
-            / model_name
-            / "components_map"
+            Path(self.data_path) / "embeddings" / "rect" / model_name / "components_map"
         )
         if self.pretrained_transform_model is not None:
             p = p_root / self.pretrained_transform_model / fn
