@@ -210,10 +210,6 @@ class DatasetRGBAnnotationMapImage(RGBAnnotationMapImage):
 
         assert dx == dy
 
-        import ipdb
-
-        ipdb.set_trace()
-
         tile_resolution = dx / 1000.0
         step_km = self.step_size * tile_resolution
         domain = datasource.domain
