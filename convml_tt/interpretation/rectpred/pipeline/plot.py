@@ -205,19 +205,27 @@ class DatasetRGBAnnotationMapImage(RGBAnnotationMapImage):
         datasource = DataSource.load(self.data_path)
         da_emb = xr.open_dataarray(self.input_path)
 
-        N_tile = (256, 256)
-        model_resolution = da_emb.lx_tile / N_tile[0] / 1000.0
+        dx = da_emb.lx_tile / da_emb.tile_nx
+        dy = da_emb.ly_tile / da_emb.tile_ny
+
+        assert dx == dy
+
+        import ipdb
+
+        ipdb.set_trace()
+
+        tile_resolution = dx / 1000.0
+        step_km = self.step_size * tile_resolution
         domain = datasource.domain
         lat0, lon0 = domain.central_latitude, domain.central_longitude
+        model_name = self.model_path.replace(".pkl", "")
 
         title_parts = [
             self.scene_id,
-            "(lat0, lon0)=({}, {})".format(lat0, lon0),
-            "{} NN model, {} x {} tiles at {:.2f}km resolution".format(
-                self.model_path.replace(".pkl", ""),
-                N_tile[0],
-                N_tile[1],
-                model_resolution,
+            f"(lat0, lon0)=({lat0}, {lon0})",
+            (
+                f"{model_name} NN model, {da_emb.tile_nx} x {da_emb.tile_ny} tiles "
+                f"at {tile_resolution:.2f}km resolution, {da_emb.step_size} step ({step_km:.2f}km)"
             ),
             "prediction RGB from {} components [{}]".format(
                 da_emb.transform_type, ", ".join([str(v) for v in self.rgb_components])
