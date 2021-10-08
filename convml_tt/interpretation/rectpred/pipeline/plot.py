@@ -4,17 +4,20 @@ luigi Tasks for running plotting pipeline on rectangular domain datasets
 from pathlib import Path
 
 import luigi
-import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
 
-from ....data.dataset import SceneBulkProcessingBaseTask, TripletDataset
-from ....data.sources.satellite import tiler
-from ....data.sources.satellite.rectpred import MakeRectRGBImage
+from ....data.sources import DataSource
+from ....data.sources.pipeline import SceneBulkProcessingBaseTask, SceneRegriddedData
 from ....pipeline import XArrayTarget
+from ..plot import (
+    get_img_with_extent,
+    get_img_with_extent_cropped,
+    make_rgb_annotation_map_image,
+)
 from .data import DatasetImagePredictionMapData
-from .transform import DatasetEmbeddingTransform
+from .transforms import DatasetEmbeddingTransform
 
 
 class ComponentsAnnotationMapImage(luigi.Task):
@@ -108,7 +111,7 @@ class ComponentsAnnotationMapImage(luigi.Task):
 
 
 class DatasetComponentsAnnotationMapImage(ComponentsAnnotationMapImage):
-    dataset_path = luigi.Parameter()
+    data_path = luigi.Parameter()
     step_size = luigi.Parameter()
     model_path = luigi.Parameter()
     scene_id = luigi.Parameter()
@@ -121,14 +124,14 @@ class DatasetComponentsAnnotationMapImage(ComponentsAnnotationMapImage):
     def requires(self):
         if self.transform_type is None:
             return DatasetImagePredictionMapData(
-                dataset_path=self.dataset_path,
+                data_path=self.data_path,
                 scene_id=self.scene_id,
                 model_path=self.model_path,
                 step_size=self.step_size,
             )
         else:
             return DatasetEmbeddingTransform(
-                dataset_path=self.dataset_path,
+                data_path=self.data_path,
                 scene_id=self.scene_id,
                 model_path=self.model_path,
                 step_size=self.step_size,
@@ -143,20 +146,20 @@ class DatasetComponentsAnnotationMapImage(ComponentsAnnotationMapImage):
 
     @property
     def src_data_path(self):
-        return self.dataset_path
+        return self.data_path
 
     def get_image(self, da_emb):
         img_path = (
-            MakeRectRGBImage(dataset_path=self.dataset_path, scene_id=self.scene_id)
-            .output()
+            SceneRegriddedData(data_path=self.data_path, scene_id=self.scene_id)
+            .output()["image"]
             .fn
         )
 
         if self.crop_img:
-            return _get_img_with_extent_cropped(da_emb, img_path)
+            return get_img_with_extent_cropped(da_emb, img_path)
         else:
-            return _get_img_with_extent(
-                da_emb=da_emb, img_fn=img_path, dataset_path=self.dataset_path
+            return get_img_with_extent(
+                da_emb=da_emb, img_fn=img_path, data_path=self.data_path
             )
 
     def output(self):
@@ -169,7 +172,7 @@ class DatasetComponentsAnnotationMapImage(ComponentsAnnotationMapImage):
             "_".join([str(v) for v in self.components]),
         )
 
-        p_root = Path(self.dataset_path) / "embeddings" / "rect" / model_name
+        p_root = Path(self.data_path) / "embeddings" / "rect" / model_name
 
         if self.pretrained_transform_model is not None:
             p = p_root / self.pretrained_transform_model / "components_map" / fn
@@ -180,7 +183,7 @@ class DatasetComponentsAnnotationMapImage(ComponentsAnnotationMapImage):
 
 class AllDatasetComponentAnnotationMapImages(SceneBulkProcessingBaseTask):
     model_path = luigi.Parameter()
-    step_size = luigi.Parameter()
+    step_size = luigi.IntParameter()
     transform_type = luigi.OptionalParameter()
     pretrained_transform_model = luigi.OptionalParameter(default=None)
     components = luigi.ListParameter(default=[0, 1, 2])
@@ -207,7 +210,7 @@ class RGBAnnotationMapImage(luigi.Task):
         return make_rgb_annotation_map_image(
             da=da_emb,
             rgb_components=self.rgb_components,
-            dataset_path=self.dataset_path,
+            data_path=self.data_path,
         )
 
     def run(self):
@@ -234,8 +237,8 @@ class RGBAnnotationMapImage(luigi.Task):
 
 
 class DatasetRGBAnnotationMapImage(RGBAnnotationMapImage):
-    dataset_path = luigi.Parameter()
-    step_size = luigi.Parameter()
+    data_path = luigi.Parameter()
+    step_size = luigi.IntParameter()
     model_path = luigi.Parameter()
     scene_id = luigi.Parameter()
     transform_type = luigi.OptionalParameter(default=None)
@@ -247,14 +250,14 @@ class DatasetRGBAnnotationMapImage(RGBAnnotationMapImage):
     def requires(self):
         if self.transform_type is None:
             return DatasetImagePredictionMapData(
-                dataset_path=self.dataset_path,
+                data_path=self.data_path,
                 scene_id=self.scene_id,
                 model_path=self.model_path,
                 step_size=self.step_size,
             )
         else:
             return DatasetEmbeddingTransform(
-                dataset_path=self.dataset_path,
+                data_path=self.data_path,
                 scene_id=self.scene_id,
                 model_path=self.model_path,
                 step_size=self.step_size,
@@ -265,13 +268,13 @@ class DatasetRGBAnnotationMapImage(RGBAnnotationMapImage):
             )
 
     def run(self):
-        dataset = TripletDataset.load(self.dataset_path)
+        datasource = DataSource.load(self.data_path)
         da_emb = xr.open_dataarray(self.input_path)
 
         N_tile = (256, 256)
         model_resolution = da_emb.lx_tile / N_tile[0] / 1000.0
-        domain_rect = dataset.extra["rectpred"]["domain"]
-        lat0, lon0 = domain_rect["lat0"], domain_rect["lon0"]
+        domain = datasource.domain
+        lat0, lon0 = domain.central_latitude, domain.central_longitude
 
         title_parts = [
             self.scene_id,
@@ -302,7 +305,7 @@ class DatasetRGBAnnotationMapImage(RGBAnnotationMapImage):
 
     @property
     def src_data_path(self):
-        return self.dataset_path
+        return self.data_path
 
     def output(self):
         model_name = Path(self.model_path).name.replace(".pkl", "")
@@ -319,7 +322,7 @@ class DatasetRGBAnnotationMapImage(RGBAnnotationMapImage):
 
         fn = f"{'.'.join(fn_parts)}.png"
 
-        p_root = Path(self.dataset_path) / "embeddings" / "rect" / model_name
+        p_root = Path(self.data_path) / "embeddings" / "rect" / model_name
         if self.pretrained_transform_model is not None:
             p = p_root / self.pretrained_transform_model / fn
         else:
@@ -329,7 +332,7 @@ class DatasetRGBAnnotationMapImage(RGBAnnotationMapImage):
 
 class AllDatasetRGBAnnotationMapImages(SceneBulkProcessingBaseTask):
     model_path = luigi.Parameter()
-    step_size = luigi.Parameter()
+    step_size = luigi.IntParameter()
     transform_type = luigi.OptionalParameter()
     transform_extra_args = luigi.OptionalParameter(default=None)
     pretrained_transform_model = luigi.OptionalParameter(default=None)

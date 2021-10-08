@@ -1,8 +1,11 @@
-import skimage.color
-import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
 import numpy as np
+import skimage.color
 import xarray as xr
+
+from ...data.sources.utils.domain_images import rgb_image_from_scene_data
+from ...data.sources import DataSource
 
 
 def make_rgb(da, alpha=0.5, **coord_components):
@@ -51,18 +54,18 @@ def make_rgb(da, alpha=0.5, **coord_components):
     return da_rgba
 
 
-def _get_img_with_extent_cropped(da_emb, img_fn):
+def get_img_with_extent_cropped(da, datasource):
     """
     Load the image in `img_fn`, clip the image and return the
     image extent (xy-extent if the source data coordinates are available)
     """
-    img = mpimg.imread(img_fn)
+    img = rgb_image_from_scene_data(data_source=datasource, da_scene=da, src_attrs=da.attrs)
 
-    i_ = da_emb.i0.values
+    i_ = da.i0.values
     # NB: j-values might be decreasing in number if we're using a
     # y-coordinate with increasing values from bottom left, so we
     # sort first
-    j_ = np.sort(da_emb.j0.values)
+    j_ = np.sort(da.j0.values)
 
     def get_spacing(v):
         dv_all = np.diff(v)
@@ -77,16 +80,16 @@ def _get_img_with_extent_cropped(da_emb, img_fn):
 
     img = img[slice(*jlim), slice(*ilim)]
 
-    if "x" in da_emb.coords and "y" in da_emb.coords:
+    if "x" in da.coords and "y" in da.coords:
         # get x,y and indexing (i,j) extent from data array so
         # so we can clip and plot the image correctly
-        x_min = da_emb.x.min()
-        y_min = da_emb.y.min()
-        x_max = da_emb.x.max()
-        y_max = da_emb.y.max()
+        x_min = da.x.min()
+        y_min = da.y.min()
+        x_max = da.x.max()
+        y_max = da.y.max()
 
-        dx = get_spacing(da_emb.x.values)
-        dy = get_spacing(da_emb.y.values)
+        dx = get_spacing(da.x.values)
+        dy = get_spacing(da.y.values)
         xlim = (x_min - dx // 2, x_max + dx // 2)
         ylim = (y_min - dy // 2, y_max + dy // 2)
 
@@ -95,19 +98,16 @@ def _get_img_with_extent_cropped(da_emb, img_fn):
     return img, np.array(extent)
 
 
-def _get_img_with_extent(da_emb, img_fn, dataset_path):
+def get_img_with_extent(da, datasource):
     """
     Load the image in `img_fn` and return the
     image extent (xy-extent if the source data coordinates are available)
     """
-    img = mpimg.imread(img_fn)
-
-    dataset = TripletDataset.load(dataset_path)
-    domain_rect = tiler.RectTile(**dataset.extra["rectpred"]["domain"])
-    return img, domain_rect.get_grid_extent()
+    img = rgb_image_from_scene_data(data_source=datasource, da_scene=da, src_attrs=da.attrs)
+    return img, datasource.domain.get_grid_extent()
 
 
-def plot_scene_image(da, dataset_path, crop_image=True, ax=None):
+def plot_scene_image(da, datasource, crop_image=True, ax=None):
     """
     Render the RGB image of the scene with `scene_id` in `da` into `ax` (a new
     figure will be created if `ax=None`)
@@ -124,18 +124,11 @@ def plot_scene_image(da, dataset_path, crop_image=True, ax=None):
             except KeyError:
                 scene_id = da.scene_id.item()
                 assert type(scene_id) == str
-            img_path = (
-                MakeRectRGBImage(dataset_path=dataset_path, scene_id=scene_id)
-                .output()
-                .fn
-            )
 
             if crop_image:
-                return _get_img_with_extent_cropped(da, img_path)
+                return get_img_with_extent_cropped(da=da, datasource=datasource)
             else:
-                return _get_img_with_extent(
-                    da, img_fn=img_path, dataset_path=dataset_path
-                )
+                return get_img_with_extent(da, datasource=datasource)
         else:
             raise NotImplementedError(da)
 
@@ -153,11 +146,11 @@ def plot_scene_image(da, dataset_path, crop_image=True, ax=None):
         ax.set_ylabel(xr.plot.utils.label_from_attrs(da.y))
     ax.imshow(img, extent=img_extent, rasterized=True)
 
-    return ax, img_extent
+    return ax, img_extent, img
 
 
 def make_rgb_annotation_map_image(
-    da, rgb_components, dataset_path, render_tiles=False, crop_image=True
+    da, rgb_components, data_path, render_tiles=False, crop_image=True
 ):
     """
     Render the contents of `da` onto the RGB image represented by the scene
@@ -166,6 +159,7 @@ def make_rgb_annotation_map_image(
     If `da` is 2D it will be rendered with discrete colours, otherwise if `da`
     is 3D the components of da to use should be given by `rgb_components`
     """
+    datasource = DataSource.load(data_path)
     if len(da.shape) == 3:
         # ensure non-xy dim is first
         d_not_xy = list(filter(lambda d: d not in ["x", "y"], da.dims))
@@ -183,7 +177,8 @@ def make_rgb_annotation_map_image(
         s = 1.0
 
     if len(da.shape) == 3:
-        da_rgba = _make_rgb(da=da, dims=rgb_components, alpha=0.5)
+        # TODO: shouldn't hardcode `pca_dim` here
+        da_rgba = make_rgb(da=da, alpha=0.5, pca_dim=rgb_components)
     elif len(da.shape) == 2:
         # when we have distinct classes (identified by integers) we just
         # want to map each label to a RGB color
@@ -211,12 +206,12 @@ def make_rgb_annotation_map_image(
     )
 
     ax = axes[0]
-    _, img_extent = plot_scene_image(
-        da=da, dataset_path=dataset_path, ax=ax, crop_image=crop_image
+    _, img_extent, img = plot_scene_image(
+        da=da, datasource=datasource, ax=ax, crop_image=crop_image
     )
 
     ax = axes[1]
-    plot_scene_image(da=da, dataset_path=dataset_path, ax=ax, crop_image=crop_image)
+    plot_scene_image(da=da, datasource=datasource, ax=ax, crop_image=crop_image)
     da_rgba.plot.imshow(ax=ax, rgb="rgba", y="y", rasterized=True)
 
     ax = axes[2]

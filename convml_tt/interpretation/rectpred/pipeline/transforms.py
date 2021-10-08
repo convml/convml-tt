@@ -8,8 +8,10 @@ from pathlib import Path
 
 import joblib
 import luigi
+import xarray as xr
 
-from ...pipeline import XArrayTarget
+from ....pipeline import XArrayTarget
+from ..transform import apply_transform
 from .data import AggregateFullDatasetImagePredictionMapData
 
 
@@ -38,6 +40,7 @@ class EmbeddingTransform(luigi.Task):
             da=da_emb,
             transform_type=self.transform_type,
             pretrained_model=pretrained_model,
+            return_model=True,
             **self._parse_transform_extra_kwargs(),
         )
 
@@ -119,14 +122,14 @@ class DatasetEmbeddingTransform(EmbeddingTransform):
     Create a netCDF file for the transformed embeddings of a single scene
     """
 
-    dataset_path = luigi.Parameter()
+    data_path = luigi.Parameter()
     model_path = luigi.Parameter()
-    step_size = luigi.Parameter()
+    step_size = luigi.IntParameter()
     scene_id = luigi.Parameter()
 
     def requires(self):
         return AggregateFullDatasetImagePredictionMapData(
-            dataset_path=self.dataset_path,
+            data_path=self.data_path,
             step_size=self.step_size,
             model_path=self.model_path,
         )
@@ -162,26 +165,26 @@ class DatasetEmbeddingTransform(EmbeddingTransform):
 
         if self.pretrained_model is not None:
             name = self.pretrained_model
-            p = Path(self.dataset_path) / "embeddings" / "rect" / model_name / name / fn
+            p = Path(self.data_path) / "embeddings" / "rect" / model_name / name / fn
         else:
-            p = Path(self.dataset_path) / "embeddings" / "rect" / model_name / fn
+            p = Path(self.data_path) / "embeddings" / "rect" / model_name / fn
 
         return XArrayTarget(str(p))
 
     def _get_pretrained_model_path(self):
         """Return path to where pretrained transform models are expected to
         reside"""
-        return Path(self.dataset_path) / "transform_models"
+        return Path(self.data_path) / "transform_models"
 
 
 class CreateAllPredictionMapsDataTransformed(EmbeddingTransform):
-    dataset_path = luigi.Parameter()
+    data_path = luigi.Parameter()
     model_path = luigi.Parameter()
-    step_size = luigi.Parameter()
+    step_size = luigi.IntParameter()
 
     def requires(self):
         return AggregateFullDatasetImagePredictionMapData(
-            dataset_path=self.dataset_path,
+            data_path=self.data_path,
             model_path=self.model_path,
             step_size=self.step_size,
         )
@@ -197,7 +200,7 @@ class CreateAllPredictionMapsDataTransformed(EmbeddingTransform):
             self._build_transform_identifier(),
         )
         p_root = (
-            Path(self.dataset_path)
+            Path(self.data_path)
             / "embeddings"
             / "rect"
             / model_name
