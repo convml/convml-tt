@@ -28,12 +28,14 @@ class SceneRegriddedData(_SceneRectSampleBase):
             reqs["source_data"] = SceneSourceFiles(
                 scene_id=self.scene_id,
                 data_path=self.data_path,
+                aux_product=self.aux_product,
             )
         else:
             reqs["source_data"] = CropSceneSourceFiles(
                 scene_id=self.scene_id,
                 data_path=self.data_path,
                 pad_ptc=self.crop_pad_ptc,
+                aux_product=self.aux_product,
             )
 
         return reqs
@@ -58,7 +60,11 @@ class SceneRegriddedData(_SceneRectSampleBase):
             )
         dx = data_source.sampling["rect"]["dx"]
 
-        da_domain = resample(domain=domain, da=da_src, dx=dx)
+        if self.aux_product is None:
+            method = "bilinear"
+        else:
+            method = "nearest_s2d"
+        da_domain = resample(domain=domain, da=da_src, dx=dx, method=method)
         domain_output = self.output()
         Path(domain_output["data"].fn).parent.mkdir(exist_ok=True, parents=True)
         domain_output["data"].write(da_domain)
@@ -72,6 +78,9 @@ class SceneRegriddedData(_SceneRectSampleBase):
     def output(self):
         scene_data_path = Path(self.data_path) / "rect"
 
+        if self.aux_product is not None:
+            scene_data_path = scene_data_path / "aux" / self.aux_product
+
         fn_data = f"{self.scene_id}.nc"
         fn_image = f"{self.scene_id}.png"
         return dict(
@@ -82,6 +91,7 @@ class SceneRegriddedData(_SceneRectSampleBase):
 
 class GenerateRegriddedScenes(luigi.Task):
     data_path = luigi.Parameter(default=".")
+    aux_product = luigi.OptionalParameter(default=None)
 
     @property
     def data_source(self):
@@ -95,7 +105,9 @@ class GenerateRegriddedScenes(luigi.Task):
 
         tasks_scenes = {}
         for scene_id in scene_ids:
-            tasks_scenes[scene_id] = SceneRegriddedData(scene_id=scene_id)
+            tasks_scenes[scene_id] = SceneRegriddedData(
+                scene_id=scene_id, aux_product=self.aux_product
+            )
 
         yield tasks_scenes
 

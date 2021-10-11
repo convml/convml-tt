@@ -116,22 +116,8 @@ def plot_scene_image(da_emb, crop_image=True, ax=None):
         d_not_xy = list(filter(lambda d: d not in ["x", "y"], da_emb.dims))
         da_emb = da_emb.transpose(*d_not_xy, "x", "y")
 
-    def _get_image():
-        if "scene_id" in list(da_emb.coords) + list(da_emb.attrs.keys()):
-            try:
-                scene_id = da_emb.attrs["scene_id"]
-            except KeyError:
-                scene_id = da_emb.scene_id.item()
-                assert type(scene_id) == str
-
-            if crop_image:
-                return get_img_with_extent_cropped(da_emb=da_emb)
-            else:
-                return get_img_with_extent(da_emb)
-        else:
-            raise NotImplementedError(da_emb)
-
-    img, img_extent = _get_image()
+    img = _load_image(da_emb=da_emb)
+    img_extent = _load_image_extent(da_emb=da_emb)
 
     if ax is None:
         lx = img_extent[1] - img_extent[0]

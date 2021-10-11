@@ -57,6 +57,15 @@ def merge_multichannel_sources(files_per_channel, time_fn):
     return scene_filesets
 
 
+def get_time_for_filename(data_source, filename):
+    if data_source.source == "goes16":
+        return GOES16Query.get_time(filename=filename)
+    elif data_source.source == "LES":
+        return FindLESFiles.get_time(filename=filename)
+    else:
+        raise NotImplementedError(data_source)
+
+
 class GenerateSceneIDs(luigi.Task):
     """
     Construct a "database" (actually a yaml-file) of all scene IDs in a dataset
@@ -112,15 +121,6 @@ class GenerateSceneIDs(luigi.Task):
 
         return tasks
 
-    def get_time_for_filename(self, filename):
-        ds = self.data_source
-        if ds.source == "goes16":
-            return GOES16Query.get_time(filename=filename)
-        elif ds.source == "LES":
-            return FindLESFiles.get_time(filename=filename)
-        else:
-            raise NotImplementedError(ds.source)
-
     def run(self):
         data_source = self.data_source
         scenes = {}
@@ -147,14 +147,14 @@ class GenerateSceneIDs(luigi.Task):
             )
 
             for scene_filenames in scene_sets:
-                t_scene = self.get_time_for_filename(filename=scene_filenames[0])
+                t_scene = get_time_for_filename(filename=scene_filenames[0], data_source=data_source)
                 if data_source.filter_scene_times(t_scene):
                     scene_id = make_scene_id(source=data_source.source, t_scene=t_scene)
                     scenes[scene_id] = scene_filenames
         elif isinstance(input, YAMLTarget):
             scene_filenames = input.open()
             for scene_filename in scene_filenames:
-                t_scene = self.get_time_for_filename(filename=scene_filename)
+                t_scene = get_time_for_filename(filename=scene_filename, data_source=data_source)
                 if data_source.filter_scene_times(t_scene):
                     scene_id = make_scene_id(source=data_source.source, t_scene=t_scene)
                     scenes[scene_id] = scene_filename
