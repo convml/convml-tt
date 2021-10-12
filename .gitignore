@@ -11,3 +11,6 @@ lightning_logs/
 *.ckpt
 example_notebooks/*/data/
 wandb/
+
+.eggs/
+*.egg-info/
