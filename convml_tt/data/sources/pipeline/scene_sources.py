@@ -3,6 +3,7 @@ from pathlib import Path
 import datetime
 import logging
 import itertools
+from functools import partial
 
 from ..goes16.pipeline import GOES16Query
 from ..les import FindLESFiles
@@ -35,7 +36,7 @@ def merge_multichannel_sources(files_per_channel, time_fn):
     N_channels = len(files_per_channel)
     for channel, channel_files in files_per_channel.items():
         for ch_filename in channel_files:
-            file_timestamp = time_fn(ch_filename)
+            file_timestamp = time_fn(filename=ch_filename)
             time_group = channel_files_by_timestamp.setdefault(file_timestamp, {})
             time_group[channel] = ch_filename
 
@@ -142,8 +143,10 @@ class GenerateSceneIDs(luigi.Task):
             for channel in channel_order:
                 channels_and_filenames[channel] = opened_inputs[channel]
 
+            time_fn = partial(get_time_for_filename, data_source=data_source)
+
             scene_sets = merge_multichannel_sources(
-                channels_and_filenames, time_fn=self.get_time_for_filename
+                channels_and_filenames, time_fn=time_fn
             )
 
             for scene_filenames in scene_sets:

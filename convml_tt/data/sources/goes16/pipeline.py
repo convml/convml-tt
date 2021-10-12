@@ -24,7 +24,7 @@ class GOES16Query(luigi.Task):
     time = luigi.DateMinuteParameter()
     debug = luigi.BoolParameter(default=False)
     data_path = luigi.Parameter()
-    product = luigi.OptionalParameter()
+    product = luigi.OptionalParameter(default=None)
 
     def get_time(filename):
         return satdata.Goes16AWS.parse_key(filename, parse_times=True)["start_time"]
