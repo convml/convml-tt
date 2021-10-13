@@ -13,6 +13,7 @@ from .. import DataSource
 from ..sampling.cropping import crop_field_to_domain
 from ..sampling.domain import LocalCartesianDomain
 from ..les import LESDataFile
+from .utils import SceneBulkProcessingBaseTask
 
 
 class SceneSourceFiles(luigi.Task):
@@ -122,6 +123,8 @@ class CropSceneSourceFiles(luigi.Task):
                 img_cropped = goes16.satpy_rgb.rgb_da_to_img(da=da_cropped)
                 if "_satpy_id" in da_cropped.attrs:
                     del da_cropped.attrs["_satpy_id"]
+            else:
+                da_cropped.attrs.update(da_full.attrs)
         else:
             raise NotImplementedError(data_source.source)
 
@@ -136,11 +139,15 @@ class CropSceneSourceFiles(luigi.Task):
         ds = self.data_source
 
         output_path = (
-            Path(self.data_path) / "source_data" / ds.source / ds.type / "cropped"
+            Path(self.data_path) / "source_data" / ds.source
         )
 
-        if self.aux_product is not None:
+        if self.aux_product is None:
+            output_path = output_path / ds.type
+        else:
             output_path = output_path / "aux" / self.aux_product
+
+        output_path = output_path / "cropped"
 
         return output_path
 
@@ -197,3 +204,13 @@ class SceneRectData(_SceneRectSampleBase):
             data=XArrayTarget(str(scene_data_path / fn_data)),
             image=XArrayTarget(str(scene_data_path / fn_image)),
         )
+
+
+class GenerateCroppedScenesData(SceneBulkProcessingBaseTask):
+    data_path = luigi.Parameter(default=".")
+    TaskClass = CropSceneSourceFiles
+
+    aux_product = luigi.OptionalParameter(default=None)
+
+    def _get_task_class_kwargs(self):
+        return dict(aux_product=self.aux_product)

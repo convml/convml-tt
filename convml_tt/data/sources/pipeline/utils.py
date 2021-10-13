@@ -10,6 +10,7 @@ class SceneBulkProcessingBaseTask(luigi.Task):
 
     data_path = luigi.Parameter()
     TaskClass = None
+    SceneIDsTaskClass = GenerateSceneIDs
 
     def requires(self):
         if self.TaskClass is None:
@@ -17,7 +18,9 @@ class SceneBulkProcessingBaseTask(luigi.Task):
                 "Please set TaskClass to the type you would like"
                 " to process for every scene"
             )
-        return GenerateSceneIDs(data_path=self.data_path)
+        return self.SceneIDsTaskClass(
+            data_path=self.data_path, **self._get_scene_ids_task_kwargs()
+        )
 
     def _get_task_class_kwargs(self):
         raise NotImplementedError(
@@ -25,6 +28,9 @@ class SceneBulkProcessingBaseTask(luigi.Task):
             " to provide the necessary kwargs for your"
             " selected task"
         )
+
+    def _get_scene_ids_task_kwargs(self):
+        return {}
 
     def _build_runtime_tasks(self):
         all_source_data = self.input().read()

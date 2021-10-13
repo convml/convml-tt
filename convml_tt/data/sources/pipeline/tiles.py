@@ -1,15 +1,17 @@
 from pathlib import Path
-import matplotlib.pyplot as plt
 
 import luigi
+import matplotlib.pyplot as plt
 
-from ....pipeline import XArrayTarget, YAMLTarget, ImageTarget
+from ....pipeline import ImageTarget, XArrayTarget, YAMLTarget
 from .. import DataSource
 from ..sampling import domain as sampling_domain
 from ..sampling.interpolation import resample
+from ..utils.domain_images import align_axis_x, rgb_image_from_scene_data
 from . import GenerateSceneIDs
 from .sampling import CropSceneSourceFiles, SceneSourceFiles, _SceneRectSampleBase
-from ..utils.domain_images import rgb_image_from_scene_data, align_axis_x
+from .utils import SceneBulkProcessingBaseTask
+from .aux import CheckForAuxiliaryFiles
 
 
 def _plot_scene_aux(da_aux, img, **kwargs):
@@ -69,6 +71,7 @@ class SceneRegriddedData(_SceneRectSampleBase):
 
     def run(self):
         domain_output = self.output()
+        data_source = self.data_source
 
         if not domain_output["data"].exists():
             inputs = self.input()
@@ -78,7 +81,6 @@ class SceneRegriddedData(_SceneRectSampleBase):
             if isinstance(domain, sampling_domain.SourceDataDomain):
                 domain = domain.generate_from_dataset(ds=da_src)
 
-            data_source = self.data_source
             if (
                 "rect" not in data_source.sampling
                 or data_source.sampling["rect"].get("dx") is None
@@ -124,29 +126,29 @@ class SceneRegriddedData(_SceneRectSampleBase):
         )
 
 
-class GenerateRegriddedScenes(luigi.Task):
+class GenerateRegriddedScenes(SceneBulkProcessingBaseTask):
     data_path = luigi.Parameter(default=".")
+    TaskClass = SceneRegriddedData
+
     aux_product = luigi.OptionalParameter(default=None)
 
-    @property
-    def data_source(self):
-        return DataSource.load(path=self.data_path)
+    def _get_task_class_kwargs(self):
+        return dict(aux_product=self.aux_product)
 
     def requires(self):
-        return GenerateSceneIDs(data_path=self.data_path)
-
-    def run(self):
-        scene_ids = list(self.input().open().keys())
-
-        tasks_scenes = {}
-        for scene_id in scene_ids:
-            tasks_scenes[scene_id] = SceneRegriddedData(
-                scene_id=scene_id, aux_product=self.aux_product
+        if self.TaskClass is None:
+            raise Exception(
+                "Please set TaskClass to the type you would like"
+                " to process for every scene"
             )
+        if self.aux_product is None:
+            TaskClass= GenerateSceneIDs
+        else:
+            TaskClass= CheckForAuxiliaryFiles
 
-        yield tasks_scenes
+        return TaskClass(
+            data_path=self.data_path, **self._get_scene_ids_task_kwargs()
+        )
 
-    def output(self):
-        fn_output = "regridded_data_by_scene.yaml"
-        p = Path(self.data_path) / "rect" / fn_output
-        return YAMLTarget(str(p))
+    def _get_scene_ids_task_kwargs(self):
+        return dict(product_name=self.aux_product)

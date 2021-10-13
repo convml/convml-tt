@@ -122,6 +122,7 @@ class DataSource:
         return self._time_intervals
 
     @classmethod
+    @functools.lru_cache(maxsize=10)
     def load(cls, path):
         path_abs = Path(path).expanduser().absolute()
         p = path_abs / "meta.yaml"

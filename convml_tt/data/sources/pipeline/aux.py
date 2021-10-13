@@ -2,6 +2,7 @@ from pathlib import Path
 
 import luigi
 import numpy as np
+import datetime
 
 from ....pipeline import YAMLTarget
 from .. import DataSource
@@ -18,6 +19,7 @@ class CheckForAuxiliaryFiles(luigi.Task):
 
     data_path = luigi.Parameter(default=".")
     product_name = luigi.Parameter()
+    dt_max = luigi.FloatParameter(default=10.0) # [minutes]
 
     @property
     def data_source(self):
@@ -86,9 +88,12 @@ class CheckForAuxiliaryFiles(luigi.Task):
 
             product_fn_for_scenes = {}
             for scene_id, scene_time in zip(scene_ids, scene_times):
-                i = np.argmin(np.abs(scene_time - product_times))
-                product_fn = product_filenames[i]
-                product_fn_for_scenes[scene_id] = product_fn
+                dt_all = np.abs(scene_time - product_times)
+                i = np.argmin(dt_all)
+                dt = dt_all[i]
+                if dt <= datetime.timedelta(minutes=self.dt_max):
+                    product_fn = product_filenames[i]
+                    product_fn_for_scenes[scene_id] = product_fn
 
             self.output().write(product_fn_for_scenes)
 

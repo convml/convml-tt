@@ -28,7 +28,7 @@ def save_ax_nosave(ax, **kwargs):
 
 def rgb_image_from_scene_data(data_source, da_scene, src_attrs):
     if data_source.source == "goes16":
-        if data_source.type == "truecolor_rgb" and da_scene.name == "Rad":
+        if data_source.type == "truecolor_rgb" and "bands" in da_scene.coords:
             # before creating the image with satpy we need to set the attrs
             # again to ensure we get a proper RGB image
             da_scene.attrs.update(src_attrs)
