@@ -1,5 +1,6 @@
 import luigi
-from . import GenerateSceneIDs
+import re
+from .scene_sources import GenerateSceneIDs
 
 
 class SceneBulkProcessingBaseTask(luigi.Task):
@@ -11,6 +12,7 @@ class SceneBulkProcessingBaseTask(luigi.Task):
     data_path = luigi.Parameter()
     TaskClass = None
     SceneIDsTaskClass = GenerateSceneIDs
+    scene_filter = luigi.OptionalParameter(default=None)
 
     def requires(self):
         if self.TaskClass is None:
@@ -32,12 +34,24 @@ class SceneBulkProcessingBaseTask(luigi.Task):
     def _get_scene_ids_task_kwargs(self):
         return {}
 
+    def _filter_scene_ids(self, scene_ids):
+        if self.scene_filter is not None:
+            scene_ids = [
+                scene_id
+                for scene_id in scene_ids
+                if re.match(self.scene_filter, scene_id)
+            ]
+        return scene_ids
+
     def _build_runtime_tasks(self):
         all_source_data = self.input().read()
         kwargs = self._get_task_class_kwargs()
 
         tasks = {}
-        for scene_id in all_source_data.keys():
+        scene_ids = all_source_data.keys()
+        scene_ids = self._filter_scene_ids(scene_ids=scene_ids)
+
+        for scene_id in scene_ids:
             tasks[scene_id] = self.TaskClass(
                 scene_id=scene_id, data_path=self.data_path, **kwargs
             )

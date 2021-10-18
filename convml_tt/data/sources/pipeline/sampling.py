@@ -2,17 +2,17 @@
 pipeline tasks related to spatial cropping, reprojection and sampling of scene data
 """
 from pathlib import Path
+
 import luigi
 import numpy as np
 
-from ....pipeline import XArrayTarget, ImageTarget
-from .. import goes16
-from . import GenerateSceneIDs
-from .aux import CheckForAuxiliaryFiles
-from .. import DataSource
+from ....pipeline import ImageTarget, XArrayTarget
+from .. import DataSource, goes16
+from ..les import LESDataFile
 from ..sampling.cropping import crop_field_to_domain
 from ..sampling.domain import LocalCartesianDomain
-from ..les import LESDataFile
+from .aux import CheckForAuxiliaryFiles
+from .scene_sources import GenerateSceneIDs
 from .utils import SceneBulkProcessingBaseTask
 
 

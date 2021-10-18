@@ -8,22 +8,23 @@ interface
 """
 
 
-from pathlib import Path
 from collections import OrderedDict
+from pathlib import Path
 
-import xarray as xr
-import numpy as np
-from numpy.ma.core import MaskedArray
 import cv2
+import luigi
+import numpy as np
+import xarray as xr
+from numpy.ma.core import MaskedArray
 from PIL import Image
 from skimage.color import rgb2gray, rgba2rgb
-import luigi
 
-from ...data.dataset import GroupedSceneBulkProcessingBaseTask
+from ...data.sources.pipeline import SceneRegriddedData, parse_scene_id
+from ...data.sources.pipeline.utils import (
+    GroupedSceneBulkProcessingBaseTask,
+    SceneBulkProcessingBaseTask,
+)
 from ...pipeline import XArrayTarget
-from ...data.sources.satellite.rectpred import MakeRectRGBImage, MakeRectRGBDataArray
-from ...data.sources.satellite.pipeline import parse_scene_id
-
 
 MIN_CORNERS = 100
 
@@ -216,24 +217,22 @@ def extract_trajectories(
     return ds
 
 
-class DatasetOpticalFlowTrajectories(luigi.Task):
+class ComputeOpticalFlowTrajectories(luigi.Task):
+    """
+    Compute optical flow trajectories for a set of scene IDs that will be
+    assumed to be consecutive in time
+    """
     scene_ids = luigi.ListParameter()
-    dataset_path = luigi.Parameter()
+    data_path = luigi.Parameter()
     prefix = luigi.Parameter()
     max_num_trajectories = luigi.IntParameter(default=400)
 
     def requires(self):
         tasks = OrderedDict()
         for scene_id in self.scene_ids:
-            tasks[scene_id] = dict(
-                image=MakeRectRGBImage(
-                    dataset_path=self.dataset_path,
-                    scene_id=scene_id,
-                ),
-                data=MakeRectRGBDataArray(
-                    dataset_path=self.dataset_path,
-                    scene_id=scene_id,
-                ),
+            tasks[scene_id] = SceneRegriddedData(
+                data_path=self.data_path,
+                scene_id=scene_id,
             )
 
         return tasks
@@ -283,16 +282,54 @@ class DatasetOpticalFlowTrajectories(luigi.Task):
         ds_trajs = xr.concat(datasets_posns, dim="scene_id")
         for v in ["x", "y", "lat", "lon"]:
             ds_trajs[v].attrs.update(da_imgdata[v].attrs)
+        Path(self.output().fn).parent.mkdir(exist_ok=True, parents=True)
         ds_trajs.to_netcdf(self.output().fn)
 
     def output(self):
         fn = f"{self.prefix}.flow_trajectories.nc"
-        p_out = Path(self.dataset_path) / "composites" / "rect" / fn
+        p_out = Path(self.data_path) / "rect" / "trajectories" / fn
         return XArrayTarget(str(p_out))
 
 
-class FullDatasetOpticalFlowTrajectories(GroupedSceneBulkProcessingBaseTask):
-    TaskClass = DatasetOpticalFlowTrajectories
+class DatasetPrefixOpticalFlowTrajectories(SceneBulkProcessingBaseTask):
+    """
+    Compute optical flow trajectories for all scenes sharing a common prefix
+    """
+    scene_prefix = luigi.Parameter()
+    # this won't actually be used because we'll only need one single parent
+    # task - the one that computes the trajectories for the scene collection
+    TaskClass = ComputeOpticalFlowTrajectories
+
+    @property
+    def scene_filter(self):
+        return f"{self.scene_prefix}.*"
+
+    def _build_runtime_tasks(self):
+        all_source_data = self.input().read()
+
+        scene_ids = all_source_data.keys()
+        scene_ids = self._filter_scene_ids(scene_ids=scene_ids)
+
+        task = ComputeOpticalFlowTrajectories(
+            scene_ids=scene_ids,
+            data_path=self.data_path,
+            prefix=self.scene_prefix,
+        )
+        return task
+
+    def output(self):
+        if not self.input().exists():
+            # the fetch has not completed yet, so we don't know how many scenes
+            # we will be working on. Therefore we just return a target we know
+            # will newer exist
+            return luigi.LocalTarget("__fake_file__.nc")
+
+        task = self._build_runtime_tasks()
+        return task.output()
+
+
+class GroupedDatasetOpticalFlowTrajectories(GroupedSceneBulkProcessingBaseTask):
+    TaskClass = ComputeOpticalFlowTrajectories
 
     def _get_task_class_kwargs(self):
         return {}
