@@ -133,6 +133,9 @@ class GenerateRegriddedScenes(SceneBulkProcessingBaseTask):
     aux_product = luigi.OptionalParameter(default=None)
 
     def _get_task_class_kwargs(self):
+        if self.aux_product is None:
+            return {}
+
         return dict(aux_product=self.aux_product)
 
     def requires(self):
@@ -142,13 +145,14 @@ class GenerateRegriddedScenes(SceneBulkProcessingBaseTask):
                 " to process for every scene"
             )
         if self.aux_product is None:
-            TaskClass= GenerateSceneIDs
+            TaskClass = GenerateSceneIDs
         else:
-            TaskClass= CheckForAuxiliaryFiles
+            TaskClass = CheckForAuxiliaryFiles
 
-        return TaskClass(
-            data_path=self.data_path, **self._get_scene_ids_task_kwargs()
-        )
+        return TaskClass(data_path=self.data_path, **self._get_scene_ids_task_kwargs())
 
     def _get_scene_ids_task_kwargs(self):
+        if self.aux_product is None:
+            return {}
+
         return dict(product_name=self.aux_product)
