@@ -8,7 +8,7 @@ from functools import partial
 from ..goes16.pipeline import GOES16Query
 from ..les import FindLESFiles
 from .. import DataSource
-from ....pipeline import YAMLTarget
+from ....pipeline import DBTarget
 from collections import OrderedDict
 
 log = logging.getLogger()
@@ -69,9 +69,9 @@ def get_time_for_filename(data_source, filename):
 
 class GenerateSceneIDs(luigi.Task):
     """
-    Construct a "database" (actually a yaml-file) of all scene IDs in a dataset
-    given the source, type and time-span of the dataset. Database contains a list
-    of the scene IDs and the sourcefile(s) per scene.
+    Construct a "database" (actually a yaml or json-file) of all scene IDs in a
+    dataset given the source, type and time-span of the dataset. Database
+    contains a list of the scene IDs and the sourcefile(s) per scene.
     """
 
     data_path = luigi.Parameter(default=".")
@@ -150,11 +150,11 @@ class GenerateSceneIDs(luigi.Task):
             )
 
             for scene_filenames in scene_sets:
-                t_scene = get_time_for_filename(filename=scene_filenames[0], data_source=data_source)
-                if data_source.filter_scene_times(t_scene):
-                    scene_id = make_scene_id(source=data_source.source, t_scene=t_scene)
-                    scenes[scene_id] = scene_filenames
-        elif isinstance(input, YAMLTarget):
+                t_scene = get_time_for_filename(
+                    filename=scene_filenames[0], data_source=data_source
+                )
+                scenes_by_time[t_scene] = scene_filenames
+        elif isinstance(input, DBTarget):
             scene_filenames = input.open()
             for scene_filename in scene_filenames:
                 t_scene = get_time_for_filename(
@@ -175,9 +175,9 @@ class GenerateSceneIDs(luigi.Task):
 
     def output(self):
         ds = self.data_source
-        fn = "scene_ids.yml"
-        p = Path(self.data_path) / "source_data" / ds.source / ds.type / fn
-        return YAMLTarget(str(p))
+        name = "scene_ids"
+        path = Path(self.data_path) / "source_data" / ds.source / ds.type
+        return DBTarget(path=str(path), db_name=name, db_type=ds.db_type)
 
 
 class DownloadAllSourceFiles(luigi.Task):

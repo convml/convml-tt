@@ -121,6 +121,14 @@ class DataSource:
     def time_intervals(self):
         return self._time_intervals
 
+    @property
+    def db_type(self):
+        """Use yaml-files as "database" files by default, but make json an option for speed"""
+        if "db_type" in self._meta:
+            return self._meta["db_type"]
+        else:
+            return "yaml"
+
     @classmethod
     @functools.lru_cache(maxsize=10)
     def load(cls, path):
