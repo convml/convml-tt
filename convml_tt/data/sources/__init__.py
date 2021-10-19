@@ -155,12 +155,11 @@ class DataSource:
             {k: v for k, v in self._meta.items() if not k.startswith("_")}
         )
 
-    def filter_scene_times(self, scene_times):
+    def valid_scene_time(self, scene_time):
         """
         Apply the time filtering specified for this source dataset if one is specified
         """
 
-        scene_times = np.atleast_1d(scene_times)
         filters = self._meta["time"].get("filters", {})
         for filter_kind, filter_value in filters.items():
             if filter_kind == "N_hours_from_zenith":
@@ -176,5 +175,8 @@ class DataSource:
                 )
             else:
                 raise NotImplementedError(filter_kind)
-            scene_times = list(filter(filter_fn, scene_times))
-        return np.squeeze(scene_times)
+
+            if not filter_fn(scene_time):
+                return False
+
+        return True

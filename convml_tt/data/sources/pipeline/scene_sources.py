@@ -124,7 +124,7 @@ class GenerateSceneIDs(luigi.Task):
 
     def run(self):
         data_source = self.data_source
-        scenes = {}
+        scenes_by_time = {}
 
         input = self.input()
         if type(input) == dict:
@@ -157,12 +157,18 @@ class GenerateSceneIDs(luigi.Task):
         elif isinstance(input, YAMLTarget):
             scene_filenames = input.open()
             for scene_filename in scene_filenames:
-                t_scene = get_time_for_filename(filename=scene_filename, data_source=data_source)
-                if data_source.filter_scene_times(t_scene):
-                    scene_id = make_scene_id(source=data_source.source, t_scene=t_scene)
-                    scenes[scene_id] = scene_filename
+                t_scene = get_time_for_filename(
+                    filename=scene_filename, data_source=data_source
+                )
+                scenes_by_time[t_scene] = scene_filename
         else:
             raise NotImplementedError(input)
+
+        scenes = {
+            make_scene_id(source=data_source.source, t_scene=t_scene): scene_files
+            for (t_scene, scene_files) in scenes_by_time.items()
+            if data_source.valid_scene_time(t_scene)
+        }
 
         Path(self.output().fn).parent.mkdir(exist_ok=True, parents=True)
         self.output().write(scenes)
