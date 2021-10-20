@@ -132,7 +132,7 @@ class FullDatasetImagePredictionMapData(SceneBulkProcessingBaseTask):
 
     TaskClass = DatasetImagePredictionMapData
 
-    def _get_task_class_kwargs(self):
+    def _get_task_class_kwargs(self, scene_ids):
         return dict(
             model_path=self.model_path,
             step_size=self.step_size,
@@ -212,7 +212,7 @@ class FullDatasetImagePredictionMapImageTiles(SceneBulkProcessingBaseTask):
     step_size = luigi.Parameter()
     TaskClass = DatasetImagePredictionMapImageTiles
 
-    def _get_task_class_kwargs(self):
+    def _get_task_class_kwargs(self, scene_ids):
         return dict(
             step_size=self.step_size,
         )

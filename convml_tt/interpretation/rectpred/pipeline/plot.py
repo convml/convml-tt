@@ -118,7 +118,7 @@ class AllDatasetComponentAnnotationMapImages(SceneBulkProcessingBaseTask):
 
     TaskClass = DatasetComponentsAnnotationMapImage
 
-    def _get_task_class_kwargs(self):
+    def _get_task_class_kwargs(self, scene_ids):
         return dict(
             model_path=self.model_path,
             step_size=self.step_size,
@@ -278,7 +278,7 @@ class AllDatasetRGBAnnotationMapImages(SceneBulkProcessingBaseTask):
 
     TaskClass = DatasetRGBAnnotationMapImage
 
-    def _get_task_class_kwargs(self):
+    def _get_task_class_kwargs(self, scene_ids):
         return dict(
             model_path=self.model_path,
             step_size=self.step_size,

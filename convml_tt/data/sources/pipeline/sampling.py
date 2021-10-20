@@ -212,5 +212,5 @@ class GenerateCroppedScenesData(SceneBulkProcessingBaseTask):
 
     aux_product = luigi.OptionalParameter(default=None)
 
-    def _get_task_class_kwargs(self):
+    def _get_task_class_kwargs(self, scene_ids):
         return dict(aux_product=self.aux_product)
