@@ -15,13 +15,7 @@ import coloredlogs
 coloredlogs.install()
 
 
-class XArrayTarget(luigi.target.FileSystemTarget):
-    fs = luigi.local_target.LocalFileSystem()
-
-    def __init__(self, path, *args, **kwargs):
-        super(XArrayTarget, self).__init__(path, *args, **kwargs)
-        self.path = path
-
+class XArrayTarget(luigi.LocalTarget):
     def open(self, *args, **kwargs):
         # ds = xr.open_dataset(self.path, engine='h5netcdf', *args, **kwargs)
         ds = xr.open_dataset(self.path, *args, **kwargs)

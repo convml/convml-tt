@@ -24,7 +24,7 @@ class SceneBulkProcessingBaseTask(luigi.Task):
             data_path=self.data_path, **self._get_scene_ids_task_kwargs()
         )
 
-    def _get_task_class_kwargs(self):
+    def _get_task_class_kwargs(self, scene_ids):
         raise NotImplementedError(
             "Please implement `_get_task_class_kwargs`"
             " to provide the necessary kwargs for your"
@@ -45,11 +45,12 @@ class SceneBulkProcessingBaseTask(luigi.Task):
 
     def _build_runtime_tasks(self):
         all_source_data = self.input().read()
-        kwargs = self._get_task_class_kwargs()
 
         tasks = {}
         scene_ids = all_source_data.keys()
         scene_ids = self._filter_scene_ids(scene_ids=scene_ids)
+
+        kwargs = self._get_task_class_kwargs(scene_ids=scene_ids)
 
         for scene_id in scene_ids:
             tasks[scene_id] = self.TaskClass(

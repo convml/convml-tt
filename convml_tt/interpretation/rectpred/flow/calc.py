@@ -6,25 +6,12 @@ using optical-flow methods. Much of this code is based on
 [pysteps](https://github.com/pySTEPS/pysteps) wrappers to the OpenCV python
 interface
 """
-
-
-from collections import OrderedDict
-from pathlib import Path
-
 import cv2
-import luigi
 import numpy as np
 import xarray as xr
 from numpy.ma.core import MaskedArray
 from PIL import Image
 from skimage.color import rgb2gray, rgba2rgb
-
-from ...data.sources.pipeline import SceneRegriddedData, parse_scene_id
-from ...data.sources.pipeline.utils import (
-    GroupedSceneBulkProcessingBaseTask,
-    SceneBulkProcessingBaseTask,
-)
-from ...pipeline import XArrayTarget
 
 MIN_CORNERS = 100
 
@@ -191,6 +178,9 @@ def extract_trajectories(
     np.nan_to_num(traj_points, copy=False, nan=-1.0)
     traj_points = traj_points.round().astype(int)
 
+    # y-indexing is from top-left for images
+    traj_points[..., 1] = ny_img - 1 - traj_points[...,1]
+
     # now we need to clean up the points. Some will be outside the valid range
     # [0, Nx] and [0, Ny]
     m_invalid = np.logical_or(
@@ -215,136 +205,3 @@ def extract_trajectories(
     ds["j"].attrs["long_name"] = "j-index"
     ds["j"].attrs["units"] = "1"
     return ds
-
-
-class ComputeOpticalFlowTrajectories(luigi.Task):
-    """
-    Compute optical flow trajectories for a set of scene IDs that will be
-    assumed to be consecutive in time
-    """
-    scene_ids = luigi.ListParameter()
-    data_path = luigi.Parameter()
-    prefix = luigi.Parameter()
-    max_num_trajectories = luigi.IntParameter(default=400)
-
-    def requires(self):
-        tasks = OrderedDict()
-        for scene_id in self.scene_ids:
-            tasks[scene_id] = SceneRegriddedData(
-                data_path=self.data_path,
-                scene_id=scene_id,
-            )
-
-        return tasks
-
-    def run(self):
-        input = self.input()
-        image_filenames = [t["image"].fn for t in input.values()]
-        ds_trajs = extract_trajectories(
-            image_filenames=image_filenames,
-            point_method_kwargs=dict(
-                max_corners=self.max_num_trajectories,
-            ),
-        )
-
-        # add a `scene_id` coordinate and make it the primary one
-        fn_to_scene_id = dict(
-            [(t["image"].fn, scene_id) for (scene_id, t) in input.items()]
-        )
-        scene_ids = [fn_to_scene_id[fn] for fn in ds_trajs.image_filename.values]
-        ds_trajs["scene_id"] = "image_filename", scene_ids
-        ds_trajs = ds_trajs.swap_dims(dict(image_filename="scene_id"))
-
-        datasets_posns = []
-        for scene_id in ds_trajs.scene_id.values:
-            ds_points_scene = ds_trajs.sel(scene_id=scene_id)
-            i_points = ds_points_scene.i.values
-            j_points = ds_points_scene.j.values
-
-            da_imgdata = self.input()[scene_id]["data"].open()
-            lat_points = da_imgdata.lat.values[i_points, j_points]
-            lon_points = da_imgdata.lon.values[i_points, j_points]
-            x_points = da_imgdata.x.values[i_points]
-            y_points = da_imgdata.y.values[j_points]
-
-            m_nans = np.logical_or(i_points == -1, j_points == -1)
-
-            def set_nans(v):
-                return np.where(m_nans, np.nan, v)
-
-            ds_points_scene["x"] = ("traj_id",), set_nans(x_points)
-            ds_points_scene["y"] = ("traj_id",), set_nans(y_points)
-            ds_points_scene["lat"] = ("traj_id",), set_nans(lat_points)
-            ds_points_scene["lon"] = ("traj_id",), set_nans(lon_points)
-
-            datasets_posns.append(ds_points_scene)
-
-        ds_trajs = xr.concat(datasets_posns, dim="scene_id")
-        for v in ["x", "y", "lat", "lon"]:
-            ds_trajs[v].attrs.update(da_imgdata[v].attrs)
-        Path(self.output().fn).parent.mkdir(exist_ok=True, parents=True)
-        ds_trajs.to_netcdf(self.output().fn)
-
-    def output(self):
-        fn = f"{self.prefix}.flow_trajectories.nc"
-        p_out = Path(self.data_path) / "rect" / "trajectories" / fn
-        return XArrayTarget(str(p_out))
-
-
-class DatasetPrefixOpticalFlowTrajectories(SceneBulkProcessingBaseTask):
-    """
-    Compute optical flow trajectories for all scenes sharing a common prefix
-    """
-    scene_prefix = luigi.Parameter()
-    # this won't actually be used because we'll only need one single parent
-    # task - the one that computes the trajectories for the scene collection
-    TaskClass = ComputeOpticalFlowTrajectories
-
-    @property
-    def scene_filter(self):
-        return f"{self.scene_prefix}.*"
-
-    def _build_runtime_tasks(self):
-        all_source_data = self.input().read()
-
-        scene_ids = all_source_data.keys()
-        scene_ids = self._filter_scene_ids(scene_ids=scene_ids)
-
-        task = ComputeOpticalFlowTrajectories(
-            scene_ids=scene_ids,
-            data_path=self.data_path,
-            prefix=self.scene_prefix,
-        )
-        return task
-
-    def output(self):
-        if not self.input().exists():
-            # the fetch has not completed yet, so we don't know how many scenes
-            # we will be working on. Therefore we just return a target we know
-            # will newer exist
-            return luigi.LocalTarget("__fake_file__.nc")
-
-        task = self._build_runtime_tasks()
-        return task.output()
-
-
-class GroupedDatasetOpticalFlowTrajectories(GroupedSceneBulkProcessingBaseTask):
-    TaskClass = ComputeOpticalFlowTrajectories
-
-    def _get_task_class_kwargs(self):
-        return {}
-
-    def run(self):
-        yield super().run()
-
-        tasks = self._build_runtime_tasks()
-        datasets = [t.output().open() for t in tasks.values()]
-
-        ds = xr.concat(datasets, dim="scene_id")
-        times = [parse_scene_id(scene_id) for scene_id in ds.scene_id.values]
-        ds.coords["time"] = ("scene_id",), times
-        ds.to_netcdf(self.output().fn)
-
-    def output(self):
-        fn = "flow_trajectories_all.nc"
-        return XArrayTarget(fn)
