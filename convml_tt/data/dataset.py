@@ -92,7 +92,7 @@ class ImageTripletDataset(_ImageDatasetBase):
         self.num_items = list(n_tiles.values())[0]
 
         if set(n_tiles.values()) == {0}:
-            raise Exception(f"No {stage} data was found in `{data_dir}`")
+            raise FileNotFoundError(f"No {stage} data was found in `{data_dir}`")
 
     def get_image(self, index, tile_type):
         image_file_path = self.file_paths[tile_type][index]
