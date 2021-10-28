@@ -4,6 +4,7 @@ from pathlib import Path
 import luigi
 import numpy as np
 import xarray as xr
+import subprocess
 
 from ....data.sources.pipeline import SceneRegriddedData, parse_scene_id
 from ....data.sources.pipeline.utils import (
@@ -155,7 +156,7 @@ class GroupedDatasetOpticalFlowTrajectories(GroupedSceneBulkProcessingBaseTask):
 
 class PlotSceneWithTrajectories(luigi.Task):
     """
-    Create trajectories using all scenes defined by `scene_ids` and create a
+    Create trajectories using all scenes defined by `trajectory_scene_ids` and create a
     plot of the scene_image with the trajectories overlaid
     """
     trajectory_scene_ids = luigi.ListParameter()
@@ -195,31 +196,73 @@ class PlotSceneWithTrajectories(luigi.Task):
 
     def output(self):
         fn = f"{self.prefix}.{self.scene_id}.flow_trajectories.png"
-        p_out = Path(self.data_path) / "rect" / "trajectories" / fn
+        p_out = Path(self.data_path) / "rect" / "trajectories" / "animations" / "frames" / fn
         return XArrayTarget(str(p_out))
 
 
-class PlotScenesWithScenePrefixTrajectories(SceneBulkProcessingBaseTask):
+class PlotScenesWithScenePrefixTrajectories(luigi.Task):
     """
     For the set of scenes that share a common prefix compute trajectories of
     movement using optical flow and plot each scene with the trajectories
     overlaid
     """
-    TaskClass = PlotSceneWithTrajectories
-    scene_prefix = luigi.Parameter()
+    prefix = luigi.Parameter()
+    scene_ids = luigi.ListParameter()
     max_num_trajectories = luigi.IntParameter(default=400)
     min_point_distance = luigi.IntParameter(default=100)
     dt_max = luigi.IntParameter(default=120)  # [min]
+    data_path = luigi.Parameter()
+    create_animation = luigi.BoolParameter(default=False)
 
-    @property
-    def scene_filter(self):
-        return f"{self.scene_prefix}.*"
+    def requires(self):
+        tasks = []
+        for scene_id in self.scene_ids:
+            task = PlotSceneWithTrajectories(
+                scene_id=scene_id,
+                trajectory_scene_ids=self.scene_ids,
+                max_num_trajectories=self.max_num_trajectories,
+                min_point_distance=self.min_point_distance,
+                prefix=self.prefix,
+                dt_max=self.dt_max,
+                data_path=self.data_path,
+            )
+            tasks.append(task)
+        return tasks
+
+    def run(self):
+        if self.create_animation:
+            args = ["convert"]
+            args += [o.path for o in self.output()["frames"]]
+            args.append(self.output()["animation"].path)
+            proc = subprocess.Popen(args=args)
+            stdout, stderr = proc.communicate()
+            if stderr is not None:
+                raise Exception(stderr)
+
+    def output(self):
+        parent_output = self.input()
+        if not self.create_animation:
+            return parent_output
+
+        fn = f"{self.prefix}.gif"
+        p_out = Path(self.data_path) / "rect" / "trajectories" / "animations" / fn
+        return dict(
+            frames=parent_output, animation=luigi.LocalTarget(p_out)
+        )
+
+
+
+class PlotAllScenesWithScenePrefixTrajectories(GroupedSceneBulkProcessingBaseTask):
+    TaskClass = PlotScenesWithScenePrefixTrajectories
+    max_num_trajectories = luigi.IntParameter(default=400)
+    min_point_distance = luigi.IntParameter(default=100)
+    dt_max = luigi.IntParameter(default=120)  # [min]
+    create_animations = luigi.BoolParameter(default=True)
 
     def _get_task_class_kwargs(self, scene_ids):
         return dict(
-            trajectory_scene_ids=scene_ids,
-            prefix=self.scene_prefix,
             max_num_trajectories=self.max_num_trajectories,
             dt_max=self.dt_max,
             min_point_distance=self.min_point_distance,
+            create_animation=self.create_animations
         )

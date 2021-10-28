@@ -1,6 +1,6 @@
 import luigi
 import re
-from .scene_sources import GenerateSceneIDs
+from .scene_sources import GenerateSceneIDs, parse_scene_id
 
 
 class SceneBulkProcessingBaseTask(luigi.Task):
@@ -9,7 +9,7 @@ class SceneBulkProcessingBaseTask(luigi.Task):
     each scene. Must set `TaskClass` in the derived class
     """
 
-    data_path = luigi.Parameter()
+    data_path = luigi.Parameter(default=".")
     TaskClass = None
     SceneIDsTaskClass = GenerateSceneIDs
     scene_filter = luigi.OptionalParameter(default=None)
@@ -76,24 +76,21 @@ class GroupedSceneBulkProcessingBaseTask(SceneBulkProcessingBaseTask):
     """
     Groups all scenes in dataset by date and runs them provided Task
     """
-
-    scene_prefix = "DATE"
+    scene_group_prefix = "DATE"
 
     def _build_runtime_tasks(self):
         all_source_data = self.input().read()
-        kwargs = self._get_task_class_kwargs()
 
-        if not self.scene_prefix == "DATE":
-            raise NotImplementedError(self.scene_prefix)
+        scene_ids = all_source_data.keys()
+        scene_ids = self._filter_scene_ids(scene_ids=scene_ids)
 
         scenes_by_prefix = {}
-        for scene_id in all_source_data.keys():
-            if not scene_id.startswith("goes16_"):
-                raise NotImplementedError(scene_id)
-
-            # the last four characters are the hour and minute
-            # TODO: generalise this to have a parser for the scene_id
-            prefix = scene_id[:-4]
+        for scene_id in scene_ids:
+            source_type, t_scene = parse_scene_id(scene_id)
+            if self.scene_group_prefix == "DATE":
+                prefix = f"{source_type}__{t_scene:%Y%m%d}"
+            else:
+                raise NotImplementedError(self.scene_group_prefix)
 
             if prefix not in scenes_by_prefix:
                 scenes_by_prefix[prefix] = []
@@ -101,10 +98,11 @@ class GroupedSceneBulkProcessingBaseTask(SceneBulkProcessingBaseTask):
 
         tasks = {}
         for prefix, scene_ids in scenes_by_prefix.items():
+            kwargs = self._get_task_class_kwargs(scene_ids=scene_ids)
             tasks[prefix] = self.TaskClass(
                 scene_ids=scene_ids,
                 prefix=prefix,
-                dataset_path=self.dataset_path,
+                data_path=self.data_path,
                 **kwargs,
             )
         return tasks
