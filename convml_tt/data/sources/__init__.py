@@ -3,8 +3,11 @@ from pathlib import Path
 import yaml
 import dateutil.parser
 import datetime
+import numpy as np
+import functools
 
 from .sampling.domain import LocalCartesianDomain, SourceDataDomain
+from .utils import time_filters
 
 
 def _parse_datetime(o):
@@ -12,6 +15,24 @@ def _parse_datetime(o):
         return dateutil.parser.parse(o)
     else:
         return o
+
+
+def _parse_time_intervals(time_meta):
+    if "intervals" in time_meta:
+        for time_interval_meta in time_meta["intervals"]:
+            for time_interval in _parse_time_intervals(time_meta=time_interval_meta):
+                yield time_interval
+    else:
+        t_start = _parse_datetime(time_meta["t_start"])
+        if "N_days" in time_meta:
+            duration = datetime.timedelta(days=time_meta["N_days"])
+            t_end = t_start + duration
+        elif "t_end" in time_meta:
+            t_end = _parse_datetime(time_meta["t_end"])
+        else:
+            raise NotImplementedError(time_meta["time"])
+
+        yield (t_start, t_end)
 
 
 class DataSource:
@@ -93,17 +114,23 @@ class DataSource:
                     "(N_days) in a `time` section of `meta.yaml`"
                 )
             return
-
-        self.t_start = _parse_datetime(time_meta["t_start"])
-        if "N_days" in time_meta:
-            duration = datetime.timedelta(days=time_meta["N_days"])
-            self.t_end = self.t_start + duration
-        elif "t_end" in time_meta:
-            self.t_end = _parse_datetime(time_meta["t_end"])
         else:
-            raise NotImplementedError(time_meta["time"])
+            self._time_intervals = list(_parse_time_intervals(time_meta=time_meta))
+
+    @property
+    def time_intervals(self):
+        return self._time_intervals
+
+    @property
+    def db_type(self):
+        """Use yaml-files as "database" files by default, but make json an option for speed"""
+        if "db_type" in self._meta:
+            return self._meta["db_type"]
+        else:
+            return "yaml"
 
     @classmethod
+    @functools.lru_cache(maxsize=10)
     def load(cls, path):
         path_abs = Path(path).expanduser().absolute()
         p = path_abs / "meta.yaml"
@@ -136,11 +163,28 @@ class DataSource:
             {k: v for k, v in self._meta.items() if not k.startswith("_")}
         )
 
-    def filter_scenes_by_time(self, scene_times):
+    def valid_scene_time(self, scene_time):
         """
         Apply the time filtering specified for this source dataset if one is specified
         """
-        if "N_hours_from_zenith" in self._meta["time"]:
-            # TODO: implement filtering here
-            pass
-        return scene_times
+
+        filters = self._meta["time"].get("filters", {})
+        for filter_kind, filter_value in filters.items():
+            if filter_kind == "N_hours_from_zenith":
+                lon_zenith = self.domain.central_longitude
+                filter_fn = functools.partial(
+                    time_filters.within_dt_from_zenith,
+                    dt_zenith_max=datetime.timedelta(hours=filter_value),
+                    lon_zenith=lon_zenith,
+                )
+            elif filter_kind == time_filters.DATETIME_ATTRS:
+                filter_fn = functools.partial(
+                    time_filters.within_attr_values, **{filter_kind: filter_value}
+                )
+            else:
+                raise NotImplementedError(filter_kind)
+
+            if not filter_fn(scene_time):
+                return False
+
+        return True

@@ -2,11 +2,13 @@ import luigi
 from pathlib import Path
 import datetime
 import logging
+import itertools
+from functools import partial
 
 from ..goes16.pipeline import GOES16Query
 from ..les import FindLESFiles
 from .. import DataSource
-from ....pipeline import YAMLTarget
+from ....pipeline import DBTarget
 from collections import OrderedDict
 
 log = logging.getLogger()
@@ -34,7 +36,7 @@ def merge_multichannel_sources(files_per_channel, time_fn):
     N_channels = len(files_per_channel)
     for channel, channel_files in files_per_channel.items():
         for ch_filename in channel_files:
-            file_timestamp = time_fn(ch_filename)
+            file_timestamp = time_fn(filename=ch_filename)
             time_group = channel_files_by_timestamp.setdefault(file_timestamp, {})
             time_group[channel] = ch_filename
 
@@ -49,18 +51,27 @@ def merge_multichannel_sources(files_per_channel, time_fn):
             )
         else:
             log.warn(
-                "Only {len(timestamp_files)} were found for timestamp {timestamp}"
+                f"Only {len(timestamp_files)} were found for timestamp {timestamp}"
                 " so this timestamp will be excluded"
             )
 
     return scene_filesets
 
 
+def get_time_for_filename(data_source, filename):
+    if data_source.source == "goes16":
+        return GOES16Query.get_time(filename=filename)
+    elif data_source.source == "LES":
+        return FindLESFiles.get_time(filename=filename)
+    else:
+        raise NotImplementedError(data_source)
+
+
 class GenerateSceneIDs(luigi.Task):
     """
-    Construct a "database" (actually a yaml-file) of all scene IDs in a dataset
-    given the source, type and time-span of the dataset. Database contains a list
-    of the scene IDs and the sourcefile(s) per scene.
+    Construct a "database" (actually a yaml or json-file) of all scene IDs in a
+    dataset given the source, type and time-span of the dataset. Database
+    contains a list of the scene IDs and the sourcefile(s) per scene.
     """
 
     data_path = luigi.Parameter(default=".")
@@ -70,100 +81,103 @@ class GenerateSceneIDs(luigi.Task):
         return DataSource.load(path=self.data_path)
 
     def requires(self):
-        ds = self.data_source
-        source_data_path = Path(self.data_path) / "source_data" / ds.source
+        data_source = self.data_source
+        source_data_path = Path(self.data_path) / "source_data" / data_source.source
 
         tasks = None
-        if ds.source == "goes16":
-            if ds.type == "truecolor_rgb":
+        if data_source.source == "goes16":
+            if data_source.type == "truecolor_rgb":
                 tasks = {}
-                t_start = ds.t_start
-                t_end = ds.t_end
-                dt_total = t_end - t_start
-                t_center = t_start + dt_total / 2.0
+                for t_start, t_end in data_source.time_intervals:
+                    dt_total = t_end - t_start
+                    t_center = t_start + dt_total / 2.0
 
-                for channel in [1, 2, 3]:
-                    t = GOES16Query(
-                        data_path=source_data_path,
-                        time=t_center,
-                        dt_max=dt_total / 2.0,
-                        channel=channel,
-                    )
-                    tasks[channel] = t
+                    for channel in [1, 2, 3]:
+                        t = GOES16Query(
+                            data_path=source_data_path,
+                            time=t_center,
+                            dt_max=dt_total / 2.0,
+                            channel=channel,
+                        )
+                        tasks.setdefault(channel, []).append(t)
             else:
-                raise NotImplementedError(ds.type)
-        elif ds.source == "LES":
-            kind, *variables = ds.type.split("__")
+                raise NotImplementedError(data_source.type)
+        elif data_source.source == "LES":
+            kind, *variables = data_source.type.split("__")
             if not kind == "singlechannel":
-                raise NotImplementedError(ds.type)
+                raise NotImplementedError(data_source.type)
             else:
                 source_variable = variables[0]
 
-            filename_glob = ds.files is not None and ds.files or "*.nc"
+            filename_glob = (
+                data_source.files is not None and data_source.files or "*.nc"
+            )
             tasks = FindLESFiles(
                 data_path=source_data_path,
                 source_variable=source_variable,
                 filename_glob=filename_glob,
             )
         else:
-            raise NotImplementedError(ds.source)
+            raise NotImplementedError(data_source.source)
 
         return tasks
 
-    def get_time_for_filename(self, filename):
-        ds = self.data_source
-        if ds.source == "goes16":
-            return GOES16Query.get_time(filename=filename)
-        elif ds.source == "LES":
-            return FindLESFiles.get_time(filename=filename)
-        else:
-            raise NotImplementedError(ds.source)
-
     def run(self):
-        ds = self.data_source
-        scenes = {}
+        data_source = self.data_source
+        scenes_by_time = {}
 
         input = self.input()
         if type(input) == dict:
             channels_and_filenames = OrderedDict()
-            if ds.type == "truecolor_rgb":
+            if data_source.type == "truecolor_rgb":
                 channel_order = [1, 2, 3]
             else:
-                raise NotImplementedError(ds.type)
+                raise NotImplementedError(data_source.type)
 
-            opened_inputs = {
-                input_name: input_item.open()
-                for (input_name, input_item) in input.items()
-            }
+            opened_inputs = {}
+            for input_name, input_parts in input.items():
+                opened_inputs[input_name] = list(
+                    itertools.chain(*[input_part.open() for input_part in input_parts])
+                )
 
             for channel in channel_order:
                 channels_and_filenames[channel] = opened_inputs[channel]
 
+            time_fn = partial(get_time_for_filename, data_source=data_source)
+
             scene_sets = merge_multichannel_sources(
-                channels_and_filenames, time_fn=self.get_time_for_filename
+                channels_and_filenames, time_fn=time_fn
             )
 
             for scene_filenames in scene_sets:
-                t_scene = self.get_time_for_filename(filename=scene_filenames[0])
-                scene_id = make_scene_id(source=ds.source, t_scene=t_scene)
-                scenes[scene_id] = scene_filenames
-        elif isinstance(input, YAMLTarget):
+                t_scene = get_time_for_filename(
+                    filename=scene_filenames[0], data_source=data_source
+                )
+                scenes_by_time[t_scene] = scene_filenames
+        elif isinstance(input, DBTarget):
             scene_filenames = input.open()
             for scene_filename in scene_filenames:
-                t_scene = self.get_time_for_filename(filename=scene_filename)
-                scene_id = make_scene_id(source=ds.source, t_scene=t_scene)
-                scenes[scene_id] = scene_filename
+                t_scene = get_time_for_filename(
+                    filename=scene_filename, data_source=data_source
+                )
+                scenes_by_time[t_scene] = scene_filename
         else:
             raise NotImplementedError(input)
+
+        scenes = {
+            make_scene_id(source=data_source.source, t_scene=t_scene): scene_files
+            for (t_scene, scene_files) in scenes_by_time.items()
+            if data_source.valid_scene_time(t_scene)
+        }
 
         Path(self.output().fn).parent.mkdir(exist_ok=True, parents=True)
         self.output().write(scenes)
 
     def output(self):
         ds = self.data_source
-        fn = "scene_ids.yml"
-        p = Path("source_data") / ds.source / ds.type / fn
-        return YAMLTarget(str(p))
+        name = "scene_ids"
+        path = Path(self.data_path) / "source_data" / ds.source / ds.type
+        return DBTarget(path=str(path), db_name=name, db_type=ds.db_type)
 
 
 class DownloadAllSourceFiles(luigi.Task):
@@ -176,4 +190,4 @@ class DownloadAllSourceFiles(luigi.Task):
         return DataSource.load(path=self.data_path)
 
     def requires(self):
-        return AllSceneIDs(data_path=self.data_path)
+        return GenerateSceneIDs(data_path=self.data_path)

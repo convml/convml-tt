@@ -1,7 +1,8 @@
-import skimage.color
-import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
 import numpy as np
+import skimage.color
 import xarray as xr
 
 
@@ -51,12 +52,12 @@ def make_rgb(da, alpha=0.5, **coord_components):
     return da_rgba
 
 
-def _get_img_with_extent_cropped(da_emb, img_fn):
+def get_img_with_extent_cropped(da_emb):
     """
     Load the image in `img_fn`, clip the image and return the
     image extent (xy-extent if the source data coordinates are available)
     """
-    img = mpimg.imread(img_fn)
+    img = _load_image(da_emb=da_emb)
 
     i_ = da_emb.i0.values
     # NB: j-values might be decreasing in number if we're using a
@@ -95,51 +96,28 @@ def _get_img_with_extent_cropped(da_emb, img_fn):
     return img, np.array(extent)
 
 
-def _get_img_with_extent(da_emb, img_fn, dataset_path):
+def get_img_with_extent(da_emb):
     """
     Load the image in `img_fn` and return the
     image extent (xy-extent if the source data coordinates are available)
     """
-    img = mpimg.imread(img_fn)
-
-    dataset = TripletDataset.load(dataset_path)
-    domain_rect = tiler.RectTile(**dataset.extra["rectpred"]["domain"])
-    return img, domain_rect.get_grid_extent()
+    img = _load_image(da_emb=da_emb)
+    img_extent = _load_image_extent(da_emb=da_emb)
+    return img, img_extent
 
 
-def plot_scene_image(da, dataset_path, crop_image=True, ax=None):
+def plot_scene_image(da_emb, crop_image=True, ax=None):
     """
     Render the RGB image of the scene with `scene_id` in `da` into `ax` (a new
     figure will be created if `ax=None`)
     """
-    if len(da.shape) == 3:
+    if len(da_emb.shape) == 3:
         # ensure non-xy dim is first
-        d_not_xy = list(filter(lambda d: d not in ["x", "y"], da.dims))
-        da = da.transpose(*d_not_xy, "x", "y")
+        d_not_xy = list(filter(lambda d: d not in ["x", "y"], da_emb.dims))
+        da_emb = da_emb.transpose(*d_not_xy, "x", "y")
 
-    def _get_image():
-        if "scene_id" in list(da.coords) + list(da.attrs.keys()):
-            try:
-                scene_id = da.attrs["scene_id"]
-            except KeyError:
-                scene_id = da.scene_id.item()
-                assert type(scene_id) == str
-            img_path = (
-                MakeRectRGBImage(dataset_path=dataset_path, scene_id=scene_id)
-                .output()
-                .fn
-            )
-
-            if crop_image:
-                return _get_img_with_extent_cropped(da, img_path)
-            else:
-                return _get_img_with_extent(
-                    da, img_fn=img_path, dataset_path=dataset_path
-                )
-        else:
-            raise NotImplementedError(da)
-
-    img, img_extent = _get_image()
+    img = _load_image(da_emb=da_emb)
+    img_extent = _load_image_extent(da_emb=da_emb)
 
     if ax is None:
         lx = img_extent[1] - img_extent[0]
@@ -149,15 +127,38 @@ def plot_scene_image(da, dataset_path, crop_image=True, ax=None):
         fig_width = fig_height * r
         fig, ax = plt.subplots(figsize=(fig_width, fig_height))
         ax.set_aspect(1.0)
-        ax.set_xlabel(xr.plot.utils.label_from_attrs(da.x))
-        ax.set_ylabel(xr.plot.utils.label_from_attrs(da.y))
+        ax.set_xlabel(xr.plot.utils.label_from_attrs(da_emb.x))
+        ax.set_ylabel(xr.plot.utils.label_from_attrs(da_emb.y))
     ax.imshow(img, extent=img_extent, rasterized=True)
 
-    return ax, img_extent
+    return ax, img_extent, img
+
+
+def _load_image(da_emb):
+    if "image_path" not in da_emb.attrs:
+        raise Exception(
+            "Cannot plot embedding annotation map images without the `image_path` "
+            "attribute defined for the embedding data-array (as this defines the "
+            "path of the image to overlay onto)"
+        )
+
+    return mpimg.imread(da_emb.image_path)
+
+
+def _load_image_extent(da_emb):
+    if "src_data_path" not in da_emb.attrs:
+        raise Exception(
+            "Cannot plot embedding annotation map images without the `src_data_path` "
+            "attribute defined for the embedding data-array (as this defines the "
+            "extent of the image to overlay onto)"
+        )
+
+    da_src = xr.open_dataarray(da_emb.src_data_path)
+    return [da_src.x.min(), da_src.x.max(), da_src.y.min(), da_src.y.max()]
 
 
 def make_rgb_annotation_map_image(
-    da, rgb_components, dataset_path, render_tiles=False, crop_image=True
+    da_emb, rgb_components, render_tiles=False, crop_image=True
 ):
     """
     Render the contents of `da` onto the RGB image represented by the scene
@@ -166,28 +167,30 @@ def make_rgb_annotation_map_image(
     If `da` is 2D it will be rendered with discrete colours, otherwise if `da`
     is 3D the components of da to use should be given by `rgb_components`
     """
-    if len(da.shape) == 3:
+    if len(da_emb.shape) == 3:
         # ensure non-xy dim is first
-        d_not_xy = list(filter(lambda d: d not in ["x", "y"], da.dims))
-        da = da.transpose(*d_not_xy, "x", "y")
+        d_not_xy = list(filter(lambda d: d not in ["x", "y"], da_emb.dims))
+        da_emb = da_emb.transpose(*d_not_xy, "x", "y")
 
     # now we get to adding the annotation
 
     # scale distances to km
-    if da.x.units == "m" and da.y.units == "m":
+    if da_emb.x.units == "m" and da_emb.y.units == "m":
         s = 1000.0
-        da = da.copy().assign_coords(dict(x=da.x.values / s, y=da.y.values / s))
-        da.x.attrs["units"] = "km"
-        da.y.attrs["units"] = "km"
+        da_emb = da_emb.copy().assign_coords(
+            dict(x=da_emb.x.values / s, y=da_emb.y.values / s)
+        )
+        da_emb.x.attrs["units"] = "km"
+        da_emb.y.attrs["units"] = "km"
     else:
         s = 1.0
 
-    if len(da.shape) == 3:
-        da_rgba = _make_rgb(da=da, dims=rgb_components, alpha=0.5)
-    elif len(da.shape) == 2:
+    if len(da_emb.shape) == 3:
+        da_rgba = make_rgb(da=da_emb, alpha=0.5, **{d_not_xy[0]: rgb_components})
+    elif len(da_emb.shape) == 2:
         # when we have distinct classes (identified by integers) we just
         # want to map each label to a RGB color
-        labels = da.stack(dict(n=da.dims))
+        labels = da_emb.stack(dict(n=da_emb.dims))
         arr_rgb = skimage.color.label2rgb(label=labels.values, bg_color=(1.0, 1.0, 1.0))
         # make an RGBA array so we can apply some alpha blending later
         rgba_shape = list(arr_rgb.shape)
@@ -199,7 +202,7 @@ def make_rgb_annotation_map_image(
             arr_rgba, dims=("n", "rgba"), coords=dict(n=labels.n)
         ).unstack("n")
     else:
-        raise NotImplementedError(da.shape)
+        raise NotImplementedError(da_emb.shape)
 
     # set up the figure
     nrows = render_tiles and 4 or 3
@@ -211,25 +214,23 @@ def make_rgb_annotation_map_image(
     )
 
     ax = axes[0]
-    _, img_extent = plot_scene_image(
-        da=da, dataset_path=dataset_path, ax=ax, crop_image=crop_image
-    )
+    _, img_extent, img = plot_scene_image(da_emb=da_emb, ax=ax, crop_image=crop_image)
 
     ax = axes[1]
-    plot_scene_image(da=da, dataset_path=dataset_path, ax=ax, crop_image=crop_image)
+    plot_scene_image(da_emb=da_emb, ax=ax, crop_image=crop_image)
     da_rgba.plot.imshow(ax=ax, rgb="rgba", y="y", rasterized=True)
 
     ax = axes[2]
     da_rgba[3] = 1.0
     da_rgba.plot.imshow(ax=ax, rgb="rgba", y="y", rasterized=True)
 
-    if "lx_tile" in da.attrs and "ly_tile" in da.attrs:
+    if "lx_tile" in da_emb.attrs and "ly_tile" in da_emb.attrs:
         if render_tiles:
-            x_, y_ = xr.broadcast(da.x, da.y)
+            x_, y_ = xr.broadcast(da_emb.x, da_emb.y)
             axes[2].scatter(x_, y_, marker="x")
 
-            lx = da.lx_tile / s
-            ly = da.ly_tile / s
+            lx = da_emb.lx_tile / s
+            ly = da_emb.ly_tile / s
             ax = axes[3]
             ax.imshow(img, extent=img_extent)
             for xc, yc in zip(x_.values.flatten(), y_.values.flatten()):
@@ -260,9 +261,9 @@ def make_rgb_annotation_map_image(
 
             xlim, ylim = pad_lims(img_extent)
         else:
-            x0, y0 = da.x.min(), da.y.max()
-            lx = da.lx_tile / s
-            ly = da.ly_tile / s
+            x0, y0 = da_emb.x.min(), da_emb.y.max()
+            lx = da_emb.lx_tile / s
+            ly = da_emb.ly_tile / s
             rect = mpatches.Rectangle(
                 (x0 - lx / 2.0, y0 - ly / 2),
                 lx,
@@ -283,4 +284,72 @@ def make_rgb_annotation_map_image(
 
     plt.tight_layout()
 
+    return fig, axes
+
+
+def make_components_annotation_map_image(da_emb, components=[0, 1, 2], col_wrap=2):
+    """
+    Create overlay plots of individual embedding components as individual
+    subplots each overlaid on the scene image
+    """
+    da_emb.coords["pca_dim"] = np.arange(da_emb.pca_dim.count())
+
+    da_emb = da_emb.assign_coords(
+        x=da_emb.x / 1000.0,
+        y=da_emb.y / 1000.0,
+        explained_variance=np.round(da_emb.explained_variance, 2),
+    )
+    da_emb.x.attrs["units"] = "km"
+    da_emb.y.attrs["units"] = "km"
+
+    img = _load_image(da_emb=da_emb)
+    img_extent = _load_image_extent(da_emb=da_emb)
+
+    img_extent = np.array(img_extent) / 1000.0
+
+    # find non-xy dim
+    d_not_xy = next(filter(lambda d: d not in ["x", "y"], da_emb.dims))
+
+    N_subplots = len(components) + 1
+    data_r = 3.0
+    ncols = col_wrap
+    size = 3.0
+
+    nrows = int(np.ceil(N_subplots / ncols))
+    figsize = (int(size * data_r * ncols), int(size * nrows))
+
+    fig, axes = plt.subplots(
+        figsize=figsize,
+        nrows=nrows,
+        ncols=ncols,
+        subplot_kw=dict(aspect=1),
+        sharex=True,
+    )
+
+    ax = axes.flatten()[0]
+    ax.imshow(img, extent=img_extent)
+    ax.set_title(da_emb.scene_id.item())
+
+    for n, ax in zip(components, axes.flatten()[1:]):
+        ax.imshow(img, extent=img_extent)
+        da_ = da_emb.sel(**{d_not_xy: n})
+        da_ = da_.drop(["i0", "j0", "scene_id"])
+
+        da_.plot.imshow(ax=ax, y="y", alpha=0.5, add_colorbar=False)
+
+        ax.set_xlim(*img_extent[:2])
+        ax.set_ylim(*img_extent[2:])
+
+    [ax.set_aspect(1) for ax in axes.flatten()]
+    [ax.set_xlabel("") for ax in axes[:-1, :].flatten()]
+
+    fig.tight_layout()
+
+    fig.text(
+        0.0,
+        -0.02,
+        "cum. explained variance: {}".format(
+            np.cumsum(da_emb.explained_variance.values)
+        ),
+    )
     return fig, axes

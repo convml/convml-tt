@@ -10,6 +10,7 @@ import os
 from xesmf.backend import esmf_regrid_build, esmf_regrid_finalize
 from pathlib import Path
 from ..sampling.domain import LocalCartesianDomain
+from .crs import parse_cf as parse_cf_crs
 
 
 class SilentRegridder(xesmf.Regridder):
@@ -45,7 +46,7 @@ def resample(
     old_grid = xr.Dataset(coords=da.coords)
     new_grid = domain.get_grid(dx=dx)
 
-    crs = getattr(da.rio, "crs")
+    crs = parse_cf_crs(da)
 
     if isinstance(domain, LocalCartesianDomain) and crs is None:
         raise Exception(

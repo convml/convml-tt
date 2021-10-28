@@ -21,13 +21,14 @@ def _cleanup_composite_da_attrs(da_composite):
             ("prerequisites", lambda v: None),
             ("crs", lambda v: str(v)),
             ("orbital_parameters", lambda v: None),
+            ("_satpy_id", lambda v: None)
         ]
 
         for v, fn in fns:
             try:
                 da.attrs[v] = fn(da.attrs[v])
-            except Exception as e:
-                print(e)
+            except Exception:
+                pass
 
         to_delete = [k for (k, v) in da.attrs.items() if v is None]
         for k in to_delete:
@@ -68,6 +69,38 @@ def load_rgb_files_and_get_composite_da(scene_fns):
     da_truecolor = _cleanup_composite_da_attrs(da_truecolor)
 
     return da_truecolor
+
+
+def load_aux_file(scene_fn):
+    # aux fields we simply open so we can crop them
+    # but we need to pick out the right variable in the dataset
+    ds = xr.open_dataset(scene_fn)
+    vars_2d = [
+        name for (name, da) in ds.data_vars.items() if len(da.shape) == 2
+    ]
+    vars_2d.remove("DQF")
+    if len(vars_2d) != 1:
+        raise Exception(
+            "More than the data-quality variable (DQF) was found "
+            "in the aux dataset"
+        )
+    var_name = vars_2d[0]
+
+    scene = satpy.Scene(reader="abi_l2_nc", filenames=[scene_fn])
+    scene.load([var_name])
+
+    da = scene[var_name]
+    if "crs" in da.coords:
+        da = da.drop("crs")
+
+    # set the projection info in a CF-compliant manner so we can load it later
+    grid_mapping_var = da.grid_mapping
+    da[grid_mapping_var] = ds[grid_mapping_var]
+
+    # remove all attributes that satpy adds which can't be serialised to a netCDF file
+    da = _cleanup_composite_da_attrs(da)
+
+    return da
 
 
 def rgb_da_to_img(da):

@@ -1,13 +1,22 @@
+import tempfile
 from pathlib import Path
 
-from PIL import Image
-import xarray as xr
+import luigi
 import numpy as np
+import xarray as xr
+from PIL import Image
 
-from convml_tt.interpretation.rectpred.data import make_sliding_tile_model_predictions
-from convml_tt.system import TripletTrainerModel
+from convml_tt.data.dataset import MovingWindowImageTilingDataset
+from convml_tt.data.examples import PretrainedModel, fetch_pretrained_model
+from convml_tt.data.sources.examples import ExampleDatasource, fetch_example_datasource
+from convml_tt.data.transforms import get_transforms as get_model_transforms
+from convml_tt.interpretation.rectpred.pipeline.data import (
+    AggregateFullDatasetImagePredictionMapData,
+)
 from convml_tt.interpretation.rectpred.plot import make_rgb
 from convml_tt.interpretation.rectpred.transform import apply_transform
+from convml_tt.system import TripletTrainerModel
+from convml_tt.utils import make_sliding_tile_model_predictions
 
 DOC_PATH = Path(__file__).parent.parent / "doc"
 RECTPRED_IMG_EXAMPLE_PATH = DOC_PATH / "goes16_202002051400.png"
@@ -26,7 +35,15 @@ def test_rectpred_sliding_window_inference():
 
     img = Image.open(RECTPRED_IMG_EXAMPLE_PATH)
     step = (500, 200)
-    da_emb_rect = make_sliding_tile_model_predictions(img=img, model=model, step=step)
+    transforms = get_model_transforms(
+        step="predict", normalize_for_arch=model.base_arch
+    )
+    tile_dataset = MovingWindowImageTilingDataset(
+        img=img, transform=transforms, step=step, N_tile=N_tile
+    )
+    da_emb_rect = make_sliding_tile_model_predictions(
+        tile_dataset=tile_dataset, model=model
+    )
 
     nx_img, ny_img = img.size
 
@@ -63,3 +80,18 @@ def test_make_rgb_rect():
     )
 
     make_rgb(da=da_emb, emb_dim=[1, 3, 2])
+
+
+def test_make_rect_data():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        datasource_path = fetch_example_datasource(
+            ExampleDatasource.EUREC4A_SMALL, data_dir=tmpdir
+        )
+        model_path = fetch_pretrained_model(PretrainedModel.FIXED_NORM_STAGE2)
+        task_rect_data = AggregateFullDatasetImagePredictionMapData(
+            data_path=datasource_path,
+            model_path=model_path,
+            step_size=100,
+            generate_tile_images=True,
+        )
+        luigi.build([task_rect_data], local_scheduler=True)

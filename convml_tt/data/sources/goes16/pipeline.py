@@ -7,7 +7,7 @@ import xarray as xr
 import numpy as np
 import isodate
 
-from ....pipeline import YAMLTarget
+from ....pipeline import YAMLTarget, XArrayTarget
 
 
 class DatetimeListParameter(luigi.Parameter):
@@ -24,6 +24,7 @@ class GOES16Query(luigi.Task):
     time = luigi.DateMinuteParameter()
     debug = luigi.BoolParameter(default=False)
     data_path = luigi.Parameter()
+    product = luigi.OptionalParameter(default=None)
 
     def get_time(filename):
         return satdata.Goes16AWS.parse_key(filename, parse_times=True)["start_time"]
@@ -31,20 +32,31 @@ class GOES16Query(luigi.Task):
     def run(self):
         cli = satdata.Goes16AWS(offline=False)
 
+        kws = dict()
+        if self.channel is None:
+            if self.product is None:
+                raise Exception("Either channel or produce should be defined")
+            kws["product"] = self.product
+        else:
+            kws["channel"] = self.channel
+
         filenames = cli.query(
-            time=self.time,
-            region="F",
-            debug=self.debug,
-            channel=self.channel,
-            dt_max=self.dt_max,
+            time=self.time, region="F", debug=self.debug, dt_max=self.dt_max, **kws
         )
 
         Path(self.output().fn).parent.mkdir(exist_ok=True, parents=True)
         self.output().write(filenames)
 
     def output(self):
-        fn = "ch{}_keys_{}_{}.yaml".format(
-            self.channel, self.time.isoformat(), isodate.duration_isoformat(self.dt_max)
+        if self.channel is not None:
+            filename_format = "ch{channel}_keys_{time}_{duration}.yaml"
+        else:
+            filename_format = "{product}_keys_{time}_{duration}.yaml"
+        fn = filename_format.format(
+            channel=self.channel,
+            product=self.product,
+            time=self.time.isoformat(),
+            duration=isodate.duration_isoformat(self.dt_max),
         )
         p = Path(self.data_path) / fn
         return YAMLTarget(str(p))
@@ -67,7 +79,7 @@ class GOES16Fetch(luigi.Task):
 
     def output(self):
         targets = [
-            luigi.LocalTarget(str(Path(self.data_path) / key)) for key in self.keys
+            XArrayTarget(str(Path(self.data_path) / key)) for key in self.keys
         ]
         return targets
 

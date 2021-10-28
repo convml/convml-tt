@@ -1,16 +1,18 @@
 from pathlib import Path
+
 import luigi
 import numpy as np
-from PIL import Image
 
-from .. import goes16
-from .sampling import _SceneRectSampleBase, CropSceneSourceFiles, SceneSourceFiles
-from ...dataset import TILE_IDENTIFIER_FORMAT
 from ....pipeline import XArrayTarget, YAMLTarget
-from ..sampling import triplets as triplet_sampling, domain as sampling_domain
+from ...common import TILE_IDENTIFIER_FORMAT
+from .. import DataSource, goes16
+from ..sampling import domain as sampling_domain
+from ..sampling import triplets as triplet_sampling
 from ..sampling.interpolation import resample
+from ..utils.domain_images import rgb_image_from_scene_data
 from . import GenerateSceneIDs
-from .. import DataSource
+from .sampling import (CropSceneSourceFiles, SceneSourceFiles,
+                       _SceneRectSampleBase)
 
 
 class TripletSceneSplits(luigi.Task):
@@ -239,20 +241,9 @@ class SceneTilesData(_SceneRectSampleBase):
             tile_output = self.output()[tile_identifier]
             tile_output["data"].write(da_tile)
 
-            if data_source.source == "goes16" and data_source.type == "truecolor_rgb":
-                # before creating the image with satpy we need to set the attrs
-                # again to ensure we get a proper RGB image
-                da_tile.attrs.update(da_src.attrs)
-                img_tile = goes16.satpy_rgb.rgb_da_to_img(da=da_tile)
-            else:
-                # TODO: make a more generic image generation function
-                img_data = da_tile.data
-                img_data = (img_data - img_data.min()) / (
-                    img_data.max() - img_data.min()
-                )
-                img_data = (img_data * 255).astype(np.uint8)
-                img_tile = Image.fromarray(img_data)
-
+            img_tile = rgb_image_from_scene_data(
+                data_source=data_source, da_scene=da_tile, src_attrs=da_src.attrs
+            )
             img_tile.save(str(tile_output["image"].fn))
 
     def output(self):
