@@ -1,4 +1,4 @@
-from .sampling import GenerateCroppedScenesData
+from .sampling import GenerateCroppedScenes
 from .scene_sources import (
     SCENE_ID_DATE_FORMAT,
     GenerateSceneIDs,

@@ -206,7 +206,7 @@ class SceneRectData(_SceneRectSampleBase):
         )
 
 
-class GenerateCroppedScenesData(SceneBulkProcessingBaseTask):
+class GenerateCroppedScenes(SceneBulkProcessingBaseTask):
     data_path = luigi.Parameter(default=".")
     TaskClass = CropSceneSourceFiles
 
