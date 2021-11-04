@@ -203,3 +203,13 @@ $> python -m luigi --module convml_tt.interpretation.rectpred.pipeline.flow Plot
 ```bash
 luigi --module convml_tt.data.interpretation.rectpred.pipeline AggregateFullDatasetImagePredictionMapData
 ```
+
+## Transforming embeddings
+
+```bash
+luigi --module convml_tt.interpretation.rectpred.pipeline.transforms CreateAllPredictionMapsDataTransformed --embedding-model-path ml-data/fixednorm-stage-2.torch.pkl --step-size 30 --transform-type pca
+```
+
+```bash
+luigi --module convml_tt.interpretation.rectpred.pipeline.transforms CreateAllPredictionMapsDataTransformed --embedding-model-path ml-data/fixednorm-stage-2.torch.pkl --step-size 30 --pretrained-transform-model pca_transform
+```
