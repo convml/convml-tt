@@ -167,10 +167,22 @@ luigi --module convml_tt.data.sources.pipeline GenerateCroppedScenes
 luigi --module convml_tt.data.sources.pipeline GenerateCroppedScenes --aux-product ACHA
 ```
 
+# Triplet-based analysis
+
 ## Generate tiles
 
 ```bash
 luigi --module convml_tt.data.sources.pipeline GenerateTiles
+```
+
+
+# Sliding-window based analysis
+
+
+## Generate sliding window embeddings
+
+```bash
+luigi --local-scheduler --module convml_tt.interpretation.rectpred.pipeline.data AggregateFullDatasetImagePredictionMapData --data-path . --step-size 30 --model-path ml-data/fixednorm-stage-2.torch.pkl
 ```
 
 ## Generate regridded data for all scenes
