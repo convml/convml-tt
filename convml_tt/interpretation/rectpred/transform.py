@@ -82,6 +82,14 @@ def apply_transform(
                 coords=dict(n=da.stack(dict(n=da.dims)).n),
             ).unstack("n")
 
+    elif transform_type == "isomap":
+        if pretrained_model is not None:
+            model = pretrained_model
+            fn_transform = model.transform
+        else:
+            model = sklearn.manifold.Isomap(**kwargs)
+            fn_transform = model.fit_transform
+
     elif transform_type == "pca_hdbscan":
         try:
             pca__n_components = kwargs.pop("pca__n_components")
