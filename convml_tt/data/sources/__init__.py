@@ -69,7 +69,12 @@ class DataSource:
         sampling_meta = self._meta.get("sampling", {})
 
         if "triplets" in sampling_meta:
-            required_vars = ["tile_size", "N_triplets"]
+            if not "resolution" in sampling_meta:
+                raise Exception(
+                    "To do triplet sampling you must define the `resolution` "
+                    "(in meters/pixel) in the `sampling` section"
+                )
+            required_vars = ["N_triplets"]
             triplets_meta = sampling_meta["triplets"]
             if triplets_meta is None:
                 triplets_meta = {}
@@ -98,7 +103,7 @@ class DataSource:
 
             assert "train" in triplets_meta["N_triplets"]
             assert "tile_N" in triplets_meta
-            assert "tile_size" in triplets_meta
+            # TODO calculate tile size here
             assert "scene_collections_splitting" in triplets_meta
             assert sum(triplets_meta["N_triplets"].values()) > 0
 

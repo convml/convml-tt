@@ -69,6 +69,20 @@ class SceneRegriddedData(_SceneRectSampleBase):
 
         return reqs
 
+    @property
+    def scene_resolution(self):
+        data_source = self.data_source
+        if (
+            "resolution" not in data_source.sampling
+            or data_source.sampling.get("resolution") is None
+        ):
+            raise Exception(
+                "To produce isometric grid resampling of the source data please "
+                "define the grid-spacing by defining `resolution` (in meters/pixel) "
+                "in the `sampling` part of the data source meta information"
+            )
+        return data_source.sampling["resolution"]
+
     def run(self):
         domain_output = self.output()
         data_source = self.data_source
@@ -81,16 +95,7 @@ class SceneRegriddedData(_SceneRectSampleBase):
             if isinstance(domain, sampling_domain.SourceDataDomain):
                 domain = domain.generate_from_dataset(ds=da_src)
 
-            if (
-                "rect" not in data_source.sampling
-                or data_source.sampling["rect"].get("dx") is None
-            ):
-                raise Exception(
-                    "To produce isometric grid resampling of the source data please "
-                    "define the grid-spacing by setting `dx` in a section called `rect` "
-                    "in the `sampling` part of the data source meta information"
-                )
-            dx = data_source.sampling["rect"]["dx"]
+            dx = self.scene_resolution
 
             if self.aux_product is None:
                 method = "bilinear"

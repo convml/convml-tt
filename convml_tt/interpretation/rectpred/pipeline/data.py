@@ -6,6 +6,7 @@ from pathlib import Path
 
 import luigi
 import xarray as xr
+import numpy as np
 from PIL import Image
 
 from ....data.sources.pipeline import SceneRegriddedData
@@ -237,6 +238,20 @@ class AggregateFullDatasetImagePredictionMapData(luigi.Task):
                 step_size=self.step_size,
             )
         return reqs
+
+    @property
+    def scene_resolution(self):
+        data_source = DataSource.load(path=self.data_path)
+        if (
+            "resolution" not in data_source.sampling
+            or data_source.sampling.get("resolution") is None
+        ):
+            raise Exception(
+                "To produce isometric grid resampling of the source data please "
+                "define the grid-spacing by defining `resolution` (in meters/pixel) "
+                "in the `sampling` part of the data source meta information"
+            )
+        return data_source.sampling["resolution"]
 
     def run(self):
         das = []
