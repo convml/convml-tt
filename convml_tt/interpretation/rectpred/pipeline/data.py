@@ -44,12 +44,26 @@ class ImagePredictionMapData(luigi.Task):
         model_transforms = get_model_transforms(
             step="predict", normalize_for_arch=model.base_arch
         )
+        ny_img, nx_img, _ = np.array(img).shape
+        if nx_img < N_tile[0] or ny_img < N_tile[1]:
+            raise Exception(
+                "The requested scene image has too few pixels to contain "
+               f"even a single tile (img size: {nx_img, ny_img} "
+               f"vs tile size: {N_tile[0], N_tile[1]}), maybe the resolution "
+                "is too coarse?"
+            )
+
         tile_dataset = MovingWindowImageTilingDataset(
             img=img,
             transform=model_transforms,
             step=(self.step_size, self.step_size),
             N_tile=N_tile,
         )
+        if len(tile_dataset) == 0:
+            raise Exception(
+                "The provided tile-dataset doesn't contain any tiles! "
+            )
+
 
         da_pred = make_sliding_tile_model_predictions(
             model=model,
