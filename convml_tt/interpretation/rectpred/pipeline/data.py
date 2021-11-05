@@ -276,8 +276,9 @@ class AggregateFullDatasetImagePredictionMapData(luigi.Task):
             # turn attributes we want to keep into extra coordinates so that
             # we'll have them later
             for v in ["src_data_path", "image_path"]:
-                value = da.attrs.pop(v)
-                da[v] = value
+                if v in da.attrs:
+                    value = da.attrs.pop(v)
+                    da[v] = value
             das.append(da)
 
         da_all = xr.concat(das, dim="scene_id")

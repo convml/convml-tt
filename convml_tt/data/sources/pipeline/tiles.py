@@ -87,6 +87,7 @@ class SceneRegriddedData(_SceneRectSampleBase):
         domain_output = self.output()
         data_source = self.data_source
 
+        da_src = None
         if not domain_output["data"].exists():
             inputs = self.input()
             da_src = inputs["source_data"]["data"].open()
@@ -112,6 +113,9 @@ class SceneRegriddedData(_SceneRectSampleBase):
             fig, _ = _plot_scene_aux(da_aux=da_domain, img=img_domain)
             fig.savefig(domain_output["image"].fn)
         else:
+            # need the scene attrs to generate a rgb image
+            if da_src is None:
+                da_src = self.input()["source_data"]["data"].open()
             img_domain = rgb_image_from_scene_data(
                 data_source=data_source, da_scene=da_domain, src_attrs=da_src.attrs
             )
