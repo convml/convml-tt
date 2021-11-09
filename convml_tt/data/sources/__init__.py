@@ -149,8 +149,12 @@ class DataSource:
                 "datasource in `meta.yaml`"
             )
         meta["name"] = name
-        meta["data_path"] = path_abs
+        meta["data_path"] = Path(path_abs).absolute()
         return cls(**meta)
+
+    @property
+    def data_path(self):
+        return self._meta["data_path"]
 
     @property
     def source(self):
