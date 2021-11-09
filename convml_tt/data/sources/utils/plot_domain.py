@@ -3,8 +3,12 @@ from matplotlib.lines import Line2D
 import cartopy.crs as ccrs
 import xarray as xr
 import numpy as np
+import luigi
 
 from .. import DataSource
+from ..sampling.domain import SourceDataDomain
+from ..pipeline.sampling import SceneSourceFiles
+from ..pipeline.scene_sources import GenerateSceneIDs
 
 
 def _plot_scene_outline(ax, da_scene, scene_num=0, color="orange"):
@@ -62,6 +66,19 @@ def plot_domain(dataset, ax, **kwargs):
         )
 
     domain = dataset.domain
+    if isinstance(domain, SourceDataDomain):
+        t_scene_ids = GenerateSceneIDs(data_path=dataset.data_path)
+        luigi.build([t_scene_ids], local_scheduler=True)
+        sources = t_scene_ids.output().open()
+        scene_ids = list(sources.keys())
+        scene_id = scene_ids[0]
+        t_source_data = SceneSourceFiles(data_path=dataset.data_path, scene_id=scene_id)
+        luigi.build([t_source_data], local_scheduler=True)
+        da_src = t_source_data.output().open()
+
+        domain = domain.generate_from_dataset(da_src)
+
+    print(domain)
     domain.plot_outline(ax=ax, set_ax_extent=True)
     ax.margins(10.0)
     # bbox_shape = domain_bbox.get_outline_shape()

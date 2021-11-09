@@ -76,7 +76,8 @@ class SourceDataDomain:
 
     def generate_from_dataset(self, ds):
         """
-        Create an actual domain instance from the provided dataset
+        Create an actual domain instance from the provided dataset. This will
+        be the largest possible domain that can fit.
         """
         if "x" in ds.coords and "y" in ds.coords:
             x_min, x_max = ds.x.min().data, ds.x.max().data
@@ -86,17 +87,56 @@ class SourceDataDomain:
             l_meridinonal = y_max - y_min
             x_c = 0.5 * (x_min + x_max)
             y_c = 0.5 * (y_min + y_max)
-            return CartesianDomain(
+            return rc.CartesianDomain(
                 l_meridional=l_meridinonal, l_zonal=l_zonal, x_c=x_c, y_c=y_c
             )
         elif "lat" in ds.coords and "lon" in ds.coords:
-            raise NotImplementedError(LocalCartesianDomain.__name__)
+            lat_min, lat_max = ds.lat.min(), ds.lat.max()
+            lon_min, lon_max = ds.lon.min(), ds.lon.max()
+            lat_center = float((lat_min + lat_max) / 2.0)
+            lon_center = float((lon_min + lon_max) / 2.0)
+            # create a domain with no span but positioned at the correct point
+            # so that ew can calculate the maximum zonal and meridional span
+            # from the lat/lon of the corners
+            dummy_domain = rc.LocalCartesianDomain(
+                central_latitude=lat_center,
+                central_longitude=lon_center,
+                l_zonal=0.0,
+                l_meridional=0.0,
+            )
+
+            # lat/lon of corners
+            # SW, SE, NW, NE
+            lats = np.array([lat_min, lat_min, lat_max, lat_max])
+            lons = np.array([lon_min, lon_max, lon_min, lon_max])
+
+            # find xy-position of corners
+            xy_corners = dummy_domain.crs.transform_points(
+                x=lons, y=lats, z=np.zeros_like(lats), src_crs=ccrs.PlateCarree()
+            )
+            # use max of W-edge, SW and NW
+            x_min = xy_corners[[0, 2], 0].max()
+            # use min of E-edge, SE and NE
+            x_max = xy_corners[[1, 3], 0].min()
+            # use max of S-edge, SW and SE
+            y_min = xy_corners[[0, 1], 1].max()
+            # use min of N-edge, NW and NE
+            y_max = xy_corners[[2, 3], 1].min()
+
+            lx = x_max - x_min
+            ly = y_max - y_min
+
+            # round down to nearest meter
+            lx = np.round(lx, decimals=0)
+            ly = np.round(ly, decimals=0)
+
+            # finally we return a domain with the correct span
+            s = 0.99
+            return rc.LocalCartesianDomain(
+                central_latitude=lat_center,
+                central_longitude=lon_center,
+                l_zonal=s*lx,
+                l_meridional=s*ly,
+            )
         else:
             raise NotImplementedError(ds.coords)
-
-
-def deserialise_domain(data):
-    if "central_longitude" in data and "central_latitude" in data:
-        return LocalCartesianDomain(**data)
-    else:
-        return CartesianDomain(**data)

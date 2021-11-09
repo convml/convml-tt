@@ -1,5 +1,6 @@
 from pathlib import Path
 from ...pipeline import XArrayTarget, YAMLTarget
+from . import DataSource
 
 import xarray as xr
 import luigi
@@ -20,6 +21,17 @@ def _dt64_to_datetime(dt64):
         return datetime.datetime.utcfromtimestamp(dt64.astype("O") / 1e9)
 
 
+def find_les_files(data_path, filename_glob):
+        les_data_path = Path(data_path) / "source_files"
+        file_paths = list(les_data_path.glob(filename_glob))
+
+        if len(file_paths) == 0:
+            raise FileNotFoundError(
+                f"No source datafiles found matching {les_data_path}/{filename_glob}"
+            )
+        return les_data_path
+
+
 class FindLESFiles(luigi.Task):
     """
     Check all the netCDF source files found for the `source_variable` and create
@@ -35,18 +47,19 @@ class FindLESFiles(luigi.Task):
         return _dt64_to_datetime(dt64)
 
     def requires(self):
-        data_path = Path(self.data_path / "source_files")
-        file_paths = list(data_path.glob(self.filename_glob))
-
-        if len(file_paths) == 0:
-            raise FileNotFoundError(
-                f"No source datafiles found matching {data_path}/{self.filename_glob}"
-            )
+        file_paths = find_les_files(data_path=self.data_path, filename_glob=self.filename_glob)
 
         tasks = [
             LESDataFile(file_path=str(file_path.absolute())) for file_path in file_paths
         ]
         return tasks
+
+    @property
+    def data_source(self):
+        # TODO: quick hack so that we can filter by time before we split into
+        # separate files
+        return DataSource.load(path=Path(self.data_path) / ".." / "..")
+
 
     def run(self):
         filenames = []
@@ -70,6 +83,7 @@ class FindLESFiles(luigi.Task):
                         f" datafile {file_path}"
                     )
 
+            data_source = self.data_source
             times = da.time.values
             timestep_counter = 0
             if len(times) > 1:
@@ -77,16 +91,22 @@ class FindLESFiles(luigi.Task):
                 fn_root = Path(file_path).name.replace(".nc", "")
                 p_file_root = Path(file_path).parent
                 for time in times:
+                    if not data_source.valid_scene_time(time):
+                        continue
                     dt = _dt64_to_datetime(dt64=time)
                     t_str = dt.isoformat().replace(":", "")
                     filename = f"{fn_root}_{t_str}.nc"
                     da_timestep = da.sel(time=time)
-                    p_new = p_file_root / filename
+                    p_new = p_file_root / "scenes" / filename
+                    p_new.parent.mkdir(exist_ok=True, parents=True)
                     da_timestep.to_netcdf(p_new)
                     filenames.append(str(p_new))
                     timestep_counter += 1
             else:
                 filenames.append(filename)
+
+        if len(filenames) == 0:
+            raise Exception("No scenes found")
 
         self.output().write(filenames)
 

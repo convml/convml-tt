@@ -39,14 +39,15 @@ class SceneSourceFiles(luigi.Task):
 
         if self.input().exists():
             all_source_files = self.input().open()
-            scene_source_files = np.atleast_1d(all_source_files[self.scene_id]).tolist()
             if ds.source == "goes16":
+                scene_source_files = all_source_files[self.scene_id]
                 task = goes16.pipeline.GOES16Fetch(
                     keys=scene_source_files, data_path=source_data_path
                 )
             elif ds.source == "LES":
                 # assume that these files already exist
-                task = LESDataFile(file_path=scene_source_files)
+                scene_source_file = all_source_files[self.scene_id]
+                task = LESDataFile(file_path=scene_source_file)
             else:
                 raise NotImplementedError(ds.source)
 

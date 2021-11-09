@@ -8,3 +8,15 @@ from .scene_sources import (
 from .tiles import GenerateRegriddedScenes, SceneRegriddedData
 from .triplets import GenerateTiles
 from .utils import SceneBulkProcessingBaseTask
+
+
+def get_source_files_filepaths(data_source):
+    t_scene_ids = GenerateSceneIDs(data_path=data_source.data_path)
+    if not t_scene_ids.output().exists():
+        raise Exception(
+            "The source files database hasn't been populated yet. Please run "
+            "then `GenerateSceneIDs` task to build it"
+        )
+
+    scene_sources = t_scene_ids.output().open()
+    return scene_sources

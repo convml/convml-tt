@@ -145,42 +145,48 @@ class SceneTileLocations(luigi.Task):
 
     def run(self):
         tiles_per_scene = self.input()["scene_splits"].open()
-        tiles_meta = tiles_per_scene[self.scene_id]
-
-        triplets_meta = self.data_source.sampling["triplets"]
-        neigh_dist_scaling = triplets_meta.get("neigh_dist_scaling", 1.0)
-        tile_size = triplets_meta["tile_size"]
-
-        domain = self.data_source.domain
-        if isinstance(domain, sampling_domain.SourceDataDomain):
-            ds_scene = self.input()["scene_source_data"].open()
-            domain = domain.generate_from_dataset(ds=ds_scene)
 
         tile_locations = []
-        for tile_meta in tiles_meta:
-            triplet_tile_locations = triplet_sampling.generate_triplet_location(
-                domain=domain,
-                tile_size=tile_size,
-                neigh_dist_scaling=neigh_dist_scaling,
-            )
+        if self.scene_id not in tiles_per_scene:
+            # we will write an empty file since we don't need to sample tiles
+            # from this scene
+            pass
+        else:
+            tiles_meta = tiles_per_scene[self.scene_id]
 
-            tile_types = []
-            if tile_meta["is_distant"]:
-                tile_types.append("distant")
-                triplet_tile_locations = triplet_tile_locations[-1:]
-            else:
-                tile_types.append("anchor")
-                tile_types.append("neighbor")
-                triplet_tile_locations = triplet_tile_locations[:-1]
+            triplets_meta = self.data_source.sampling["triplets"]
+            neigh_dist_scaling = triplets_meta.get("neigh_dist_scaling", 1.0)
+            tile_size = triplets_meta["tile_size"]
 
-            for (tile_type, tile_domain) in zip(tile_types, triplet_tile_locations):
-                tile_meta = dict(
-                    loc=tile_domain.serialize(),
-                    tile_type=tile_type,
-                    triplet_id=tile_meta["triplet_id"],
-                    triplet_collection=tile_meta["triplet_collection"],
+            domain = self.data_source.domain
+            if isinstance(domain, sampling_domain.SourceDataDomain):
+                ds_scene = self.input()["scene_source_data"].open()
+                domain = domain.generate_from_dataset(ds=ds_scene)
+
+            for tile_meta in tiles_meta:
+                triplet_tile_locations = triplet_sampling.generate_triplet_location(
+                    domain=domain,
+                    tile_size=tile_size,
+                    neigh_dist_scaling=neigh_dist_scaling,
                 )
-                tile_locations.append(tile_meta)
+
+                tile_types = []
+                if tile_meta["is_distant"]:
+                    tile_types.append("distant")
+                    triplet_tile_locations = triplet_tile_locations[-1:]
+                else:
+                    tile_types.append("anchor")
+                    tile_types.append("neighbor")
+                    triplet_tile_locations = triplet_tile_locations[:-1]
+
+                for (tile_type, tile_domain) in zip(tile_types, triplet_tile_locations):
+                    tile_meta = dict(
+                        loc=tile_domain.serialize(),
+                        tile_type=tile_type,
+                        triplet_id=tile_meta["triplet_id"],
+                        triplet_collection=tile_meta["triplet_collection"],
+                    )
+                    tile_locations.append(tile_meta)
 
         Path(self.output().fn).parent.mkdir(exist_ok=True, parents=True)
         self.output().write(tile_locations)
@@ -220,21 +226,20 @@ class SceneTilesData(_SceneRectSampleBase):
 
     def run(self):
         inputs = self.input()
-        da_src = inputs["source_data"]["data"].open()
-        tiles_meta = inputs["tile_locations"].open()
+        source_data_input = inputs["source_data"]
+        # for cropped fields the parent task returns a dictionary so that
+        # we can have the rendered image too (if that has been produced)
+        if isinstance(source_data_input, dict):
+            da_src = source_data_input["data"].open()
+        else:
+            da_src = source_data_input.open()
 
         domain = self.data_source.domain
         if isinstance(domain, sampling_domain.SourceDataDomain):
             domain = domain.generate_from_dataset(ds=da_src)
 
         data_source = self.data_source
-        triplets_meta = self.data_source.sampling["triplets"]
-        tile_size = triplets_meta["tile_size"]
-        tile_N = triplets_meta["tile_N"]
-        dx = tile_size / tile_N
-
-        for tile_meta in tiles_meta:
-            tile_identifier = TILE_IDENTIFIER_FORMAT.format(**tile_meta)
+        dx = data_source.sampling["resolution"]
 
         for tile_identifier, tile_domain in self.tile_domains:
             da_tile = rc.resample(domain=tile_domain, da=da_src, dx=dx)
@@ -245,6 +250,16 @@ class SceneTilesData(_SceneRectSampleBase):
                 data_source=data_source, da_scene=da_tile, src_attrs=da_src.attrs
             )
             img_tile.save(str(tile_output["image"].fn))
+
+    @property
+    def tile_domains(self):
+        tiles_meta = self.input()["tile_locations"].open()
+
+        for tile_meta in tiles_meta:
+            tile_domain = rc.deserialise_domain(tile_meta["loc"])
+            tile_identifier = TILE_IDENTIFIER_FORMAT.format(**tile_meta)
+
+            yield tile_identifier, tile_domain
 
     def output(self):
         if not self.input()["tile_locations"].exists():

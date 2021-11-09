@@ -177,8 +177,18 @@ class DataSource:
         """
         Apply the time filtering specified for this source dataset if one is specified
         """
+        time_meta = self._meta.get("time")
+        if time_meta is None:
+            return True
 
-        filters = self._meta["time"].get("filters", {})
+        found_valid_interval = False
+        for t_start, t_end in self.time_intervals:
+            if np.datetime64(t_start) <= scene_time and scene_time <= np.datetime64(t_end):
+                found_valid_interval = True
+        if not found_valid_interval:
+            return False
+
+        filters = time_meta.get("filters", {})
         for filter_kind, filter_value in filters.items():
             if filter_kind == "N_hours_from_zenith":
                 lon_zenith = self.domain.central_longitude
