@@ -2,11 +2,11 @@ from pathlib import Path
 
 import luigi
 import matplotlib.pyplot as plt
+import regridcart as rc
 
 from ....pipeline import ImageTarget, XArrayTarget, YAMLTarget
 from .. import DataSource
 from ..sampling import domain as sampling_domain
-from ..sampling.interpolation import resample
 from ..utils.domain_images import align_axis_x, rgb_image_from_scene_data
 from . import GenerateSceneIDs
 from .sampling import CropSceneSourceFiles, SceneSourceFiles, _SceneRectSampleBase
@@ -102,7 +102,7 @@ class SceneRegriddedData(_SceneRectSampleBase):
                 method = "bilinear"
             else:
                 method = "nearest_s2d"
-            da_domain = resample(domain=domain, da=da_src, dx=dx, method=method)
+            da_domain = rc.resample(domain=domain, da=da_src, dx=dx, method=method)
             Path(domain_output["data"].fn).parent.mkdir(exist_ok=True, parents=True)
             domain_output["data"].write(da_domain)
         else:

@@ -5,12 +5,11 @@ from pathlib import Path
 
 import luigi
 import numpy as np
+import regridcart as rc
 
 from ....pipeline import ImageTarget, XArrayTarget
 from .. import DataSource, goes16
 from ..les import LESDataFile
-from ..sampling.cropping import crop_field_to_domain
-from ..sampling.domain import LocalCartesianDomain
 from .aux import CheckForAuxiliaryFiles
 from .scene_sources import GenerateSceneIDs
 from .utils import SceneBulkProcessingBaseTask
@@ -106,14 +105,14 @@ class CropSceneSourceFiles(luigi.Task):
         elif data_source.source == "LES":
             domain = data_source.domain
             ds_input = self.input().open()
-            if isinstance(domain, LocalCartesianDomain):
+            if isinstance(domain, rc.LocalCartesianDomain):
                 domain.validate_dataset(ds=ds_input)
 
             raise NotADirectoryError(42)
         else:
             raise NotImplementedError(data_source.source)
 
-        da_cropped = crop_field_to_domain(
+        da_cropped = rc.crop_field_to_domain(
             domain=data_source.domain, da=da_full, pad_pct=self.pad_ptc
         )
 

@@ -2,13 +2,13 @@ from pathlib import Path
 
 import luigi
 import numpy as np
+import regridcart as rc
 
 from ....pipeline import XArrayTarget, YAMLTarget
 from ...common import TILE_IDENTIFIER_FORMAT
 from .. import DataSource, goes16
 from ..sampling import domain as sampling_domain
 from ..sampling import triplets as triplet_sampling
-from ..sampling.interpolation import resample
 from ..utils.domain_images import rgb_image_from_scene_data
 from . import GenerateSceneIDs
 from .sampling import (CropSceneSourceFiles, SceneSourceFiles,
@@ -236,8 +236,8 @@ class SceneTilesData(_SceneRectSampleBase):
         for tile_meta in tiles_meta:
             tile_identifier = TILE_IDENTIFIER_FORMAT.format(**tile_meta)
 
-            tile_domain = sampling_domain.deserialise_domain(tile_meta["loc"])
-            da_tile = resample(domain=tile_domain, da=da_src, dx=dx)
+        for tile_identifier, tile_domain in self.tile_domains:
+            da_tile = rc.resample(domain=tile_domain, da=da_src, dx=dx)
             tile_output = self.output()[tile_identifier]
             tile_output["data"].write(da_tile)
 

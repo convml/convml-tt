@@ -5,8 +5,9 @@ import dateutil.parser
 import datetime
 import numpy as np
 import functools
+from regridcart import LocalCartesianDomain
 
-from .sampling.domain import LocalCartesianDomain, SourceDataDomain
+from .sampling.domain import SourceDataDomain
 from .utils import time_filters
 
 

@@ -1,1 +1,1 @@
-from .domain import LocalCartesianDomain, CartesianSquareTileDomain  # noqa
+from .domain import CartesianSquareTileDomain  # noqa

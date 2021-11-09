@@ -1,7 +1,8 @@
-from scipy.constants import pi
-from ..sampling import CartesianSquareTileDomain, LocalCartesianDomain
-
 import numpy as np
+from regridcart import LocalCartesianDomain
+from scipy.constants import pi
+
+from ..sampling import CartesianSquareTileDomain
 
 
 def generate_randomly_located_tile(domain, tile_size):
