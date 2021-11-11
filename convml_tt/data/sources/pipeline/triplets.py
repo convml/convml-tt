@@ -71,7 +71,8 @@ class TripletSceneSplits(luigi.Task):
                 "under `sampling` for the dataset meta info. At minimum "
                 "it should contain the number of triplets (`N_triplets` , "
                 "this can be a dictionary to have multiple sets, e.g. "
-                "'train', 'study', etc) and the tile size in meters (`tile_size`) "
+                "'train', 'study', etc), the tile pixel resolution meters (`resolution`) "
+                "and the number of pixels in the tile (`tile_N`)"
             )
 
         triplets_meta = ds.sampling["triplets"]
@@ -156,7 +157,9 @@ class SceneTileLocations(luigi.Task):
 
             triplets_meta = self.data_source.sampling["triplets"]
             neigh_dist_scaling = triplets_meta.get("neigh_dist_scaling", 1.0)
-            tile_size = triplets_meta["tile_size"]
+            dx = self.data_source.sampling["resolution"]
+            tile_N = triplets_meta["tile_N"]
+            tile_size = dx * tile_N
 
             domain = self.data_source.domain
             if isinstance(domain, sampling_domain.SourceDataDomain):
@@ -236,13 +239,17 @@ class SceneTilesData(_SceneRectSampleBase):
 
         domain = self.data_source.domain
         if isinstance(domain, sampling_domain.SourceDataDomain):
-            domain = domain.generate_from_dataset(ds=da_src)
+            import ipdb
+            with ipdb.launch_ipdb_on_exception():
+                domain = domain.generate_from_dataset(ds=da_src)
 
         data_source = self.data_source
         dx = data_source.sampling["resolution"]
 
         for tile_identifier, tile_domain in self.tile_domains:
-            da_tile = rc.resample(domain=tile_domain, da=da_src, dx=dx)
+            import ipdb
+            with ipdb.launch_ipdb_on_exception():
+                da_tile = rc.resample(domain=tile_domain, da=da_src, dx=dx)
             tile_output = self.output()[tile_identifier]
             tile_output["data"].write(da_tile)
 

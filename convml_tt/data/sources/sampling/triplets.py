@@ -59,7 +59,7 @@ def generate_tile_domain_with_peturbed_location(
     tile_domain_perturbed = CartesianSquareTileDomain(x_c=x_t, y_c=y_t, size=tile_size)
     if isinstance(domain, LocalCartesianDomain):
         tile_domain_perturbed = tile_domain_perturbed.locate_in_latlon_domain(
-            domain=domain
+            domain=tile_domain
         )
 
     if domain_bounds_geometry.contains(tile_domain_perturbed.spatial_bounds_geometry):

@@ -14,3 +14,4 @@ wandb/
 
 .eggs/
 *.egg-info/
+.DS_Store
