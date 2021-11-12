@@ -8,7 +8,7 @@ from functools import partial
 from ..goes16.pipeline import GOES16Query
 from ..les import FindLESFiles
 from .. import DataSource
-from ....pipeline import DBTarget, YAMLTarget
+from ....pipeline import DBTarget
 from collections import OrderedDict
 
 log = logging.getLogger()
@@ -154,7 +154,7 @@ class GenerateSceneIDs(luigi.Task):
                     filename=scene_filenames[0], data_source=data_source
                 )
                 scenes_by_time[t_scene] = scene_filenames
-        elif isinstance(input, YAMLTarget):
+        elif isinstance(input, DBTarget):
             # this represents LES-based sources
             scene_filenames = input.open()
             for scene_filename in scene_filenames:

@@ -4,7 +4,7 @@ import luigi
 import numpy as np
 import datetime
 
-from ....pipeline import YAMLTarget
+from ....pipeline import DBTarget
 from .. import DataSource
 from ..goes16.pipeline import GOES16Query
 from .scene_sources import GenerateSceneIDs, get_time_for_filename, parse_scene_id
@@ -19,7 +19,7 @@ class CheckForAuxiliaryFiles(luigi.Task):
 
     data_path = luigi.Parameter(default=".")
     product_name = luigi.Parameter()
-    dt_max = luigi.FloatParameter(default=10.0) # [minutes]
+    dt_max = luigi.FloatParameter(default=10.0)  # [minutes]
 
     @property
     def data_source(self):
@@ -102,9 +102,10 @@ class CheckForAuxiliaryFiles(luigi.Task):
         output = None
 
         if data_source.source == "goes16":
-            fn = f"{self.product_name}.yml"
-            p = Path(self.data_path) / "source_data" / data_source.source / "aux" / fn
-            output = YAMLTarget(str(p))
+            p = Path(self.data_path) / "source_data" / data_source.source / "aux"
+            output = DBTarget(
+                path=str(p), db_name=self.product_name, db_type=data_source.db_type
+            )
 
         return output
 

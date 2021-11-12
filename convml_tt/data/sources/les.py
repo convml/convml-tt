@@ -1,5 +1,5 @@
 from pathlib import Path
-from ...pipeline import XArrayTarget, YAMLTarget
+from ...pipeline import XArrayTarget, DBTarget
 from . import DataSource
 
 import xarray as xr
@@ -22,14 +22,14 @@ def _dt64_to_datetime(dt64):
 
 
 def find_les_files(data_path, filename_glob):
-        les_data_path = Path(data_path) / "source_files"
-        file_paths = list(les_data_path.glob(filename_glob))
+    les_data_path = Path(data_path) / "source_files"
+    file_paths = list(les_data_path.glob(filename_glob))
 
-        if len(file_paths) == 0:
-            raise FileNotFoundError(
-                f"No source datafiles found matching {les_data_path}/{filename_glob}"
-            )
-        return les_data_path
+    if len(file_paths) == 0:
+        raise FileNotFoundError(
+            f"No source datafiles found matching {les_data_path}/{filename_glob}"
+        )
+    return les_data_path
 
 
 class FindLESFiles(luigi.Task):
@@ -47,7 +47,9 @@ class FindLESFiles(luigi.Task):
         return _dt64_to_datetime(dt64)
 
     def requires(self):
-        file_paths = find_les_files(data_path=self.data_path, filename_glob=self.filename_glob)
+        file_paths = find_les_files(
+            data_path=self.data_path, filename_glob=self.filename_glob
+        )
 
         tasks = [
             LESDataFile(file_path=str(file_path.absolute())) for file_path in file_paths
@@ -59,7 +61,6 @@ class FindLESFiles(luigi.Task):
         # TODO: quick hack so that we can filter by time before we split into
         # separate files
         return DataSource.load(path=Path(self.data_path) / ".." / "..")
-
 
     def run(self):
         filenames = []
@@ -111,6 +112,6 @@ class FindLESFiles(luigi.Task):
         self.output().write(filenames)
 
     def output(self):
-        fn = "files.yml"
-        p = Path(self.data_path) / fn
-        return YAMLTarget(str(p))
+        return DBTarget(
+            path=str(self.data_path), db_name="files", db_type=self.data_source.db_type
+        )
