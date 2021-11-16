@@ -47,7 +47,7 @@ def rgb_image_from_scene_data(data_source, da_scene, src_attrs):
     else:
         # TODO: make a more generic image generation function
         img_data = da_scene.data
-        img_data = (img_data - img_data.min()) / (img_data.max() - img_data.min())
+        img_data = 1.0 - (img_data - img_data.min()) / (img_data.max() - img_data.min())
         img_data = (img_data * 255).astype(np.uint8)
         img_domain = Image.fromarray(img_data)
 
