@@ -24,6 +24,9 @@
   (can't load `.tgz` files)
   [\#48](https://github.com/convml/convml_tt/pull/48)
 
+- Add link to Google Colab instructions
+  [\#48](https://github.com/convml/convml_tt/pull/49)
+
 
 
 ## [v0.9.0](https://github.com/convml/convml_tt/tree/v0.9.0)
