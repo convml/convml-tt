@@ -4,8 +4,10 @@ from PIL import Image
 import xarray as xr
 import numpy as np
 
-from convml_tt.interpretation.rectpred.data import make_sliding_tile_model_predictions
+from convml_tt.utils import make_sliding_tile_model_predictions
 from convml_tt.system import TripletTrainerModel
+from convml_tt.data.dataset import MovingWindowImageTilingDataset
+from convml_tt.data.transforms import get_transforms as get_model_transforms
 from convml_tt.interpretation.rectpred.plot import make_rgb
 from convml_tt.interpretation.rectpred.transform import apply_transform
 
@@ -26,7 +28,15 @@ def test_rectpred_sliding_window_inference():
 
     img = Image.open(RECTPRED_IMG_EXAMPLE_PATH)
     step = (500, 200)
-    da_emb_rect = make_sliding_tile_model_predictions(img=img, model=model, step=step)
+    transforms = get_model_transforms(
+        step="predict", normalize_for_arch=model.base_arch
+    )
+    tile_dataset = MovingWindowImageTilingDataset(
+        img=img, transform=transforms, step=step, N_tile=N_tile
+    )
+    da_emb_rect = make_sliding_tile_model_predictions(
+        tile_dataset=tile_dataset, model=model
+    )
 
     nx_img, ny_img = img.size
 
