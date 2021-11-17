@@ -2,6 +2,12 @@
 Copy of [lightning-flash](https://github.com/PyTorchLightning/lightning-flash)'s
 `flash/vision/backbones.py` as of commit `24c5b66e`, duplicated here so we
 don't have to install all of lightning-flash
+
+As of commit 49de5a0b0f631bbdd5e136abc920c56a7ed14821 lightning-flash no longer
+has a flash.vision.backbones module this was split into flash.image...
+
+Also, pytorch-lightning doens't have a routine to check for `lightning-bolts`
+so I've removed the bolts models.
 """
 # Copyright The PyTorch Lightning team.
 #
@@ -20,13 +26,10 @@ from typing import Tuple
 
 import antialiased_cnns
 import torchvision
-from pytorch_lightning.utilities import _BOLTS_AVAILABLE, rank_zero_warn
+from pytorch_lightning.utilities import rank_zero_warn
 from pytorch_lightning.utilities.exceptions import MisconfigurationException
 from torch import nn as nn
 from torchvision.models.detection.backbone_utils import resnet_fpn_backbone
-
-if _BOLTS_AVAILABLE:
-    from pl_bolts.models.self_supervised import SimCLR, SwAV
 
 ROOT_S3_BUCKET = "https://pl-bolts-weights.s3.us-east-2.amazonaws.com"
 
@@ -44,8 +47,6 @@ RESNET_MODELS = [
 DENSENET_MODELS = ["densenet121", "densenet169", "densenet161"]
 TORCHVISION_MODELS = MOBILENET_MODELS + VGG_MODELS + RESNET_MODELS + DENSENET_MODELS
 
-BOLTS_MODELS = ["simclr-imagenet", "swav-imagenet"]
-
 
 def backbone_and_num_features(
     model_name: str,
@@ -57,7 +58,7 @@ def backbone_and_num_features(
 ) -> Tuple[nn.Module, int]:
     """
     Args:
-        model_name: backbone supported by `torchvision` and `bolts`
+        model_name: backbone supported by `torchvision`
         fpn: If True, creates a Feature Pyramind Network on top of Resnet based CNNs.
         pretrained: if true, returns a model with backbone pre-trained on Imagenet
         trainable_backbone_layers: number of trainable resnet layers starting from final block.
@@ -89,57 +90,10 @@ def backbone_and_num_features(
                 f"{model_name} backbone is not supported with `fpn=True`, `fpn` won't be added."
             )
 
-    if model_name in BOLTS_MODELS:
-        if anti_aliased:
-            raise NotImplementedError(
-                "anti-aliased versions of bolts models aren't currently available"
-            )
-        return bolts_backbone_and_num_features(model_name)
-
     if model_name in TORCHVISION_MODELS:
         return torchvision_backbone_and_num_features(
             model_name, pretrained, anti_aliased=anti_aliased
         )
-
-    raise ValueError(f"{model_name} is not supported yet.")
-
-
-def bolts_backbone_and_num_features(model_name: str) -> Tuple[nn.Module, int]:
-    """
-    >>> bolts_backbone_and_num_features('simclr-imagenet')  # doctest: +ELLIPSIS
-    (Sequential(...), 2048)
-    >>> bolts_backbone_and_num_features('swav-imagenet')  # doctest: +ELLIPSIS
-    (Sequential(...), 2048)
-    """
-
-    # TODO: maybe we should plain pytorch weights so we don't need to rely on bolts to load these
-    # also mabye just use torchhub for the ssl lib
-    def load_simclr_imagenet(
-        path_or_url: str = f"{ROOT_S3_BUCKET}/simclr/bolts_simclr_imagenet/simclr_imagenet.ckpt",
-    ):
-        simclr = SimCLR.load_from_checkpoint(path_or_url, strict=False)
-        # remove the last two layers & turn it into a Sequential model
-        backbone = nn.Sequential(*list(simclr.encoder.children())[:-2])
-        return backbone, 2048
-
-    def load_swav_imagenet(
-        path_or_url: str = f"{ROOT_S3_BUCKET}/swav/swav_imagenet/swav_imagenet.pth.tar",
-    ):
-        swav = SwAV.load_from_checkpoint(path_or_url, strict=True)
-        # remove the last two layers & turn it into a Sequential model
-        backbone = nn.Sequential(*list(swav.model.children())[:-2])
-        return backbone, 2048
-
-    models = {
-        "simclr-imagenet": load_simclr_imagenet,
-        "swav-imagenet": load_swav_imagenet,
-    }
-    if not _BOLTS_AVAILABLE:
-        raise MisconfigurationException(
-            "Bolts isn't installed. Please, use ``pip install lightning-bolts``."
-        )
-    if model_name in models:
-        return models[model_name]()
 
     raise ValueError(f"{model_name} is not supported yet.")
 
