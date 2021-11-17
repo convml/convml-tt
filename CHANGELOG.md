@@ -2,7 +2,7 @@
 
 ## [Unreleased](https://github.com/convml/convml_tt/tree/HEAD)
 
-[Full Changelog](https://github.com/convml/convml_tt/compare/v0.8.0...HEAD)
+[Full Changelog](https://github.com/convml/convml_tt/compare/v0.9.0...HEAD)
 
 *new features*
 
@@ -12,6 +12,17 @@
 
 - support for z-order and zero-offset annotations in annotated scatterplot
   [\#44](https://github.com/convml/convml_tt/pull/44)
+
+- add `data.dataset.MovingWindowImageTilingDataset` to produce image tile
+  data from a sliding window across a larger image
+  [\#45](https://github.com/convml/convml_tt/pull/45)
+
+*breaking changes*
+
+- `utils.make_sliding_tile_model_predictions` now takes in
+  a `data.dataset.MovingWindowImageTilingDataset` rather than an image,
+  and so a dataset must be created from an image first
+  [\#45](https://github.com/convml/convml_tt/pull/45)
 
 *changed default*
 
