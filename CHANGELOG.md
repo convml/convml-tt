@@ -21,6 +21,13 @@
 - annotated scatterplot now sets equal x/y-axis
   [\#44](https://github.com/convml/convml_tt/pull/44)
 
+*maintenance*
+
+- fix for `pytorch-ligtning >= 1.5.0` and exclude `torchvision == 0.10.*`
+  (can't load `.tgz` files)
+  [\#48](https://github.com/convml/convml_tt/pull/48)
+
+
 
 ## [v0.9.0](https://github.com/convml/convml_tt/tree/v0.9.0)
 
