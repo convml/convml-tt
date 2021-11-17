@@ -2,7 +2,7 @@
 
 ## [Unreleased](https://github.com/convml/convml_tt/tree/HEAD)
 
-[Full Changelog](https://github.com/convml/convml_tt/compare/v0.8.0...HEAD)
+[Full Changelog](https://github.com/convml/convml_tt/compare/v0.9.0...HEAD)
 
 *new features*
 
@@ -17,6 +17,17 @@
   `TripletTrainerModel.load_from_checkpoint`
   [\#46](https://github.com/convml/convml_tt/pull/46)
 
+- add `data.dataset.MovingWindowImageTilingDataset` to produce image tile
+  data from a sliding window across a larger image
+  [\#45](https://github.com/convml/convml_tt/pull/45)
+
+*breaking changes*
+
+- `utils.make_sliding_tile_model_predictions` now takes in
+  a `data.dataset.MovingWindowImageTilingDataset` rather than an image,
+  and so a dataset must be created from an image first
+  [\#45](https://github.com/convml/convml_tt/pull/45)
+
 *changed default*
 
 - annotated scatterplot now sets equal x/y-axis
@@ -27,6 +38,9 @@
 - fix for `pytorch-ligtning >= 1.5.0` and exclude `torchvision == 0.10.*`
   (can't load `.tgz` files)
   [\#48](https://github.com/convml/convml_tt/pull/48)
+
+- Add link to Google Colab instructions
+  [\#48](https://github.com/convml/convml_tt/pull/49)
 
 
 

@@ -120,8 +120,9 @@ can see some simple examples how what commands to use by looking at the
 automated tests in [tests/](tests/).
 
 Finally there detailed notes on how to train on the ARC3 HPC cluster at
-University of Leeds are in [doc/README.ARC3.md](doc/README.ARC3.md) and on the
-[JASMIN](doc/README.JASMIN.md) analysis cluster.
+University of Leeds are in [doc/README.ARC3.md](doc/README.ARC3.md), on the
+[JASMIN](doc/README.JASMIN.md) analysis cluster and on
+[Google Colab](https://colab.research.google.com/drive/18Hmik9Nacqo-29b16hgQ3XfPum1lHdCO?usp=sharing).
 
 # Model interpretation
 

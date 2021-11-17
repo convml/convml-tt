@@ -10,20 +10,28 @@ from PIL import Image
 import matplotlib.pyplot as plt
 
 from convml_tt.interpretation.rectpred.transform import apply_transform
-from convml_tt.interpretation.rectpred.data import make_sliding_tile_model_predictions
+from convml_tt.utils import make_sliding_tile_model_predictions
 from convml_tt.system import TripletTrainerModel
 from convml_tt.interpretation.rectpred.plot import make_rgb
+from convml_tt.data.dataset import MovingWindowImageTilingDataset
+from convml_tt.data.transforms import get_transforms as get_model_transforms
 
 DEFAULT_IMAGE_PATH = Path(__file__).parent.parent / "doc" / "goes16_202002051400.png"
 
 
-def make_plot(model, image_path, prediction_batch_size=128):
-    scene_id = image_path.name.split(".")[0]
+def make_plot(model, image_path, N_tile, prediction_batch_size=128):
     image_path = Path(image_path)
     img = Image.open(image_path)
 
+    step = (50, 50)
+    transforms = get_model_transforms(
+        step="predict", normalize_for_arch=model.base_arch
+    )
+    tile_dataset = MovingWindowImageTilingDataset(
+        img=img, transform=transforms, step=step, N_tile=N_tile
+    )
     da_emb = make_sliding_tile_model_predictions(
-        img=img, model=model, step=(50, 50), prediction_batch_size=prediction_batch_size
+        tile_dataset=tile_dataset, model=model
     )
 
     da_emb_pca = apply_transform(da_emb, "pca")
@@ -44,8 +52,10 @@ def main(model_path, image_path):
     model_name = model_path.parent.parent.name
     model = TripletTrainerModel.load_from_checkpoint(model_path)
 
-    make_plot(model=model, image_path=image_path, model_name=model_name)
+    N_tile = (256, 256)
+    make_plot(model=model, image_path=image_path, model_name=model_name, N_tile=N_tile)
 
+    scene_id = Path(image_path).name.split(".")[0]
     output_img_filename = f"{model_name}.{scene_id}.PCA012_rgb.png"
     plt.savefig(output_img_filename)
     print(f"wrote image to `{output_img_filename}`")
