@@ -13,6 +13,9 @@
 - support for z-order and zero-offset annotations in annotated scatterplot
   [\#44](https://github.com/convml/convml_tt/pull/44)
 
+- add isomap to available transforms on rectangular domain
+  [\#47](https://github.com/convml/convml_tt/pull/47)
+
 *changed default*
 
 - annotated scatterplot now sets equal x/y-axis
