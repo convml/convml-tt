@@ -16,6 +16,10 @@
 - add isomap to available transforms on rectangular domain
   [\#47](https://github.com/convml/convml_tt/pull/47)
 
+- make it possible to load fastai v1 model using
+  `TripletTrainerModel.load_from_checkpoint`
+  [\#46](https://github.com/convml/convml_tt/pull/46)
+
 - add `data.dataset.MovingWindowImageTilingDataset` to produce image tile
   data from a sliding window across a larger image
   [\#45](https://github.com/convml/convml_tt/pull/45)
