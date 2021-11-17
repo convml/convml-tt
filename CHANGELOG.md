@@ -13,6 +13,10 @@
 - support for z-order and zero-offset annotations in annotated scatterplot
   [\#44](https://github.com/convml/convml_tt/pull/44)
 
+- make it possible to load fastai v1 model using
+  `TripletTrainerModel.load_from_checkpoint`
+  [\#46](https://github.com/convml/convml_tt/pull/46)
+
 - add `data.dataset.MovingWindowImageTilingDataset` to produce image tile
   data from a sliding window across a larger image
   [\#45](https://github.com/convml/convml_tt/pull/45)
