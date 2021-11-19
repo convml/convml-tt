@@ -2,7 +2,18 @@
 
 ## [Unreleased](https://github.com/convml/convml_tt/tree/HEAD)
 
-[Full Changelog](https://github.com/convml/convml_tt/compare/v0.10.0...HEAD)
+[Full Changelog](https://github.com/convml/convml_tt/compare/v0.10.1...HEAD)
+
+
+## [v0.10.1](https://github.com/convml/convml_tt/tree/v0.10.1)
+
+[Full Changelog](https://github.com/convml/convml_tt/compare/v0.10.0...v0.10.1)
+
+*bugfixes*
+
+- Fix for xarray bug which arised with call in
+  `utils.interpretation.rectpred.plot.make_rgb`
+  [\#51](https://github.com/convml/convml_tt/pull/51)
 
 
 ## [v0.10.0](https://github.com/convml/convml_tt/tree/v0.10.0)
