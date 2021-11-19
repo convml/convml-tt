@@ -41,7 +41,7 @@ def make_rgb(da, alpha=0.5, **coord_components):
     )
 
     def _make_component(da_):
-        if da_.rgba == 3:
+        if da_.rgba.data == 3:
             return alpha * np.ones_like(da_)
         else:
             return scale(da.sel({v_dim: dim_idxs[da_.rgba.item()]}).values)
