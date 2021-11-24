@@ -132,6 +132,11 @@ def apply_transform(
         s = ",".join([f"{k}={v}" for (k, v) in kwargs])
         da_transformed.attrs["transform_extra_args"] = s
 
+    # explicitly copy over coords that we want to retain
+    for c in ["image_path", "src_data_path"]:
+        if c in da:
+            da_transformed[c] = da[c]
+
     if return_model:
         return da_transformed, model
     else:
