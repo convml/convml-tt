@@ -1,6 +1,7 @@
 import pytorch_lightning as pl
 import torch
 import inspect
+import semver
 
 
 class AddOneCycleSchedulerCallback(pl.Callback):
@@ -21,11 +22,20 @@ class AddOneCycleSchedulerCallback(pl.Callback):
         n_steps_per_epoch = len(trainer.datamodule.train_dataloader())
 
         # TODO: take into account `max_steps` value for the scheduler
-        should_by_none = ["min_steps", "max_steps"]
-        for attr in should_by_none:
-            if getattr(trainer, attr) is not None:
+        should_be_none = ["min_steps", "max_steps"]
+        for attr in should_be_none:
+            value = getattr(trainer, attr)
+            target_value = None
+            if attr == "max_steps" and semver.compare(pl.__version__, "1.5.0") >= -1:
+                # from v1.5.0 the default value for `max_steps` in
+                # pytorch-lightning was changed to -1
+                # https://github.com/PyTorchLightning/pytorch-lightning/pull/9460
+                target_value = -1
+
+            if value != target_value:
                 raise Exception(
-                    f"{attr} should be `None` on the trainer to use one-cycle training"
+                    f"{attr} (== {value}) should be == `{target_value}` on the "
+                    "trainer to use one-cycle training"
                 )
 
         n_epochs = trainer.max_epochs
