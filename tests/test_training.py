@@ -2,6 +2,7 @@ import numpy as np
 import pytorch_lightning as pl
 import torch
 from pytorch_lightning.callbacks import LearningRateMonitor
+import pytest
 
 from convml_tt.data.dataset import ImageSingletDataset, TileType
 from convml_tt.data.examples import (
@@ -20,8 +21,14 @@ from convml_tt.trainer_onecycle import OneCycleTrainer
 from convml_tt.utils import get_embeddings
 
 
+if torch.cuda.is_available():
+    N_GPUS = 1
+else:
+    N_GPUS = 0
+
+
 def test_train_new():
-    trainer = pl.Trainer(max_epochs=5)
+    trainer = pl.Trainer(max_epochs=5, gpus=N_GPUS)
     arch = "resnet18"
     model = TripletTrainerModel(pretrained=False, base_arch=arch)
     data_path = fetch_example_dataset(dataset=ExampleData.TINY10)
@@ -32,7 +39,7 @@ def test_train_new():
 
 
 def test_train_new_anti_aliased():
-    trainer = pl.Trainer(max_epochs=5)
+    trainer = pl.Trainer(max_epochs=5, gpus=N_GPUS)
     arch = "resnet18"
     model = TripletTrainerModel(
         pretrained=False, base_arch=arch, anti_aliased_backbone=True
@@ -45,7 +52,7 @@ def test_train_new_anti_aliased():
 
 
 def test_train_new_with_preloading():
-    trainer = pl.Trainer(max_epochs=5)
+    trainer = pl.Trainer(max_epochs=5, gpus=N_GPUS)
     arch = "resnet18"
     model = TripletTrainerModel(pretrained=False, base_arch=arch)
     data_path = fetch_example_dataset(dataset=ExampleData.TINY10)
@@ -56,7 +63,7 @@ def test_train_new_with_preloading():
 
 
 def test_finetune_pretrained():
-    trainer = pl.Trainer(max_epochs=5, callbacks=[HeadFineTuner()])
+    trainer = pl.Trainer(max_epochs=5, callbacks=[HeadFineTuner()], gpus=N_GPUS)
     arch = "resnet18"
     model = TripletTrainerModel(pretrained=True, base_arch=arch)
     data_path = fetch_example_dataset(dataset=ExampleData.TINY10)
@@ -121,7 +128,7 @@ def test_load_from_weights():
 
 def test_train_new_onecycle():
     lr_monitor = LearningRateMonitor(logging_interval="step")
-    trainer = OneCycleTrainer(max_epochs=5, callbacks=[lr_monitor])
+    trainer = OneCycleTrainer(max_epochs=5, callbacks=[lr_monitor], gpus=N_GPUS)
     arch = "resnet18"
     model = TripletTrainerModel(pretrained=False, base_arch=arch)
     data_path = fetch_example_dataset(dataset=ExampleData.TINY10)

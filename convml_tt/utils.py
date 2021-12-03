@@ -2,11 +2,14 @@
 Utility functions for the triplet-trainer
 """
 from pathlib import Path
+import multiprocessing
 
 import numpy as np
 import xarray as xr
 from torch.utils.data import DataLoader
+import torch
 from tqdm import tqdm
+import pytorch_lightning as pl
 
 from .data.dataset import (
     ImageSingletDataset,
@@ -19,18 +22,36 @@ def get_embeddings(
     tile_dataset: [ImageSingletDataset, ImageTripletDataset],
     model,
     prediction_batch_size=32,
+    n_worker_cpu_cores="all",
 ):
     """
     Use the provided model to calculate the embeddings for all tiles of a
     specific `tile_type` in the given `data_dir`. If you run out of memory
     reduce the `prediction_batch_size` (you may also increase it to generate
     predictions faster while using more RAM).
+
+    If a GPU is available it will be used. For now we only use a single GPU
+    even if multiple are available. By default we will use all available cpu
+    cores for the dataloader.
     """
-    tile_dataloader = DataLoader(dataset=tile_dataset, batch_size=prediction_batch_size)
+    if n_worker_cpu_cores == "all":
+        n_worker_cpu_cores = multiprocessing.cpu_count()
+
+    tile_dataloader = DataLoader(
+        dataset=tile_dataset,
+        batch_size=prediction_batch_size,
+        num_workers=n_worker_cpu_cores,
+    )
     batched_results = []
 
+    if torch.cuda.is_available():
+        gpus = 1
+    else:
+        gpus = 0
+    trainer = pl.Trainer()
+
     def apply_model(x):
-        return model.forward(x).cpu().detach().numpy()
+        return trainer.predict(model=model, dataloaders=[tile_dataloader])[0]
 
     tile_ids = np.arange(len(tile_dataloader.dataset))
     coords = dict(tile_id=tile_ids)
@@ -48,6 +69,8 @@ def get_embeddings(
         batched_results.append(np.hstack(triplet_batch))
         dims = ("tile_type", "tile_id", "emb_dim")
         coords["tile_type"] = ["anchor", "neighbor", "distant"]
+    else:
+        raise NotImplementedError(tile_dataset)
 
     embeddings = np.vstack(batched_results)
 
