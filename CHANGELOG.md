@@ -4,6 +4,11 @@
 
 [Full Changelog](https://github.com/convml/convml_tt/compare/v0.10.1...HEAD)
 
+*new features*
+
+- Annotated scatterplots now work for `data.dataset.MovingWindowImageTilingDataset`s
+  [\#52](https://github.com/convml/convml_tt/pull/52)
+
 
 ## [v0.10.1](https://github.com/convml/convml_tt/tree/v0.10.1)
 
