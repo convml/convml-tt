@@ -4,7 +4,7 @@ from PIL import Image
 import xarray as xr
 import numpy as np
 
-from convml_tt.utils import make_sliding_tile_model_predictions
+from convml_tt.utils import get_embeddings
 from convml_tt.system import TripletTrainerModel
 from convml_tt.data.dataset import MovingWindowImageTilingDataset
 from convml_tt.data.transforms import get_transforms as get_model_transforms
@@ -35,7 +35,7 @@ def test_rectpred_sliding_window_inference():
     tile_dataset = MovingWindowImageTilingDataset(
         img=img, transform=transforms, step=step, N_tile=N_tile
     )
-    da_emb_rect = make_sliding_tile_model_predictions(
+    da_emb_rect = get_embeddings(
         tile_dataset=tile_dataset, model=model
     )
 
