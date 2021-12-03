@@ -1,8 +1,8 @@
 # Changelog
 
-## [Unreleased](https://github.com/convml/convml_tt/tree/HEAD)
+## [v0.11.0](https://github.com/convml/convml_tt/tree/HEAD)
 
-[Full Changelog](https://github.com/convml/convml_tt/compare/v0.10.1...HEAD)
+[Full Changelog](https://github.com/convml/convml_tt/compare/v0.10.1...v0.11.0)
 
 *new features*
 
