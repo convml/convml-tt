@@ -95,6 +95,15 @@ class ImageTripletDataset(_ImageDatasetBase):
         if set(n_tiles.values()) == {0}:
             raise FileNotFoundError(f"No {stage} data was found in `{data_dir}`")
 
+    def make_singlet_dataset(self, tile_type):
+        """Produce an ImageSingletDataset for a particular tile type"""
+        return ImageSingletDataset(
+            data_dir=self.data_dir,
+            tile_type=tile_type,
+            stage=self.stage,
+            transform=self.transform,
+        )
+
     def get_image(self, index, tile_type):
         image_file_path = self.file_paths[tile_type][index]
         return self._read_image(image_file_path)
