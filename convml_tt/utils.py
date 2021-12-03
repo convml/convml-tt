@@ -108,6 +108,8 @@ def get_embeddings(
     if hasattr(tile_dataset, "data_dir"):
         attrs["data_dir"] = str(Path(tile_dataset.data_dir).absolute())
 
+    da_emb = xr.DataArray(embeddings, dims=dims, coords=coords, attrs=attrs)
+
     if isinstance(tile_dataset, MovingWindowImageTilingDataset):
         # "unstack" the 2D array with coords (tile_id, emb_dim) to have coords (i0,
         # j0, emb_dim), where `i0` and `j0` represent the index of the pixel in the
@@ -122,7 +124,8 @@ def get_embeddings(
         da_emb.attrs["tile_nx"] = tile_dataset.nxt
         da_emb.attrs["tile_ny"] = tile_dataset.nyt
 
-    return xr.DataArray(embeddings, dims=dims, coords=coords, attrs=attrs)
+    return da_emb
+
 
 
 def make_sliding_tile_model_predictions(
