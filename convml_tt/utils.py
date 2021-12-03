@@ -48,7 +48,7 @@ def get_embeddings(
         gpus = 1
     else:
         gpus = 0
-    trainer = pl.Trainer()
+    trainer = pl.Trainer(gpus=gpus)
 
     def apply_model(x):
         return trainer.predict(model=model, dataloaders=[tile_dataloader])[0]
