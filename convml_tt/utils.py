@@ -15,6 +15,7 @@ from .data.dataset import (
     ImageSingletDataset,
     ImageTripletDataset,
     MovingWindowImageTilingDataset,
+    TileType
 )
 
 
@@ -33,9 +34,34 @@ def get_embeddings(
     If a GPU is available it will be used. For now we only use a single GPU
     even if multiple are available. By default we will use all available cpu
     cores for the dataloader.
+
+    For a moving window dataset (data.datasets.MovingWindowImageTilingDataset)
+    the data will be reshaped to be 2D as the input image. The i0 and j0
+    coordinates denote center of each prediction tile. NB: j-indexing is from
+    "top_left" i.e. is likely in the opposite order to what would be expected
+    for y-axis of original image (positive being up)
+
     """
     if len(tile_dataset) == 0:
         raise Exception("No tiles in the provided dataset")
+
+    if isinstance(tile_dataset, ImageTripletDataset):
+        das = []
+        for tile_type in TileType:
+            tile_dataset_tiletype = tile_dataset.make_singlet_dataset(
+                tile_type=tile_type
+            )
+            da_embs_tiletype = get_embeddings(
+                tile_dataset=tile_dataset_tiletype,
+                model=model,
+                prediction_batch_size=prediction_batch_size,
+                n_worker_cpu_cores=n_worker_cpu_cores,
+            )
+            da_embs_tiletype["tile_type"] = tile_type.name.lower()
+            das.append(da_embs_tiletype)
+
+        da_embeddings = xr.concat(das, dim="tile_type")
+        return da_embeddings
 
     if n_worker_cpu_cores == "all":
         n_worker_cpu_cores = multiprocessing.cpu_count()
@@ -72,7 +98,7 @@ def get_embeddings(
     while len(batched_results) == 0:
         batched_results = trainer.predict(model=model, dataloaders=tile_dataloader)
 
-    embeddings = np.vstack([ batch.detach().numpy() for batch in batched_results ])
+    embeddings = np.vstack([batch.detach().numpy() for batch in batched_results])
 
     attrs = {}
     if hasattr(tile_dataset, "tile_type"):
