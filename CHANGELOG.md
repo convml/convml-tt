@@ -6,9 +6,18 @@
 
 *new features*
 
+- Annotated scatterplots now work for `data.dataset.MovingWindowImageTilingDataset`s
+  [\#52](https://github.com/convml/convml_tt/pull/52)
+
 - `utils.get_embeddings` now uses GPU for producing the embeddings if one is
   available, drastically speeding up inference time.
   [\#53](https://github.com/convml/convml_tt/pull/53)
+
+*breaking changes*
+
+- `utils.make_sliding_tile_model_predictions` has been removed in favour of
+  using `utils.get_embeddings` directly
+  [\#54](https://github.com/convml/convml_tt/pull/54)
 
 
 ## [v0.10.1](https://github.com/convml/convml_tt/tree/v0.10.1)

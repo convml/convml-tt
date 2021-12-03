@@ -30,9 +30,7 @@ def make_plot(model, image_path, N_tile, prediction_batch_size=128):
     tile_dataset = MovingWindowImageTilingDataset(
         img=img, transform=transforms, step=step, N_tile=N_tile
     )
-    da_emb = make_sliding_tile_model_predictions(
-        tile_dataset=tile_dataset, model=model
-    )
+    da_emb = make_sliding_tile_model_predictions(tile_dataset=tile_dataset, model=model)
 
     da_emb_pca = apply_transform(da_emb, "pca")
 
