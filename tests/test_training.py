@@ -97,6 +97,13 @@ def assert_models_equal(model_1, model_2):
 def test_load_from_weights():
     model = load_pretrained_model(pretrained_model=PretrainedModel.FIXED_NORM_STAGE2)
 
+    # there was a bug where fetching, loading and producing embeddings the same
+    # way again yielded different embeddings. I need to check that using a
+    # loaded network always gives the same result
+    model2 = load_pretrained_model(pretrained_model=PretrainedModel.FIXED_NORM_STAGE2)
+
+    assert_models_equal(model, model2)
+
     data_path = fetch_example_dataset(dataset=ExampleData.TINY10)
     dataset = ImageSingletDataset(
         data_dir=data_path,
@@ -106,21 +113,8 @@ def test_load_from_weights():
     )
     da_emb = get_embeddings(tile_dataset=dataset, model=model, prediction_batch_size=16)
 
-    # there was a bug where fetching, loading and producing embeddings the same
-    # way again yielded different embeddings. I need to check that using a
-    # loaded network always gives the same result
-    model2 = load_pretrained_model(pretrained_model=PretrainedModel.FIXED_NORM_STAGE2)
-
-    def has_same_parameters(model1, model2):
-        for p1, p2 in zip(model1.parameters(), model2.parameters()):
-            if p1.data.ne(p2.data).sum() > 0:
-                return False
-        return True
-
-    assert_models_equal(model, model2)
-
     da_emb2 = get_embeddings(
-        tile_dataset=dataset, model=model2, prediction_batch_size=20
+        tile_dataset=dataset, model=model2, prediction_batch_size=16
     )
 
     np.testing.assert_allclose(da_emb, da_emb2)
