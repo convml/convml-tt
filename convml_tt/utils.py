@@ -139,7 +139,16 @@ def make_sliding_tile_model_predictions(
     j_img_tile_center = (j_img_tile + 0.5 * tile_dataset.nyt).astype(int)
     da_emb["i0"] = ("tile_id"), i_img_tile_center
     da_emb["j0"] = ("tile_id"), j_img_tile_center
+
+    # because we want to retain the tile id for later we make a copy here (the
+    # coordinate itself will disappear when we unstack). Need to take the
+    # `values` otherwise the unstacking fails (because xarray is confused about
+    # the copy of the coordinate)
+    da_emb["tile_id_copy"] = ("tile_id"), da_emb.tile_id.values
+
     da_emb = da_emb.set_index(tile_id=("i0", "j0")).unstack("tile_id")
+
+    da_emb = da_emb.rename(tile_id_copy="tile_id")
 
     da_emb.attrs["tile_nx"] = tile_dataset.nxt
     da_emb.attrs["tile_ny"] = tile_dataset.nyt

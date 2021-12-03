@@ -6,6 +6,9 @@
 
 *new features*
 
+- Annotated scatterplots now work for `data.dataset.MovingWindowImageTilingDataset`s
+  [\#52](https://github.com/convml/convml_tt/pull/52)
+
 - `utils.get_embeddings` now uses GPU for producing the embeddings if one is
   available, drastically speeding up inference time.
   [\#53](https://github.com/convml/convml_tt/pull/53)
