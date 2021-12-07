@@ -42,7 +42,7 @@ class SceneSourceFiles(luigi.Task):
             if ds.source == "goes16":
                 scene_source_files = all_source_files[self.scene_id]
                 task = goes16.pipeline.GOES16Fetch(
-                    keys=scene_source_files, data_path=source_data_path
+                    keys=np.atleast_1d(scene_source_files).tolist(), data_path=source_data_path
                 )
             elif ds.source == "LES":
                 # assume that these files already exist
@@ -209,8 +209,14 @@ class SceneRectData(_SceneRectSampleBase):
 class GenerateCroppedScenes(SceneBulkProcessingBaseTask):
     data_path = luigi.Parameter(default=".")
     TaskClass = CropSceneSourceFiles
+    SceneIDsTaskClass = CheckForAuxiliaryFiles
 
     aux_product = luigi.OptionalParameter(default=None)
 
     def _get_task_class_kwargs(self, scene_ids):
         return dict(aux_product=self.aux_product)
+
+    def _get_scene_ids_task_kwargs(self):
+        if self.aux_product is None:
+            return {}
+        return dict(product_name=self.aux_product)
