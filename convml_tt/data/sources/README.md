@@ -129,7 +129,7 @@ resampled onto a isometric Cartesian grid (by setting `kind == rect`). This is
 done by doing a projection onto a tangential plane centered on a point you
 define. For `LES` data the `domain` section may be omitted if the whole domain
 is to be used (in the case the domain centre will be use for the Cartesian
-projectino origin).
+projection origin).
 
 ```yaml
 domain:
