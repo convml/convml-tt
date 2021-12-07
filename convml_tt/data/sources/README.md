@@ -127,9 +127,9 @@ The `domain` section of `meta.yaml` defines the spatial domain within which you
 want to use data. If your data is given at lat/lon coordinates it will be
 resampled onto a isometric Cartesian grid (by setting `kind == rect`). This is
 done by doing a projection onto a tangential plane centered on a point you
-define. For `LES` data this may be omitted if the whole domain is to be used
-(in the case the domain centre will be use for the Cartesian projectino
-origin).
+define. For `LES` data the `domain` section may be omitted if the whole domain
+is to be used (in the case the domain centre will be use for the Cartesian
+projectino origin).
 
 ```yaml
 domain:
