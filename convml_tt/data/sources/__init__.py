@@ -1,3 +1,6 @@
+"""
+Parser and class for representing dataset information given by `meta.yaml` files
+"""
 import pprint
 from pathlib import Path
 import yaml
