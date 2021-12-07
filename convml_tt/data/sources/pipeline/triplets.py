@@ -4,7 +4,7 @@ import luigi
 import numpy as np
 import regridcart as rc
 
-from ....pipeline import XArrayTarget, YAMLTarget
+from ....pipeline import XArrayTarget, DBTarget
 from ...common import TILE_IDENTIFIER_FORMAT
 from .. import DataSource, goes16
 from ..sampling import domain as sampling_domain
@@ -119,9 +119,8 @@ class TripletSceneSplits(luigi.Task):
         self.output().write(tiles_per_scene)
 
     def output(self):
-        fn = "tiles_per_scene.yaml"
-        p = Path(self.data_path) / "triplets" / fn
-        return YAMLTarget(str(p))
+        p = Path(self.data_path) / "triplets"
+        return DBTarget(path=p, db_type="yaml", db_name="tile_scene_splits")
 
 
 class SceneTileLocations(luigi.Task):
@@ -195,9 +194,9 @@ class SceneTileLocations(luigi.Task):
         self.output().write(tile_locations)
 
     def output(self):
-        fn = f"tile_locations.{self.scene_id}.yaml"
-        p = Path(self.data_path) / "triplets" / fn
-        return YAMLTarget(str(p))
+        name = f"tile_locations.{self.scene_id}"
+        p = Path(self.data_path) / "triplets"
+        return DBTarget(path=p, db_type="yaml", db_name=name)
 
 
 class SceneTilesData(_SceneRectSampleBase):
@@ -239,17 +238,13 @@ class SceneTilesData(_SceneRectSampleBase):
 
         domain = self.data_source.domain
         if isinstance(domain, sampling_domain.SourceDataDomain):
-            import ipdb
-            with ipdb.launch_ipdb_on_exception():
-                domain = domain.generate_from_dataset(ds=da_src)
+            domain = domain.generate_from_dataset(ds=da_src)
 
         data_source = self.data_source
         dx = data_source.sampling["resolution"]
 
         for tile_identifier, tile_domain in self.tile_domains:
-            import ipdb
-            with ipdb.launch_ipdb_on_exception():
-                da_tile = rc.resample(domain=tile_domain, da=da_src, dx=dx)
+            da_tile = rc.resample(domain=tile_domain, da=da_src, dx=dx)
             tile_output = self.output()[tile_identifier]
             tile_output["data"].write(da_tile)
 
@@ -297,18 +292,14 @@ class GenerateTiles(luigi.Task):
         return DataSource.load(path=self.data_path)
 
     def requires(self):
-        return GenerateSceneIDs(data_path=self.data_path)
+        return TripletSceneSplits(data_path=self.data_path)
 
     def run(self):
-        scene_ids = list(self.input().open().keys())
+        tiles_per_scene = self.input().open()
 
         tasks_tiles = {}
-        for scene_id in scene_ids:
-            tasks_tiles[scene_id] = SceneTilesData(scene_id=scene_id)
+        for scene_id, tiles_meta in tiles_per_scene.items():
+            if len(tiles_meta) > 0:
+                tasks_tiles[scene_id] = SceneTilesData(scene_id=scene_id)
 
-        yield tasks_tiles
-
-    def output(self):
-        fn_output = "tiles_by_scene.yaml"
-        p = Path(self.data_path) / "triplets" / fn_output
-        return YAMLTarget(str(p))
+        output = yield tasks_tiles
