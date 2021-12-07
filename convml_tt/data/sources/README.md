@@ -69,7 +69,10 @@ type: singlechannel__rlut
 ```
 
 Will create single-channel tiles using the `rlut` field in the provided netCDF
-file(s).
+file(s). **NOTE**: for now grey-scale images are created from this single field
+which are then fed to the neural network as RGB images. In future it will be
+possible to define a userfunction which sets up the channels and input
+normalisation for the neural network.
 
 
 ## The timespan of your data-source
@@ -104,8 +107,10 @@ time:
     N_hours_from_zenith: 4.0
 ```
 
-And you may optionally list filters to use to exclude times within your defined
-interval(s):
+And you may optionally list filters to use to only include times match the
+filter arguments (at the moment only `N_hours_from_zenith` may be used which
+calculates the zenith time in the center of the domain and filters based on
+time-difference to this time):
 
 ```yaml
 time:
@@ -119,16 +124,15 @@ time:
 ## The sampling `domain` for your data-source
 
 The `domain` section of `meta.yaml` defines the spatial domain within which you
-want to use data. Currently, all data is resampled onto a isometric Cartesian
-grid (by setting `kind == rect`), in the case of `goes16` data (which is
-natively on the lat/lon grid of the Earth's surface) this is done by doing a
-projection onto a tangential plane centered on a point you define.
-
-TODO: this hasn't been completed for LES data yet
+want to use data. If your data is given at lat/lon coordinates it will be
+resampled onto a isometric Cartesian grid (by setting `kind == rect`). This is
+done by doing a projection onto a tangential plane centered on a point you
+define. For `LES` data this may be omitted if the whole domain is to be used
+(in the case the domain centre will be use for the Cartesian projectino
+origin).
 
 ```yaml
 domain:
-  kind: rect
   central_latitude: 14.0
   central_longitude: -48.0
   l_zonal: 3000.0e+3
@@ -141,8 +145,9 @@ domain:
 To do the tile-based embedding projections using `convml_tt` we must either
 feed it individual tiles. There is currently implemented support for producing
 triplets of tiles for this purpose or regridding the entire domain at a fixed
-resolution and feeding data using a sliding-window to generate tiles at
-inference time.
+resolution and feeding data using a sliding-window to
+generate tiles at inference time. In both cases the resolution must be defined
+(which is assumed to be given in meters).
 
 ```yaml
 sampling:
@@ -151,13 +156,14 @@ sampling:
     scene_collections_splitting: random_by_relative_sample_size
     N_triplets: {train: 10, study: 2}
     tile_N: 256
-    tile_size: 200000.0
 ```
 
 ## Auxiliary data
 
-For some source (for example `goes16`) there may be auxiliary data fields that
-you would like to download and regrid to use during inference time. You should list the ones you wish to download using the `aux_products` part of the `meta.yaml` file:
+For some sources (for example `goes16`) there may be auxiliary data fields that
+you would like to download and regrid to use during inference time. You should
+list the ones you wish to download using the `aux_products` part of the
+`meta.yaml` file:
 
 ```yaml
 aux_products:
