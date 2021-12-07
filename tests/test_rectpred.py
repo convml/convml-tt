@@ -10,13 +10,14 @@ from convml_tt.data.dataset import MovingWindowImageTilingDataset
 from convml_tt.data.examples import PretrainedModel, fetch_pretrained_model
 from convml_tt.data.sources.examples import ExampleDatasource, fetch_example_datasource
 from convml_tt.data.transforms import get_transforms as get_model_transforms
+from convml_tt.interpretation.plots import annotated_scatter_plot
 from convml_tt.interpretation.rectpred.pipeline.data import (
     AggregateFullDatasetImagePredictionMapData,
 )
 from convml_tt.interpretation.rectpred.plot import make_rgb
 from convml_tt.interpretation.rectpred.transform import apply_transform
 from convml_tt.system import TripletTrainerModel
-from convml_tt.utils import make_sliding_tile_model_predictions
+from convml_tt.utils import get_embeddings
 
 DOC_PATH = Path(__file__).parent.parent / "doc"
 RECTPRED_IMG_EXAMPLE_PATH = DOC_PATH / "goes16_202002051400.png"
@@ -41,7 +42,7 @@ def test_rectpred_sliding_window_inference():
     tile_dataset = MovingWindowImageTilingDataset(
         img=img, transform=transforms, step=step, N_tile=N_tile
     )
-    da_emb_rect = make_sliding_tile_model_predictions(
+    da_emb_rect = get_embeddings(
         tile_dataset=tile_dataset, model=model
     )
 
@@ -54,6 +55,13 @@ def test_rectpred_sliding_window_inference():
     assert da_emb_rect.emb_dim.count() == model.n_embedding_dims
     assert da_emb_rect.i0.count() == nxt
     assert da_emb_rect.j0.count() == nyt
+
+    # try creating an annotated scatter with the embedding
+    da_x = da_emb_rect.sel(emb_dim=0)
+    da_y = da_emb_rect.sel(emb_dim=0)
+    annotated_scatter_plot(
+        x=da_x, y=da_y, points=5, tile_dataset=tile_dataset, autopos_method=None
+    )
 
 
 def test_apply_transform_rect():
