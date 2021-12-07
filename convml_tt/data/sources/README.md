@@ -23,13 +23,11 @@ domain:
   l_meridional: 200000
 
 sampling:
+  resolution: 1000.0
   triplets:
     scene_collections_splitting: random_by_relative_sample_size
     N_triplets: {train: 10, study: 2}
     tile_N: 256
-    tile_size: 200000.0
-  rect:
-    dx: 1000.0
 ```
 
 ## The `source` and `type` of your dataset
@@ -148,13 +146,12 @@ inference time.
 
 ```yaml
 sampling:
+  resolution: 1000.0
   triplets:
     scene_collections_splitting: random_by_relative_sample_size
     N_triplets: {train: 10, study: 2}
     tile_N: 256
     tile_size: 200000.0
-  rect:
-    dx: 1000.0
 ```
 
 ## Auxiliary data
