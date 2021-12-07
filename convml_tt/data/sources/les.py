@@ -29,7 +29,7 @@ def find_les_files(data_path, filename_glob):
         raise FileNotFoundError(
             f"No source datafiles found matching {les_data_path}/{filename_glob}"
         )
-    return les_data_path
+    return file_paths
 
 
 class FindLESFiles(luigi.Task):
@@ -42,6 +42,7 @@ class FindLESFiles(luigi.Task):
     filename_glob = luigi.Parameter(default="*.nc")
     source_variable = luigi.Parameter()
 
+    @staticmethod
     def get_time(filename):
         dt64 = xr.open_dataset(filename).time
         return _dt64_to_datetime(dt64)
