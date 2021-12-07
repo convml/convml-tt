@@ -92,6 +92,19 @@ def annotated_scatter_plot(
             "`x` or `y`. Either set these or provide a `tile_dataset`"
         )
 
+    if x.shape != y.shape:
+        raise Exception(f"x and y don't have the same shape ({x.shape} != {y.shape})")
+    elif x.dims != y.dims:
+        raise Exception(
+            f"x and y don't have the same dimensions ({x.dims} != {y.dims})"
+        )
+    elif len(x.shape) != 1:
+        # looks like the embeddings provided have been unstacked (for example
+        # they're representing embeddings in a 2D domain). Let's see if we can
+        # stack them into a single 1D array
+        x = x.stack(sample=x.dims)
+        y = y.stack(sample=y.dims)
+
     def _is_array(v):
         return isinstance(v, np.ndarray) or (type(v) == list and type(v[0]) == int)
 
