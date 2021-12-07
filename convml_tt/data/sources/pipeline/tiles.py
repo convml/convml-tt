@@ -4,14 +4,14 @@ import luigi
 import matplotlib.pyplot as plt
 import regridcart as rc
 
-from ....pipeline import ImageTarget, XArrayTarget, YAMLTarget
+from ....pipeline import ImageTarget, XArrayTarget
 from .. import DataSource
 from ..sampling import domain as sampling_domain
 from ..utils.domain_images import align_axis_x, rgb_image_from_scene_data
 from . import GenerateSceneIDs
 from .sampling import CropSceneSourceFiles, SceneSourceFiles, _SceneRectSampleBase
 from .utils import SceneBulkProcessingBaseTask
-from .aux import CheckForAuxiliaryFiles
+from .aux_sources import CheckForAuxiliaryFiles
 
 
 def _plot_scene_aux(da_aux, img, **kwargs):

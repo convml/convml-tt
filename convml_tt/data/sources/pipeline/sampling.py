@@ -10,7 +10,7 @@ import regridcart as rc
 from ....pipeline import ImageTarget, XArrayTarget
 from .. import DataSource, goes16
 from ..les import LESDataFile
-from .aux import CheckForAuxiliaryFiles
+from .aux_sources import CheckForAuxiliaryFiles
 from .scene_sources import GenerateSceneIDs
 from .utils import SceneBulkProcessingBaseTask
 

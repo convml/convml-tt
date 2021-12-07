@@ -6,7 +6,7 @@ import regridcart as rc
 
 from ....pipeline import XArrayTarget, DBTarget
 from ...common import TILE_IDENTIFIER_FORMAT
-from .. import DataSource, goes16
+from .. import DataSource
 from ..sampling import domain as sampling_domain
 from ..sampling import triplets as triplet_sampling
 from ..utils.domain_images import rgb_image_from_scene_data
