@@ -73,6 +73,9 @@ def sample_best_triplets(
 def _make_isomap_reference_plot(fn_triplet_embeddings):
     da_embs = xr.open_dataarray(fn_triplet_embeddings)
 
+    if "triplet_part" in da_embs.dims:
+        da_embs = da_embs.rename(triplet_part="tile_type")
+
     da_embs_neardiff = da_embs.sel(tile_type="anchor") - da_embs.sel(
         tile_type="neighbor"
     )
@@ -129,7 +132,7 @@ def plot_embs_on_isomap_manifold(fn_triplet_embeddings, da_embs):
     )
 
     da_embs_isomap = rp_transform.apply_transform(
-        da=da_embs * 1.0e3,
+        da=da_embs * 1.0e0,
         transform_type="isomap",
         pretrained_model=model_isomap,
     )
@@ -146,8 +149,6 @@ def plot_embs_on_isomap_manifold(fn_triplet_embeddings, da_embs):
     ax_overlay.set_xlim(ax.get_xlim())
     ax_overlay.set_ylim(ax.get_ylim())
     ax_overlay.axis("off")
-
-    ax.set_title("2nd Feb 2020 embeddings of HALO circle title 200km x 200km")
 
     return fig, ax
 
