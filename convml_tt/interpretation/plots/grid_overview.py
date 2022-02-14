@@ -47,18 +47,24 @@ def grid_overview(
         ax.axison = False
         if isinstance(tile_dataset, ImageTripletDataset):
             tile_image = tile_dataset.get_image(index=i, tile_type=tile_type)
-        elif isinstance(tile_dataset, ImageSingletDataset):
-            tile_image = tile_dataset.get_image(index=i)
         else:
-            raise NotImplementedError(tile_dataset)
+            tile_image = tile_dataset.get_image(index=i)
 
         ax.imshow(tile_image)
         ax.set_aspect("equal")
         ax.set_xticklabels([])
         ax.set_yticklabels([])
         label_text = None
-        if type(label) == str and label == "tile_id":
-            label_text = str(i)
+        if type(label) == str:
+            if label == "tile_id":
+                label_text = str(i)
+            elif getattr(tile_dataset, "get_tile_meta"):
+                label_text = tile_dataset.get_tile_meta(index=i, field=label)
+            else:
+                raise NotImplementedError(
+                    "To use a different attribute as a label please a method"
+                    f" `get_tile_meta(index=..., field=...)` to {tile_dataset.__class__}"
+                )
         elif type(label) == list:
             label_text = label[n]
         else:
