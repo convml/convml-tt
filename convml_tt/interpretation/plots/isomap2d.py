@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-import joblib
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.stats
@@ -70,7 +69,7 @@ def sample_best_triplets(
     return tile_ids_new
 
 
-def _make_isomap_reference_plot(fn_triplet_embeddings):
+def make_isomap_reference_plot(fn_triplet_embeddings, tile_size=0.02, dl=0.1, ax=None):
     da_embs = xr.open_dataarray(fn_triplet_embeddings)
 
     if "triplet_part" in da_embs.dims:
@@ -104,7 +103,7 @@ def _make_isomap_reference_plot(fn_triplet_embeddings):
         x_dim=0,
         y_dim=1,
         ds=ds,
-        dl=0.1,
+        dl=dl,
         an_dist_max=0.8,
         var="emb_isomap",
     )
@@ -112,7 +111,10 @@ def _make_isomap_reference_plot(fn_triplet_embeddings):
     x = ds.emb_isomap.sel(isomap_dim=0)
     y = ds.emb_isomap.sel(isomap_dim=1)
 
-    fig, ax = plt.subplots(figsize=(14, 14))
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(14, 14))
+    else:
+        fig = ax.figure
 
     x.attrs["tile_type"] = "ANCHOR"
     y.attrs["tile_type"] = "ANCHOR"
@@ -120,28 +122,34 @@ def _make_isomap_reference_plot(fn_triplet_embeddings):
     x.attrs["data_dir"] = da_embs.data_dir
 
     _ = annotated_scatter_plot(
-        x=x, y=y, points=tile_ids_sampled, ax=ax, autopos_method=None, size=0.02
+        x=x, y=y, points=tile_ids_sampled, ax=ax, autopos_method=None, size=tile_size
     )
 
     return fig, ax, model_isomap
 
 
-def plot_embs_on_isomap_manifold(fn_triplet_embeddings, da_embs):
-    fig, ax, model_isomap = _make_isomap_reference_plot(
-        fn_triplet_embeddings=fn_triplet_embeddings
+def plot_embs_on_isomap_manifold(fn_triplet_embeddings, da_embs, dl=0.1, tile_size=0.02):
+    if len(da_embs.dims) > 2:
+        raise Exception(
+            "The embeddings provided should only have a single dimension besides"
+            " the embedding dimension (`emb_dim`). Please stack the dimensions"
+            f" {da_embs.dims}, e.g. to `(emb_dim, tile_id)`"
+        )
+
+    fig, ax, model_isomap = make_isomap_reference_plot(
+        fn_triplet_embeddings=fn_triplet_embeddings, dl=dl, tile_size=tile_size
     )
 
     da_embs_isomap = rp_transform.apply_transform(
-        da=da_embs * 1.0e0,
+        da=da_embs,
         transform_type="isomap",
         pretrained_model=model_isomap,
     )
     # ax_overlay = ax.inset_axes([0., 0., 1.0, 1.0], transform=ax.transAxes, zorder=10e9)
     ax_overlay = fig.add_axes(ax.get_position(), zorder=4, transform=ax.transAxes)
 
-    da_ = da_embs_isomap.isel(x=2, y=2)
-    x = da_.sel(isomap_dim=0)
-    y = da_.sel(isomap_dim=1)
+    x = da_embs_isomap.sel(isomap_dim=0)
+    y = da_embs_isomap.sel(isomap_dim=1)
     ax_overlay.plot(x, y, color="lightgreen", marker=".")
     ax_overlay.plot(x[0], y[0], color="lightgreen", marker="o", markersize=15)
 
