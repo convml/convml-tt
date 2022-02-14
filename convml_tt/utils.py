@@ -82,13 +82,11 @@ def get_embeddings(
     tile_ids = np.arange(len(tile_dataloader.dataset))
     coords = dict(tile_id=tile_ids)
 
-    if isinstance(tile_dataset, ImageSingletDataset):
-        dims = ("tile_id", "emb_dim")
-    elif isinstance(tile_dataset, ImageTripletDataset):
+    if isinstance(tile_dataset, ImageTripletDataset):
         dims = ("tile_type", "tile_id", "emb_dim")
         coords["tile_type"] = ["anchor", "neighbor", "distant"]
     else:
-        raise NotImplementedError(tile_dataset)
+        dims = ("tile_id", "emb_dim")
 
     batched_results = []
     # XXX: this is a hack. There appears to be somesort of race condition
