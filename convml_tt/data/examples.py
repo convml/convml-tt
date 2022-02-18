@@ -5,7 +5,7 @@ import enum
 from pathlib import Path
 from typing import Union
 
-from torchvision.datasets.utils import download_and_extract_archive
+from ..utils import download_and_extract_archive
 
 from ..system import TripletTrainerModel
 
