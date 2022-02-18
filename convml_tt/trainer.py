@@ -52,6 +52,12 @@ def main(args=None):
         action="store_true",
         help="Use one-cycle learning rate scheduling",
     )
+    parser.add_argument(
+        "--precision",
+        default=32,
+        type=int,
+        help="Floating point precision to use during training",
+    )
 
     if os.environ.get("FROM_CHECKPOINT"):
         parser.add_argument(
