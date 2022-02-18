@@ -6,11 +6,8 @@ channels:
   - conda-forge
 dependencies:
   - pip
-  - python=3.7
   - netcdf4
-  # pin pytorch version until kornia have fixed issue with 1.8.0
-  # https://github.com/kornia/kornia/issues/902
-  - pytorch==1.7.1
+  - pytorch
   - pytorch-lightning
   - torchvision>=0.4.0
   - cudatoolkit

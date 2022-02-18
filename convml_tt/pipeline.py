@@ -1,8 +1,7 @@
+import coloredlogs
 import luigi
 import xarray as xr
 import yaml
-
-import coloredlogs
 
 coloredlogs.install()
 

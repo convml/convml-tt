@@ -1,6 +1,5 @@
-from torchvision import transforms as tv_transforms
 import kornia.augmentation as kaug
-from torch import nn
+from torchvision import transforms as tv_transforms
 
 
 class GetItemTransform:

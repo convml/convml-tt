@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import luigi
 
 from . import TripletDataset

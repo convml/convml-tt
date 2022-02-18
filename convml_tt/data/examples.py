@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Union
 
 from torchvision.datasets.utils import download_and_extract_archive
+
 from ..system import TripletTrainerModel
 
 _URL_ROOT = "http://homepages.see.leeds.ac.uk/~earlcd/ml-datasets"

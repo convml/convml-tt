@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
 
-from ...data.dataset import TileType, ImageSingletDataset, ImageTripletDataset
+from ...data.dataset import ImageSingletDataset, ImageTripletDataset, TileType
 
 
 def grid_overview(

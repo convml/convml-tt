@@ -5,9 +5,9 @@ be unpickled and we can create a pytorch model from the same weights without
 using fastai
 """
 
-from torch import nn
 import torch
 from fastai.basic_train import load_learner
+from torch import nn
 
 
 def get_pytorch_model(model):

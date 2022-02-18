@@ -2,9 +2,9 @@ import warnings
 
 import torch
 from torch import nn
-from .nn_layers import AdaptiveConcatPool2d
 
 from ..system import TripletTrainerModel
+from .nn_layers import AdaptiveConcatPool2d
 
 
 class ScalingLayer(torch.nn.Module):

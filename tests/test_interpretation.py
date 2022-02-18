@@ -1,7 +1,7 @@
 import numpy as np
 from torch.utils.data import DataLoader
 
-from convml_tt.data.dataset import TileType, ImageSingletDataset, ImageTripletDataset
+from convml_tt.data.dataset import ImageSingletDataset, ImageTripletDataset, TileType
 from convml_tt.data.examples import ExampleData, fetch_example_dataset
 from convml_tt.data.transforms import get_transforms
 from convml_tt.interpretation import plots as interpretation_plot
