@@ -4,6 +4,13 @@
 
 [Full Changelog](https://github.com/convml/convml_tt/compare/v0.11.0...HEAD)
 
+*new features*
+
+- Add new isomap 2D embedding manifold plot which takes the best (nearest
+  anchor-neighbor) triplets and plots these at a uniform sampling across an
+  isomap 2D extracted embedding manifold
+  [\#57](https://github.com/convml/convml_tt/pull/57)
+
 *maintenance*
 
 - Fix CI testing by switching to microconda and unpinning pytorch version
