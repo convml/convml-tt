@@ -1,10 +1,10 @@
 from collections import OrderedDict
 
 import matplotlib.pyplot as plt
-from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 import numpy as np
 import seaborn as sns
 import xarray as xr
+from matplotlib.offsetbox import AnnotationBbox, OffsetImage
 
 from ...data.dataset import ImageSingletDataset
 from .mpl_autopos_annotation import calc_offset_points
