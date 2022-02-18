@@ -26,6 +26,7 @@ from typing import (
 )
 from urllib.parse import urlparse
 
+import requests
 import torch
 from tqdm.auto import tqdm
 
@@ -219,7 +220,6 @@ def download_file_from_google_drive(
         md5 (str, optional): MD5 checksum of the download. If None, do not check
     """
     # Based on https://stackoverflow.com/questions/38511444/python-download-files-from-google-drive-using-url
-    import requests
 
     url = "https://docs.google.com/uc?export=download"
 
