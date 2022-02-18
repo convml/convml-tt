@@ -1,35 +1,33 @@
 import bz2
+import gzip
+import hashlib
+import itertools
+import lzma
 import os
 import os.path
-import hashlib
-import gzip
+import pathlib
 import re
 import tarfile
+import urllib
+import urllib.error
+import urllib.request
+import zipfile
 from typing import (
+    IO,
     Any,
     Callable,
-    List,
-    Iterable,
-    Optional,
-    TypeVar,
     Dict,
-    IO,
-    Tuple,
+    Iterable,
     Iterator,
+    List,
+    Optional,
+    Tuple,
+    TypeVar,
 )
 from urllib.parse import urlparse
-import zipfile
-import lzma
-import urllib
-import urllib.request
-import urllib.error
-import pathlib
-import itertools
 
 import torch
-
 from tqdm.auto import tqdm
-
 
 USER_AGENT = "pytorch/vision"
 
