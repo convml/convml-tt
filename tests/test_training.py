@@ -2,7 +2,6 @@ import numpy as np
 import pytorch_lightning as pl
 import torch
 from pytorch_lightning.callbacks import LearningRateMonitor
-import pytest
 
 from convml_tt.data.dataset import ImageSingletDataset, TileType
 from convml_tt.data.examples import (
@@ -19,7 +18,6 @@ from convml_tt.system import (
 )
 from convml_tt.trainer_onecycle import OneCycleTrainer
 from convml_tt.utils import get_embeddings
-
 
 if torch.cuda.is_available():
     N_GPUS = 1

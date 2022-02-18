@@ -2,19 +2,19 @@
 Contains the main triplet-trainer architecture (TripletTrainerModel) and the datamodule to
 load triplet-datasets (TripletTrainerDataModule)
 """
+import argparse
 import pathlib
 
-import argparse
 import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
 from torch import nn
 from torch.utils.data import DataLoader, random_split
 
+from . import backbones
 from .data.dataset import ImageTripletDataset, MemoryMappedImageTripletDataset
 from .data.transforms import get_transforms
 from .external.nn_layers import AdaptiveConcatPool2d
-from . import backbones
 
 
 class HeadFineTuner(pl.callbacks.BaseFinetuning):

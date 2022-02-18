@@ -1,1 +1,1 @@
-from . import plots
+from . import plots  # noqa

@@ -1,7 +1,4 @@
-from pathlib import Path
-
 from . import TripletDataset
-
 
 if __name__ == "__main__":
     import argparse
