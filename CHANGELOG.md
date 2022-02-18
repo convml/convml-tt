@@ -4,6 +4,13 @@
 
 [Full Changelog](https://github.com/convml/convml_tt/compare/v0.11.0...HEAD)
 
+*new features*
+
+- annotated scatterplot now uses matplotlib's AnnotationBbox which means that
+  annotated scatterplots can be rescaled (with say `ax.set_xlim`) with
+  annotations staying in place and keep a fixed size
+  [\#58](https://github.com/convml/convml_tt/pull/59)
+
 *maintenance*
 
 - Fix CI testing by switching to microconda and unpinning pytorch version
