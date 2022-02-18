@@ -6,8 +6,8 @@ from pathlib import Path
 import luigi
 import matplotlib.pyplot as plt
 import xarray as xr
-from convml_data.pipeline import SceneBulkProcessingBaseTask
 from convml_data import DataSource
+from convml_data.pipeline import SceneBulkProcessingBaseTask
 
 from ....pipeline import XArrayTarget
 from ..plot import make_components_annotation_map_image, make_rgb_annotation_map_image

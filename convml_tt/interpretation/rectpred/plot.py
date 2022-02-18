@@ -1,6 +1,6 @@
+import matplotlib.image as mpimg
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
-import matplotlib.image as mpimg
 import numpy as np
 import skimage.color
 import xarray as xr

@@ -1,16 +1,15 @@
-import satpy
-import yaml
 import cartopy.crs as ccrs
-import xarray as xr
 import numpy as np
-
-from satdata import Goes16AWS
-from . import tiler, bbox
-
-import satpy.composites.viirs
+import satpy
 import satpy.composites.abi
 import satpy.composites.cloud_products
+import satpy.composites.viirs
 import satpy.enhancements
+import xarray as xr
+import yaml
+from satdata import Goes16AWS
+
+from . import bbox, tiler
 
 
 def _cleanup_composite_da_attrs(da_composite):
@@ -56,7 +55,7 @@ def save_scene_meta(source_fns, fn_meta):
             else:
                 try:
                     new_attrs[k] = float(v)
-                except:
+                except Exception:
                     raise NotImplementedError(
                         "not sure how to handle `{}`:{}".format(k, v)
                     )
@@ -159,10 +158,11 @@ def get_rgb_composite_in_bbox(scene_fns, data_path, bbox_extent, bbox_pad_pct=0.
         da_truecolor_domain = _cleanup_composite_da_attrs(da_truecolor_domain)
 
         da_truecolor_domain.to_netcdf(path_nc)
+        save_scene_meta(source_fns=scene_fns, fn_meta=path_meta)
+    else:
+        da_truecolor_domain = xr.open_dataarray(path_nc)
 
-        meta = _save_scene_meta(source_fns=scene_fns, fn_meta=path_meta)
-
-    return da
+    return da_truecolor_domain
 
 
 def rgb_da_to_img(da):

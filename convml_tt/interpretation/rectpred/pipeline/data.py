@@ -7,8 +7,8 @@ from pathlib import Path
 import luigi
 import numpy as np
 import xarray as xr
-from convml_data.pipeline import SceneBulkProcessingBaseTask, SceneRegriddedData
 from convml_data import DataSource
+from convml_data.pipeline import SceneBulkProcessingBaseTask, SceneRegriddedData
 from PIL import Image
 
 from ....data.dataset import MovingWindowImageTilingDataset

@@ -1,5 +1,5 @@
-from PIL import Image
 import numpy as np
+from PIL import Image
 
 
 def create_true_color_img(das_channels):

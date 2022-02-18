@@ -36,7 +36,9 @@ class EmbeddingTransform(luigi.Task):
         model_path = models_path / model_filename
         if not model_path.exists():
             pretrained_model_files = models_path.glob(model_filename_format.format("*"))
-            avail_models = {p.name.replace(".model.joblib", ""): p for p in pretrained_model_files}
+            avail_models = {
+                p.name.replace(".model.joblib", ""): p for p in pretrained_model_files
+            }
             avail_models_str = "\n".join(
                 [f"\t{k: <20}: {v}" for (k, v) in avail_models.items()]
             )

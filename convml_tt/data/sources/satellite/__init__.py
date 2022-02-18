@@ -1,14 +1,14 @@
 import datetime
 
-from matplotlib.lines import Line2D
 import cartopy.crs as ccrs
-import satdata
 import luigi
-import xarray as xr
 import numpy as np
+import satdata
+import xarray as xr
+from matplotlib.lines import Line2D
 
-from ...dataset import TripletDataset, TrajectoryDataset
-from . import processing, pipeline
+from ...dataset import TrajectoryDataset, TripletDataset
+from . import pipeline, processing
 from .bbox import LatLonBox
 from .tiler import RectTile
 
@@ -265,4 +265,4 @@ class FixedTimeRangeSatelliteTripletDataset(SatelliteTripletDataset):
         # [x0, x1, y0, y1]
         ax.set_extent(domain_bbox.get_extent(pad=0.8), crs=ccrs.PlateCarree())
 
-        ax.legend(lines, [l.get_label() for l in lines])
+        ax.legend(lines, [line.get_label() for line in lines])

@@ -1,7 +1,8 @@
-import pytorch_lightning as pl
-import torch
 import inspect
+
+import pytorch_lightning as pl
 import semver
+import torch
 
 
 class AddOneCycleSchedulerCallback(pl.Callback):

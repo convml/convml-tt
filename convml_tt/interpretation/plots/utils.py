@@ -1,11 +1,7 @@
+import matplotlib.pyplot as plt
 import numpy as np
-
-from scipy.spatial import ConvexHull
 from scipy.interpolate import CubicSpline
-
-
-def _import_matplotlib():
-    import matplotlib.pyplot as plt
+from scipy.spatial import ConvexHull
 
 
 def calc_point_offsets(points, scale=0.2, show_plot=False):
@@ -40,7 +36,6 @@ def calc_point_offsets(points, scale=0.2, show_plot=False):
     y_s = cs_y(nt)
 
     if show_plot:
-        _import_matplotlib()
         plt.plot(x_s, y_s, marker=".")
 
     points_s = np.array([x_s, y_s]).T

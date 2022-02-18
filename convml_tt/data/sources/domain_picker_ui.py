@@ -10,23 +10,22 @@ In a jupyter notebook cells simply run the command:
 try:
     from ipyleaflet import (
         Map,
-        basemaps,
-        basemap_to_tiles,
         Marker,
         Polygon,
         WidgetControl,
+        basemap_to_tiles,
+        basemaps,
     )
 except ImportError:
     raise Exception(
         "To use the domain picker UI you will need to install" " `ipyleaflet`"
     )
 
-from ipywidgets import IntSlider, ColorPicker, Button, link, Text
-
 import datetime
-
 from functools import partial
+
 import yaml
+from ipywidgets import Button, Text
 
 
 class DomainPicker:
