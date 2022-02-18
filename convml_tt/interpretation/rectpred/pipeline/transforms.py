@@ -8,8 +8,10 @@ from pathlib import Path
 
 import joblib
 import luigi
+import xarray as xr
 
 from ...pipeline import XArrayTarget
+from ..transform import apply_transform
 from .data import AggregateFullDatasetImagePredictionMapData
 
 

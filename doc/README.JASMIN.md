@@ -6,10 +6,10 @@ Below is an example submission script for training on the
 environment called `convml_tt`.
 
 ```bash
-#!/bin/bash 
+#!/bin/bash
 #SBATCH --partition=lotus_gpu
 #SBATCH --account=lotus_gpu
-#SBATCH -o convml_tt.%a.%j.out 
+#SBATCH -o convml_tt.%a.%j.out
 #SBATCH -e convml_tt.%a.%j.err
 #SBATCH --time=01:00:00
 #SBATCH --gres=gpu:1

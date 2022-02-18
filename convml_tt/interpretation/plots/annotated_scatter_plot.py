@@ -1,5 +1,4 @@
 from collections import OrderedDict
-import enum
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -35,7 +34,7 @@ def find_nearest_tile(x_sample, y_sample, x, y, dim="tile_id", scaling=1.0):
     return dl.isel(**{dim: dl.argmin(dim=dim)})[dim]
 
 
-def annotated_scatter_plot(
+def annotated_scatter_plot(  # noqa
     x,
     y,
     points,

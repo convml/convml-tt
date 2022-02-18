@@ -148,7 +148,7 @@ Specifically this includes:
 - `pytorch.Dataset` (`convml_tt.data.TripletDataset`) for handling loading of individual triplet datasets (and one for single-tile datasets). This has the option to load all data into a single numpy memory-mapped array to reduce number of disc reads
 
 - `pytorch_lightning.LightningDataModule` (`convml_tt.data.TripletDataModule`) for handling transform, batching and splitting data for train/test
-  
+
   - includes transforms previously provided by fastai now using the
     [kornia](https://kornia.github.io/) library
   - correct normalisation when using pretrained network is used

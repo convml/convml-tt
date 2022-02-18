@@ -1,21 +1,20 @@
 """
 Utility functions for the triplet-trainer
 """
-from pathlib import Path
 import multiprocessing
+from pathlib import Path
 
 import numpy as np
+import pytorch_lightning as pl
+import torch
 import xarray as xr
 from torch.utils.data import DataLoader
-import torch
-from tqdm import tqdm
-import pytorch_lightning as pl
 
 from .data.dataset import (
     ImageSingletDataset,
     ImageTripletDataset,
     MovingWindowImageTilingDataset,
-    TileType
+    TileType,
 )
 
 
@@ -132,7 +131,6 @@ def get_embeddings(
         da_emb.attrs["tile_ny"] = tile_dataset.nyt
 
     return da_emb
-
 
 
 def make_sliding_tile_model_predictions(

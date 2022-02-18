@@ -1,8 +1,13 @@
-import skimage.color
-import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
 import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
 import numpy as np
+import skimage.color
 import xarray as xr
+
+from ...data.dataset import TripletDataset
+from ...data.sources.satellite import tiler
+from .pipeline.plot import MakeRectRGBImage
 
 
 def make_rgb(da, alpha=0.5, **coord_components):
@@ -51,7 +56,7 @@ def make_rgb(da, alpha=0.5, **coord_components):
     return da_rgba
 
 
-def _get_img_with_extent_cropped(da_emb, img_fn):
+def get_img_with_extent_cropped(da_emb, img_fn):
     """
     Load the image in `img_fn`, clip the image and return the
     image extent (xy-extent if the source data coordinates are available)
@@ -95,7 +100,7 @@ def _get_img_with_extent_cropped(da_emb, img_fn):
     return img, np.array(extent)
 
 
-def _get_img_with_extent(da_emb, img_fn, dataset_path):
+def get_img_with_extent(da_emb, img_fn, dataset_path):
     """
     Load the image in `img_fn` and return the
     image extent (xy-extent if the source data coordinates are available)
@@ -107,7 +112,7 @@ def _get_img_with_extent(da_emb, img_fn, dataset_path):
     return img, domain_rect.get_grid_extent()
 
 
-def plot_scene_image(da, dataset_path, crop_image=True, ax=None):
+def plot_scene_image(da, dataset_path, crop_image=True, ax=None, return_image=False):
     """
     Render the RGB image of the scene with `scene_id` in `da` into `ax` (a new
     figure will be created if `ax=None`)
@@ -131,9 +136,9 @@ def plot_scene_image(da, dataset_path, crop_image=True, ax=None):
             )
 
             if crop_image:
-                return _get_img_with_extent_cropped(da, img_path)
+                return get_img_with_extent_cropped(da, img_path)
             else:
-                return _get_img_with_extent(
+                return get_img_with_extent(
                     da, img_fn=img_path, dataset_path=dataset_path
                 )
         else:
@@ -153,6 +158,8 @@ def plot_scene_image(da, dataset_path, crop_image=True, ax=None):
         ax.set_ylabel(xr.plot.utils.label_from_attrs(da.y))
     ax.imshow(img, extent=img_extent, rasterized=True)
 
+    if return_image:
+        return ax, img_extent, img
     return ax, img_extent
 
 
@@ -183,7 +190,7 @@ def make_rgb_annotation_map_image(
         s = 1.0
 
     if len(da.shape) == 3:
-        da_rgba = _make_rgb(da=da, dims=rgb_components, alpha=0.5)
+        da_rgba = make_rgb(da=da, dims=rgb_components, alpha=0.5)
     elif len(da.shape) == 2:
         # when we have distinct classes (identified by integers) we just
         # want to map each label to a RGB color
@@ -211,8 +218,12 @@ def make_rgb_annotation_map_image(
     )
 
     ax = axes[0]
-    _, img_extent = plot_scene_image(
-        da=da, dataset_path=dataset_path, ax=ax, crop_image=crop_image
+    _, img_extent, img = plot_scene_image(
+        da=da,
+        dataset_path=dataset_path,
+        ax=ax,
+        crop_image=crop_image,
+        return_image=True,
     )
 
     ax = axes[1]

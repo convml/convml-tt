@@ -1,18 +1,17 @@
-import luigi
 from pathlib import Path
 
-from ...data.sources.satellite.rectpred import MakeAllRectRGBDataArrays
-from ..eurec4a.flow import FullDatasetOpticalFlowTrajectories
-from ...pipeline import XArrayTarget
-from ...data.sources.satellite.pipeline import parse_scene_id
-from ..eurec4a.data import N_TILE, FakeImagesList
-
+import luigi
+import numpy as np
+import xarray as xr
 from fastai.basic_train import load_learner
 from fastai.vision import open_image
 from tqdm import tqdm
-import xarray as xr
 
-import numpy as np
+from ...data.sources.satellite.pipeline import parse_scene_id
+from ...data.sources.satellite.rectpred import MakeAllRectRGBDataArrays
+from ...pipeline import XArrayTarget
+from ..eurec4a.data import N_TILE, FakeImagesList
+from ..eurec4a.flow import FullDatasetOpticalFlowTrajectories
 
 
 class RectTilerPoints:
@@ -63,7 +62,7 @@ class TrajectoryEmbeddingSampling(luigi.Task):
         return dict(images=MakeAllRectRGBDataArrays(dataset_path=self.dataset_path))
 
     def _find_nearest_scene_id(self, time, scene_ids):
-        times = [parse_scene_id(scene_id) for scene_id in scene_ids]
+        # times = [parse_scene_id(scene_id) for scene_id in scene_ids]
         raise NotImplementedError
 
     def run(self):

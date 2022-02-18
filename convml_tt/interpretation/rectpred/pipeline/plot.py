@@ -4,15 +4,18 @@ luigi Tasks for running plotting pipeline on rectangular domain datasets
 from pathlib import Path
 
 import luigi
-import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
 
 from ....data.dataset import SceneBulkProcessingBaseTask, TripletDataset
-from ....data.sources.satellite import tiler
 from ....data.sources.satellite.rectpred import MakeRectRGBImage
 from ....pipeline import XArrayTarget
+from ..plot import (
+    get_img_with_extent,
+    get_img_with_extent_cropped,
+    make_rgb_annotation_map_image,
+)
 from .data import DatasetImagePredictionMapData
 from .transform import DatasetEmbeddingTransform
 
@@ -153,9 +156,9 @@ class DatasetComponentsAnnotationMapImage(ComponentsAnnotationMapImage):
         )
 
         if self.crop_img:
-            return _get_img_with_extent_cropped(da_emb, img_path)
+            return get_img_with_extent_cropped(da_emb, img_path)
         else:
-            return _get_img_with_extent(
+            return get_img_with_extent(
                 da_emb=da_emb, img_fn=img_path, dataset_path=self.dataset_path
             )
 

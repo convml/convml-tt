@@ -2,13 +2,14 @@
 Example on how to train convml_tt with logging on weights & biases
 (https://wandb.ai)
 """
+import os
+from pathlib import Path
+
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger
-from pathlib import Path
-import os
 
-from .system import TripletTrainerModel, TripletTrainerDataModule, HeadFineTuner
 from . import __version__, trainer_logging
+from .system import HeadFineTuner, TripletTrainerDataModule, TripletTrainerModel
 from .trainer_onecycle import OneCycleTrainer
 
 

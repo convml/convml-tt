@@ -4,14 +4,13 @@ pytorch
 """
 import enum
 from pathlib import Path
-import numpy as np
-from tqdm import tqdm
 
+import numpy as np
 import parse
 from PIL import Image
 from torch.utils.data.dataset import Dataset
 from torchvision import transforms as tv_transforms
-
+from tqdm import tqdm
 
 TILE_FILENAME_FORMAT = "{triplet_id:05d}_{tile_type}.png"
 

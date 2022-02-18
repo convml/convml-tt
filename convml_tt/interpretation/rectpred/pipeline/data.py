@@ -8,18 +8,19 @@ from pathlib import Path
 
 import luigi
 import xarray as xr
-
 from fastai.basic_train import load_learner
 from fastai.vision import open_image
 
+from ...architectures.triplet_trainer import monkey_patch_fastai
+from ...data.dataset import SceneBulkProcessingBaseTask
 from ...data.sources.satellite.rectpred import MakeRectRGBImage
 from ...pipeline import XArrayTarget
-from ...data.dataset import SceneBulkProcessingBaseTask
-from ...architectures.triplet_trainer import monkey_patch_fastai
 
 monkey_patch_fastai()  # noqa
 
 IMAGE_TILE_FILENAME_FORMAT = "{i0:05d}_{j0:05d}.png"
+
+N_tile = 256
 
 
 class ImagePredictionMapData(luigi.Task):
@@ -41,7 +42,10 @@ class ImagePredictionMapData(luigi.Task):
         model = load_learner(model_path, model_fn)
         img = open_image(self.image_path)
 
-        tiler = RectTiler(img=img, N_tile=n_TILE, step=(self.step_size, self.step_size))
+        # TODO: fix this
+        RectTiler = None
+
+        tiler = RectTiler(img=img, N_tile=N_tile, step=(self.step_size, self.step_size))
         da_pred = tiler.make_tile_predictions(model=model)
 
         if self.src_data_path:
@@ -91,6 +95,8 @@ class ImagePredictionMapImageTiles(luigi.Task):
 
         N_tile = (256, 256)
 
+        # TODO: fix this
+        RectTiler = None
         tiler = RectTiler(img=img, N_tile=N_tile, step=(self.step_size, self.step_size))
 
         for (i, j), tile_img in tiler.get_tile_images():

@@ -1,15 +1,11 @@
-import base64
 import pickle
-import numpy as np
+from pathlib import Path
 
 import xarray as xr
-
 from faerun import Faerun, host
-import tmap as tm
+from tqdm import tqdm
 
 from .data import IMAGE_TILE_FILENAME_FORMAT, DatasetImagePredictionMapImageTiles
-from pathlib import Path
-from tqdm import tqdm
 
 
 def _get_tile_image_path(dataset_path, scene_id, i0, j0):
@@ -33,7 +29,7 @@ def main(da, dataset_path):
     # enc = tm.Minhash()
     # lf = tm.LSHForest(weighted=True)
 
-    labels = []
+    # labels = []
     image_labels = []
 
     # data = []
@@ -44,9 +40,9 @@ def main(da, dataset_path):
 
     # scene_ids = list(da.unstack().scene_id.values)
 
-    x_ = []
-    y_ = []
-    z_ = []
+    # x_ = []
+    # y_ = []
+    # z_ = []
 
     for tile_id in tqdm(da.tile_id.values):
         try:
@@ -54,7 +50,7 @@ def main(da, dataset_path):
             i0, j0 = da_.i0.item(), da_.j0.item()
             try:
                 scene_id = da_.scene_id.item()
-            except:
+            except Exception:
                 scene_id = tile_id[-1]
             # x_.append(tile_id[0])
             # y_.append(tile_id[1])

@@ -1,5 +1,5 @@
-from .interpretation.rectpred.sample import make_plot as rectpred_sample_plot
 from .interpretation.plots import dendrogram
+from .interpretation.rectpred.sample import make_plot as rectpred_sample_plot
 from .utils import get_embeddings
 
 

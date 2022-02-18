@@ -1,12 +1,14 @@
 # coding: utf-8
-from . import tiler, FixedTimeRangeSatelliteTripletDataset
-from . import satpy_rgb, pipeline as sat_pipeline
-from ....pipeline import XArrayTarget
-from ....data.dataset import SceneBulkProcessingBaseTask
-
-from pathlib import Path
 import warnings
+from pathlib import Path
+
 import luigi
+
+from ....data.dataset import SceneBulkProcessingBaseTask
+from ....pipeline import XArrayTarget
+from . import FixedTimeRangeSatelliteTripletDataset
+from . import pipeline as sat_pipeline
+from . import satpy_rgb
 
 
 class MakeRectRGBDataArray(luigi.Task):

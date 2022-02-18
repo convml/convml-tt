@@ -1,16 +1,16 @@
 from pathlib import Path
 
-from PIL import Image
-import xarray as xr
 import numpy as np
+import xarray as xr
+from PIL import Image
 
-from convml_tt.utils import get_embeddings
-from convml_tt.system import TripletTrainerModel
 from convml_tt.data.dataset import MovingWindowImageTilingDataset
 from convml_tt.data.transforms import get_transforms as get_model_transforms
+from convml_tt.interpretation.plots import annotated_scatter_plot
 from convml_tt.interpretation.rectpred.plot import make_rgb
 from convml_tt.interpretation.rectpred.transform import apply_transform
-from convml_tt.interpretation.plots import annotated_scatter_plot
+from convml_tt.system import TripletTrainerModel
+from convml_tt.utils import get_embeddings
 
 DOC_PATH = Path(__file__).parent.parent / "doc"
 RECTPRED_IMG_EXAMPLE_PATH = DOC_PATH / "goes16_202002051400.png"
@@ -35,9 +35,7 @@ def test_rectpred_sliding_window_inference():
     tile_dataset = MovingWindowImageTilingDataset(
         img=img, transform=transforms, step=step, N_tile=N_tile
     )
-    da_emb_rect = get_embeddings(
-        tile_dataset=tile_dataset, model=model
-    )
+    da_emb_rect = get_embeddings(tile_dataset=tile_dataset, model=model)
 
     nx_img, ny_img = img.size
 

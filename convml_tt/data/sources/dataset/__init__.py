@@ -1,12 +1,12 @@
-from pathlib import Path
 import importlib
 import pprint
-
-import yaml
-import luigi
-import xarray as xr
-import numpy as np
 from datetime import datetime
+from pathlib import Path
+
+import luigi
+import numpy as np
+import xarray as xr
+import yaml
 
 
 class GenericDataset:
@@ -42,7 +42,7 @@ class GenericDataset:
 
     @staticmethod
     def _get_loading_assets(path):
-        return data
+        return path
 
     @classmethod
     def load(cls, path):
@@ -183,7 +183,7 @@ class GroupedSceneBulkProcessingBaseTask(SceneBulkProcessingBaseTask):
             # TODO: generalise this to have a parser for the scene_id
             prefix = scene_id[:-4]
 
-            if not prefix in scenes_by_prefix:
+            if prefix not in scenes_by_prefix:
                 scenes_by_prefix[prefix] = []
             scenes_by_prefix[prefix].append(scene_id)
 

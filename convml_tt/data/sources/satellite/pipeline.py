@@ -1,15 +1,15 @@
+import datetime
 from pathlib import Path
 
-import satdata
-import luigi
 import dateutil.parser
-import xarray as xr
+import luigi
 import numpy as np
-import datetime
+import satdata
+import xarray as xr
 
-from . import processing, satpy_rgb, tiler, bbox
 from ....pipeline import YAMLTarget
 from ...dataset import GenericDataset
+from . import processing, satpy_rgb, tiler
 
 SOURCE_DIR = Path("source_data")
 
