@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 import xarray as xr
+from matplotlib.offsetbox import AnnotationBbox, OffsetImage
 
 from ...data.dataset import ImageSingletDataset
 from .mpl_autopos_annotation import calc_offset_points
@@ -221,27 +222,37 @@ def annotated_scatter_plot(  # noqa
         if zorder is not None:
             ax_zorder = zorder.sel(tile_id=tile_id)
             ax_kwargs["zorder"] = ax_zorder
-        ax1 = fig.add_axes([xp - 0.5 * size, yh - size * 0.5, size, size], **ax_kwargs)
-        ax1.set_aspect(1)
-        ax1.axison = False
+
+        img_idx = int(tile_id.values)
+        img = tile_dataset.get_image(index=img_idx)
+        oim = OffsetImage(img, zoom=size)
+        oim.image.axes = ax
+
+        ab = AnnotationBbox(
+            oim,
+            [x_, y_],
+            xybox=(0.0, 0.0),
+            xycoords="data",
+            boxcoords="offset points",
+            pad=0.0,
+            bboxprops=dict(color="none"),
+        )
+        ax.add_artist(ab)
 
         if hue is not None:
             label_text = hue.sel(tile_id=tile_id).item()
             if isinstance(label_text, xr.DataArray):
                 label_text = label_text.values
-            ax1.text(
+            ab.text(
                 0.1,
                 0.15,
                 label_text,
-                transform=ax1.transAxes,
+                transform=ab.transAxes,
                 bbox={"facecolor": "white", "alpha": 0.6, "pad": 2},
             )
 
-        img_idx = int(tile_id.values)
-        img = tile_dataset.get_image(index=img_idx)
-
         # img = Image.open(tiles_path/"{:05d}_anchor.png".format())
-        ax1.imshow(img)
+        # ax1.imshow(img)
 
     # ensure that adding the points doesn't change the axis limits since we
     # calculated the offset for the annotations
