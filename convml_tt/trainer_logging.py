@@ -1,16 +1,5 @@
 from .interpretation.plots import dendrogram
-from .interpretation.rectpred.sample import make_plot as rectpred_sample_plot
 from .utils import get_embeddings
-
-
-def make_rectpred_logger(image_path):
-    import wandb
-
-    def _logger(model, stage):
-        fig = rectpred_sample_plot(model=model, image_path=image_path)
-        wandb.log({f"{stage}_rectpred": fig})
-
-    return _logger
 
 
 def make_dendrogram_logger(datamodule):

@@ -27,12 +27,6 @@ def main(args=None):
         help="Log training to Weights & Biases",
     )
     parser.add_argument(
-        "--sample-rectpred-plot-image-path",
-        default=None,
-        type=Path,
-        help="Use this image to produce a rectpred example at the beginning and end of training",
-    )
-    parser.add_argument(
         "--log-dendrogram",
         default=False,
         action="store_true",
@@ -111,22 +105,15 @@ def main(args=None):
             {"convml_tt__version": __version__}
         )
 
-    rectpred_logger = None
-    if args.sample_rectpred_plot_image_path:
-        rectpred_logger = trainer_logging.make_rectpred_logger(
-            args.sample_rectpred_plot_image_path
-        )
-        rectpred_logger(model=model, stage="start")
-
     dendrogram_logger = None
     if args.log_dendrogram:
-        rectpred_logger = trainer_logging.make_dendrogram_logger(datamodule=datamodule)
-        rectpred_logger(model=model, stage="start")
+        dendrogram_logger = trainer_logging.make_dendrogram_logger(
+            datamodule=datamodule
+        )
+        dendrogram_logger(model=model, stage="start")
 
     trainer.fit(model=model, datamodule=datamodule)
 
-    if rectpred_logger:
-        rectpred_logger(model=model, stage="end")
     if dendrogram_logger:
         dendrogram_logger(model=model, stage="end")
 
