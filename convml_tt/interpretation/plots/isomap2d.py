@@ -40,25 +40,25 @@ def sample_best_triplets(
     # work out what the dimension of the embedding vector is called
     dim = list((set(ds[var].dims).difference(ds.an_dist.dims)))[0]
 
-    x = ds[var].sel({dim: x_dim})
-    y = ds[var].sel({dim: y_dim})
+    da_x = ds[var].sel({dim: x_dim})
+    da_y = ds[var].sel({dim: y_dim})
 
-    kde = scipy.stats.gaussian_kde([x, y])
+    kde = scipy.stats.gaussian_kde([da_x, da_y])
     tile_ids_new = []
 
-    x_ = x.sel(tile_id=tile_ids_close)
-    y_ = y.sel(tile_id=tile_ids_close)
+    da_x_tile = da_x.sel(tile_id=tile_ids_close)
+    da_y_tile = da_y.sel(tile_id=tile_ids_close)
 
     for x_pca in np.arange(*x_range, dl):
         for y_pca in np.arange(*y_range, dl):
-            lx = x_ - x_pca
-            ly = y_ - y_pca
+            da_lx = da_x_tile - x_pca
+            da_ly = da_y_tile - y_pca
 
-            l = np.sqrt(lx ** 2.0 + ly ** 2.0)
-            tid = l.isel(tile_id=l.argmin(dim="tile_id")).tile_id.item()
-            if l.sel(tile_id=tid) < dl:
+            da_l = np.sqrt(da_lx ** 2.0 + da_ly ** 2.0)
+            tid = da_l.isel(tile_id=da_l.argmin(dim="tile_id")).tile_id.item()
+            if da_l.sel(tile_id=tid) < dl:
 
-                x_p, y_p = x_.sel(tile_id=tid), y_.sel(tile_id=tid)
+                x_p, y_p = da_x_tile.sel(tile_id=tid), da_y_tile.sel(tile_id=tid)
 
                 if kde([x_p, y_p]) < 1.0e-7:
                     continue
@@ -128,7 +128,9 @@ def make_isomap_reference_plot(fn_triplet_embeddings, tile_size=0.02, dl=0.1, ax
     return fig, ax, model_isomap
 
 
-def plot_embs_on_isomap_manifold(fn_triplet_embeddings, da_embs, dl=0.1, tile_size=0.02):
+def plot_embs_on_isomap_manifold(
+    fn_triplet_embeddings, da_embs, dl=0.1, tile_size=0.02
+):
     if len(da_embs.dims) > 2:
         raise Exception(
             "The embeddings provided should only have a single dimension besides"
