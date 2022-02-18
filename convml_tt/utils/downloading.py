@@ -1,35 +1,34 @@
 import bz2
+import gzip
+import hashlib
+import itertools
+import lzma
 import os
 import os.path
-import hashlib
-import gzip
+import pathlib
 import re
 import tarfile
+import urllib
+import urllib.error
+import urllib.request
+import zipfile
 from typing import (
+    IO,
     Any,
     Callable,
-    List,
-    Iterable,
-    Optional,
-    TypeVar,
     Dict,
-    IO,
-    Tuple,
+    Iterable,
     Iterator,
+    List,
+    Optional,
+    Tuple,
+    TypeVar,
 )
 from urllib.parse import urlparse
-import zipfile
-import lzma
-import urllib
-import urllib.request
-import urllib.error
-import pathlib
-import itertools
 
+import requests
 import torch
-
 from tqdm.auto import tqdm
-
 
 USER_AGENT = "pytorch/vision"
 
@@ -221,7 +220,6 @@ def download_file_from_google_drive(
         md5 (str, optional): MD5 checksum of the download. If None, do not check
     """
     # Based on https://stackoverflow.com/questions/38511444/python-download-files-from-google-drive-using-url
-    import requests
 
     url = "https://docs.google.com/uc?export=download"
 
