@@ -1,6 +1,5 @@
 from pathlib import Path
 
-import cartopy.crs as ccrs
 import numpy as np
 from PIL import Image
 

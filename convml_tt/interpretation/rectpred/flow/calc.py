@@ -179,7 +179,7 @@ def extract_trajectories(
     traj_points = traj_points.round().astype(int)
 
     # y-indexing is from top-left for images
-    traj_points[..., 1] = ny_img - 1 - traj_points[...,1]
+    traj_points[..., 1] = ny_img - 1 - traj_points[..., 1]
 
     # now we need to clean up the points. Some will be outside the valid range
     # [0, Nx] and [0, Ny]

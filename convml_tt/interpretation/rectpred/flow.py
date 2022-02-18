@@ -8,23 +8,21 @@ interface
 """
 
 
-from pathlib import Path
 from collections import OrderedDict
+from pathlib import Path
 
-import xarray as xr
-import numpy as np
-from numpy.ma.core import MaskedArray
-import matplotlib.pyplot as plt
 import cv2
+import luigi
+import numpy as np
+import xarray as xr
+from numpy.ma.core import MaskedArray
 from PIL import Image
 from skimage.color import rgb2gray, rgba2rgb
-import luigi
 
 from ...data.dataset import GroupedSceneBulkProcessingBaseTask
-from ...pipeline import XArrayTarget
-from ...data.sources.satellite.rectpred import MakeRectRGBImage, MakeRectRGBDataArray
 from ...data.sources.satellite.pipeline import parse_scene_id
-
+from ...data.sources.satellite.rectpred import MakeRectRGBDataArray, MakeRectRGBImage
+from ...pipeline import XArrayTarget
 
 MIN_CORNERS = 100
 
