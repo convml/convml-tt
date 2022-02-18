@@ -1,8 +1,7 @@
-import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
+import matplotlib.pyplot as plt
 
 from . import TripletDataset
-
 
 if __name__ == "__main__":
     import argparse

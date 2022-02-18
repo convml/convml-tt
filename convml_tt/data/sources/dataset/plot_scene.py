@@ -1,9 +1,6 @@
-from pathlib import Path
-
 import matplotlib.pyplot as plt
 
 from . import TripletDataset
-
 
 if __name__ == "__main__":
     import argparse

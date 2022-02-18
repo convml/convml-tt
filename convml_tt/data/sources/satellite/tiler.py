@@ -1,26 +1,23 @@
 """
 Utilities to create (approximate) square tiles from lat/lon satelite data
 """
-import cartopy.crs as ccrs
-import xesmf
-import xarray as xr
-import numpy as np
-from scipy.constants import pi
-import shapely.geometry as geom
-from pathlib import Path
-import matplotlib.pyplot as plt
-
 import itertools
+import math
+import os
+import tempfile
 import warnings
+from pathlib import Path
+
+import cartopy.crs as ccrs
+import matplotlib.pyplot as plt
+import numpy as np
+import shapely.geometry as geom
+import xarray as xr
+import xesmf
+from scipy.constants import pi
+from xesmf.backend import esmf_regrid_build, esmf_regrid_finalize
 
 from .utils import create_true_color_img
-
-import os
-
-from xesmf.backend import esmf_grid, add_corner, esmf_regrid_build, esmf_regrid_finalize
-
-import tempfile
-import math
 
 try:
     from . import satpy_rgb
@@ -92,8 +89,8 @@ class RectTile:
         lat/lon distance as if the tile was centered on the equator and then
         uses a rotated pole projection to move the title
         """
-        ldeg_lon = self._get_approximate_equator_deg_dist(l=self.l_zonal)
-        ldeg_lat = self._get_approximate_equator_deg_dist(l=self.l_meridional)
+        ldeg_lon = self._get_approximate_equator_deg_dist(ln=self.l_zonal)
+        ldeg_lat = self._get_approximate_equator_deg_dist(ln=self.l_meridional)
 
         corners_dir = list(itertools.product([1, -1], [1, -1]))
         corners_dir.insert(0, corners_dir.pop(2))
@@ -112,10 +109,10 @@ class RectTile:
         return ccrs.PlateCarree().transform_points(p, lon, lat)[..., :2]
 
     @staticmethod
-    def _get_approximate_equator_deg_dist(l):
+    def _get_approximate_equator_deg_dist(ln):
         # approximate lat/lon distance
         r = 6371e3  # [m]
-        return np.arcsin(l / r) * 180.0 / 3.14
+        return np.arcsin(ln / r) * 180.0 / 3.14
 
     def get_outline_shape(self):
         """return a shapely shape valid for plotting"""
@@ -129,8 +126,8 @@ class RectTile:
         """
         N_zonal = math.ceil(self.l_zonal / dx)
         N_meridional = math.ceil(self.l_meridional / dx)
-        ldeg_lon = self._get_approximate_equator_deg_dist(l=self.l_zonal)
-        ldeg_lat = self._get_approximate_equator_deg_dist(l=self.l_meridional)
+        ldeg_lon = self._get_approximate_equator_deg_dist(ln=self.l_zonal)
+        ldeg_lat = self._get_approximate_equator_deg_dist(ln=self.l_meridional)
 
         lon_eq_ = np.linspace(-ldeg_lon / 2.0, ldeg_lon / 2.0, N_zonal)
         lat_eq_ = np.linspace(-ldeg_lat / 2.0, ldeg_lat / 2.0, N_meridional)
@@ -307,7 +304,7 @@ class RectTile:
         if ax is None:
             crs = ccrs.PlateCarree()
             fig, ax = plt.subplots(subplot_kw=dict(projection=crs), figsize=(10, 6))
-            gl = ax.gridlines(linestyle="--", draw_labels=True)
+            ax.gridlines(linestyle="--", draw_labels=True)
             ax.coastlines(resolution="10m", color="grey")
 
         ax.add_geometries(
@@ -356,7 +353,7 @@ def triplet_generator(
             assert lon_min + h_ts <= lon <= lon_max - h_ts
             assert lat_min + h_ts <= lat <= lat_max - h_ts
             return True
-        except:
+        except Exception:
             return False
 
     def _generate_latlon():

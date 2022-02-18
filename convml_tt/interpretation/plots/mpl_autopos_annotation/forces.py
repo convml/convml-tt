@@ -81,7 +81,6 @@ def calc_offset_points(pts, scale=0.2, callback=None, debug=False):
         x_new = np.copy(x)
         v_new = np.copy(v)
 
-        ekint = [0.0, 0.0]
         for i in range(m):
             Fx = 0.0
             Fy = 0.0
@@ -119,9 +118,6 @@ def calc_offset_points(pts, scale=0.2, callback=None, debug=False):
 
     v = np.zeros_like(x)
     m = len(x)
-
-    e_increasing = True
-    e_old = 0.0
 
     e_hist = []
     n = 0
@@ -236,7 +232,7 @@ if __name__ == "__main__":
     pts = np.loadtxt(p.parent / "points.npz")
     try:
         pass
-    except:
+    except Exception:
         pts = np.array(
             [
                 [0.747264, 90.93342],
