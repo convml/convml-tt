@@ -12,15 +12,16 @@ import sklearn.cluster
 import xarray as xr
 
 
-def _apply_transform_function(da, fn, transform_name):
+def _apply_transform_function(da, fn, transform_name, emb_coord="emb_dim"):
     # stack all other dims apart from the `emb_dim`
     dims = list(da.dims)
-    if "emb_dim" in dims:
-        dims.remove("emb_dim")
-    elif "pca_dim" in dims:
-        dims.remove("pca_dim")
+    if emb_coord in dims:
+        dims.remove(emb_coord)
     else:
-        raise NotImplementedError(da.dims)
+        raise Exception(
+            f"Couldn't find embedding coordinate `{emb_coord}` in provided data-array"
+        )
+
     da_stacked = da.stack(dict(n=dims))
     arr = fn(X=da_stacked.T)
     if len(arr.shape) == 2:
@@ -32,13 +33,18 @@ def _apply_transform_function(da, fn, transform_name):
 
 # flake8: noqa: C901
 def apply_transform(
-    da, transform_type, pretrained_model=None, return_model=False, **kwargs
+    da,
+    transform_type,
+    pretrained_model=None,
+    return_model=False,
+    emb_coord="emb_dim",
+    **kwargs,
 ):
     """
     Apply transform to xr.DataArray `da` representing embedding-vectors (or
-    other 1D vector data) on a 2D rectangular domain (with indecies given by
-    `i0` `j0`). The type of transform to applied should be provided by
-    `transform_type` and be one of `pca`, `kmeans`, `hdbscan`.
+    other 1D vector data) with the embedding coordinate given by `emb_coord`. The
+    type of transform to applied should be provided by `transform_type` and be
+    one of `pca`, `kmeans`, `hdbscan`.
 
     For `transform_type=="pca"` you can provide a pretrained transform model
     with `pretrained_model`
@@ -114,7 +120,10 @@ def apply_transform(
         raise NotImplementedError(transform_type)
 
     da_transformed = _apply_transform_function(
-        da=da, fn=fn_transform, transform_name=transform_type
+        da=da,
+        fn=fn_transform,
+        transform_name=transform_type,
+        emb_coord=emb_coord,
     )
 
     da_transformed.attrs.update(da.attrs)
@@ -124,16 +133,14 @@ def apply_transform(
 
     da_transformed.attrs.update(da.attrs)
     da_transformed.name = "emb"
-    for v in ["i0", "j0"]:
-        if v in da:
-            da_transformed[v] = da[v]
     da_transformed.attrs["transform_type"] = transform_type
+
     if kwargs:
         s = ",".join([f"{k}={v}" for (k, v) in kwargs])
         da_transformed.attrs["transform_extra_args"] = s
 
-    # explicitly copy over coords and attrs that we want to retain
-    for c in ["image_path", "src_data_path", "tile_id"]:
+    # explicitly copy over coords and attrs that we might want to retain
+    for c in ["image_path", "src_data_path", "tile_id", "i0", "j0"]:
         if c in da.coords or c in da.attrs:
             da_transformed[c] = da[c]
 

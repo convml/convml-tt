@@ -11,7 +11,7 @@ import luigi
 import xarray as xr
 
 from ....pipeline import XArrayTarget
-from ..transform import apply_transform
+from ...embedding_transforms import apply_transform
 from .data import AggregateFullDatasetImagePredictionMapData
 
 
