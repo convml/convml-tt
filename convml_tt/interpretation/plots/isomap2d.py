@@ -7,7 +7,7 @@ import scipy.stats
 import xarray as xr
 from sklearn.manifold import Isomap
 
-from ..rectpred import transform as rp_transform
+from .. import embedding_transforms
 from . import annotated_scatter_plot
 
 
@@ -69,11 +69,15 @@ def sample_best_triplets(
     return tile_ids_new
 
 
-def make_isomap_reference_plot(fn_triplet_embeddings, tile_size=0.02, dl=0.1, ax=None):
-    da_embs = xr.open_dataarray(fn_triplet_embeddings)
-
+def make_isomap_reference_plot(da_embs, tile_size=0.02, dl=0.1, ax=None):
     if "triplet_part" in da_embs.dims:
         da_embs = da_embs.rename(triplet_part="tile_type")
+
+    if not "tile_type" in da_embs.coords:
+        raise Exception(
+            "To create an isomap embedding plot you need to provide a triplet embeddings. "
+            "Expected to find a `tile_type` coordinate, but it it wasn't found"
+        )
 
     da_embs_neardiff = da_embs.sel(tile_type="anchor") - da_embs.sel(
         tile_type="neighbor"
@@ -118,7 +122,7 @@ def make_isomap_reference_plot(fn_triplet_embeddings, tile_size=0.02, dl=0.1, ax
 
     x.attrs["tile_type"] = "ANCHOR"
     y.attrs["tile_type"] = "ANCHOR"
-    x.attrs["stage"] = "study"
+    x.attrs["stage"] = da_embs.stage
     x.attrs["data_dir"] = da_embs.data_dir
 
     _ = annotated_scatter_plot(
@@ -129,7 +133,7 @@ def make_isomap_reference_plot(fn_triplet_embeddings, tile_size=0.02, dl=0.1, ax
 
 
 def plot_embs_on_isomap_manifold(
-    fn_triplet_embeddings, da_embs, dl=0.1, tile_size=0.02
+    da_embs_triplets, da_embs, dl=0.1, tile_size=0.1
 ):
     if len(da_embs.dims) > 2:
         raise Exception(
@@ -139,10 +143,10 @@ def plot_embs_on_isomap_manifold(
         )
 
     fig, ax, model_isomap = make_isomap_reference_plot(
-        fn_triplet_embeddings=fn_triplet_embeddings, dl=dl, tile_size=tile_size
+        da_embs_triplets=da_embs_triplets, dl=dl, tile_size=tile_size
     )
 
-    da_embs_isomap = rp_transform.apply_transform(
+    da_embs_isomap = embedding_transforms.apply_transform(
         da=da_embs,
         transform_type="isomap",
         pretrained_model=model_isomap,
@@ -174,9 +178,10 @@ if __name__ == "__main__":
     filepath_embs = args.embs_path
 
     da_embs = xr.open_dataarray(filepath_embs)
+    da_embs_triplets = xr.open_dataarray(args.triplet_embs_path)
 
     fig, ax = plot_embs_on_isomap_manifold(
-        fn_triplet_embeddings=args.triplet_embs_path, da_embs=da_embs
+        da_embs_triplets=da_embs_triplets, da_embs=da_embs
     )
 
     fig.savefig("embs_isomap_overlay.png")
