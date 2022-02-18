@@ -2,6 +2,17 @@
 
 ## [v0.11.0](https://github.com/convml/convml_tt/tree/HEAD)
 
+[Full Changelog](https://github.com/convml/convml_tt/compare/v0.11.0...HEAD)
+
+*maintenance*
+
+- Fix CI testing by switching to microconda and unpinning pytorch version
+  (since kornia now supports pytorch==1.8.0) and switch to pre-commit for
+  linting while fixing linting issues picked up during this switch.
+  [\#60](https://github.com/convml/convml_tt/pull/60)
+
+## [v0.11.0](https://github.com/convml/convml_tt/tree/v0.11.0)
+
 [Full Changelog](https://github.com/convml/convml_tt/compare/v0.10.1...v0.11.0)
 
 *new features*
