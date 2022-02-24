@@ -18,6 +18,10 @@
   linting while fixing linting issues picked up during this switch.
   [\#60](https://github.com/convml/convml_tt/pull/60)
 
+- Move examples downloading functionality into package instead of relying on
+  torchvision since the code in there keeps changing and breaking our examples
+  [\#61](https://github.com/convml/convml_tt/pull/61)
+
 ## [v0.11.0](https://github.com/convml/convml_tt/tree/v0.11.0)
 
 [Full Changelog](https://github.com/convml/convml_tt/compare/v0.10.1...v0.11.0)
