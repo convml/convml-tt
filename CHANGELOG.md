@@ -6,6 +6,11 @@
 
 *new features*
 
+- Add new isomap 2D embedding manifold plot which takes the best (nearest
+  anchor-neighbor) triplets and plots these at a uniform sampling across an
+  isomap 2D extracted embedding manifold
+  [\#57](https://github.com/convml/convml_tt/pull/57)
+
 - annotated scatterplot now uses matplotlib's AnnotationBbox which means that
   annotated scatterplots can be rescaled (with say `ax.set_xlim`) with
   annotations staying in place and keep a fixed size
