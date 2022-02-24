@@ -8,40 +8,63 @@ from pathlib import Path
 
 import joblib
 import luigi
+import xarray as xr
 
-from ...pipeline import XArrayTarget
+from ....pipeline import XArrayTarget
+from ...embedding_transforms import apply_transform
 from .data import AggregateFullDatasetImagePredictionMapData
 
 
 class EmbeddingTransform(luigi.Task):
-    input_path = luigi.Parameter()
+    """
+    Apply a transform to the embeddings stored in `emb_input_path` of type
+    `transform_type` (for example `pca`). You can optionally provide the "name"
+    of the pretrained transform model (this is expected to be stored in the
+    same directory as the embeddings, and then name will be parsed as
+    `{name}.joblib`)
+    """
+
+    emb_input_path = luigi.Parameter()
     transform_type = luigi.Parameter()
-    pretrained_model = luigi.OptionalParameter(default=None)
-    transform_extra_args = luigi.OptionalParameter()
+    pretrained_transform_model = luigi.OptionalParameter(default=None)
+    transform_extra_args = luigi.OptionalParameter(default="")
+
+    def _load_pretrained_transform_model(self):
+        model_filename_format = "{}.model.joblib"
+        model_filename = model_filename_format.format(self.pretrained_transform_model)
+        models_path = Path(self._get_pretrained_transform_model_path())
+        model_path = models_path / model_filename
+        if not model_path.exists():
+            pretrained_model_files = models_path.glob(model_filename_format.format("*"))
+            avail_models = {
+                p.name.replace(".model.joblib", ""): p for p in pretrained_model_files
+            }
+            avail_models_str = "\n".join(
+                [f"\t{k: <20}: {v}" for (k, v) in avail_models.items()]
+            )
+            raise Exception(
+                f"Couldn't find pre-trained transform model in `{model_path}`. "
+                f"Available models:\n{avail_models_str}"
+            )
+        return joblib.load(str(model_path))
 
     def run(self):
-        da_emb = xr.open_dataarray(self.input_path)
+        da_emb = xr.open_dataarray(self.emb_input_path)
 
-        if self.pretrained_model:
-            p = Path(self._get_pretrained_model_path()) / "{}.joblib".format(
-                self.pretrained_model
-            )
-            if not p.exists():
-                raise Exception(
-                    "Couldn't find pre-trained transform" " model in `{}`".format(p)
-                )
-            pretrained_model = joblib.load(str(p))
+        if self.pretrained_transform_model:
+            pretrained_transform_model = self._load_pretrained_transform_model()
         else:
-            pretrained_model = None
+            pretrained_transform_model = None
 
         da_cluster, model = apply_transform(
             da=da_emb,
             transform_type=self.transform_type,
-            pretrained_model=pretrained_model,
+            pretrained_model=pretrained_transform_model,
+            return_model=True,
             **self._parse_transform_extra_kwargs(),
         )
 
-        if model is not None and self.pretrained_model is None:
+        if model is not None and self.pretrained_transform_model is None:
             joblib.dump(model, self.output()["model"].fn)
 
         da_cluster.attrs.update(da_emb.attrs)
@@ -82,36 +105,39 @@ class EmbeddingTransform(luigi.Task):
     def _make_transform_model_filename(self):
         return f"{self._build_transform_identifier()}.model.joblib"
 
-    def _get_pretrained_model_path(self):
+    def _get_pretrained_transform_model_path(self):
         """Return path to where pretrained transform models are expected to
         reside"""
-        return Path(self.input_path).parent
+        return Path(self.emb_input_path).parent
 
     def _build_transform_identifier(self):
+        if self.pretrained_transform_model:
+            return self.pretrained_transform_model
+
         s = f"{self.transform_type}_transform"
         if self.transform_extra_args:
             s += "__" + self.transform_extra_args.replace(",", "__").replace("=", "_")
         return s
 
-    def output(self):
-        src_fullpath = Path(self.input_path)
-        src_path, src_fn = src_fullpath.parent, src_fullpath.name
+    @property
+    def _output_path(self):
+        src_fullpath = Path(self.emb_input_path)
+        src_path = src_fullpath.parent
+        return src_path
 
+    def output(self):
+        src_fn = Path(self.emb_input_path).name
+
+        output_path = self._output_path
         fn_data = src_fn.replace(".nc", f".{self._build_transform_identifier()}.nc")
 
-        if self.pretrained_model:
-            # we won't be resaving a pre-trained model, so there's only a
-            # transformed data output, but in a subdir named after the
-            # pretrained-model
-            p = src_path / self.pretrained_model / fn_data
-            return dict(transformed_data=XArrayTarget(str(p)))
-
-        else:
+        output = dict(transformed_data=XArrayTarget(str(output_path / fn_data)))
+        if not self.pretrained_transform_model:
+            # we only save the model when not using a pretrained transform model
             fn_model = self._make_transform_model_filename()
-            return dict(
-                model=luigi.LocalTarget(str(src_path / fn_model)),
-                transformed_data=XArrayTarget(str(src_path / fn_data)),
-            )
+            output["model"] = luigi.LocalTarget(str(output_path / fn_model))
+
+        return output
 
 
 class DatasetEmbeddingTransform(EmbeddingTransform):
@@ -119,92 +145,60 @@ class DatasetEmbeddingTransform(EmbeddingTransform):
     Create a netCDF file for the transformed embeddings of a single scene
     """
 
-    dataset_path = luigi.Parameter()
+    data_path = luigi.OptionalParameter(default=".")
     model_path = luigi.Parameter()
-    step_size = luigi.Parameter()
+    step_size = luigi.IntParameter()
     scene_id = luigi.Parameter()
 
     def requires(self):
         return AggregateFullDatasetImagePredictionMapData(
-            dataset_path=self.dataset_path,
+            data_path=self.data_path,
             step_size=self.step_size,
             model_path=self.model_path,
         )
 
     def run(self):
         parent_output = yield EmbeddingTransform(
-            input_path=self.input_path,
+            emb_input_path=self.emb_input_path,
             transform_type=self.transform_type,
-            pretrained_model=self.pretrained_model,
+            pretrained_transform_model=self.pretrained_transform_model,
             transform_extra_args=self.transform_extra_args,
         )
 
-        import ipdb
+        da_emb_all = parent_output["transformed_data"].open()
+        Path(self.output().fn).parent.mkdir(exist_ok=True, parents=True)
+        da_emb = da_emb_all.sel(scene_id=self.scene_id)
 
-        with ipdb.launch_ipdb_on_exception():
-            da_emb_all = parent_output["transformed_data"].open()
-            Path(self.output().fn).parent.mkdir(exist_ok=True, parents=True)
-            da_emb = da_emb_all.sel(scene_id=self.scene_id)
-            da_emb.to_netcdf(self.output().fn)
+        # turn values that were previously attributes (but have been stored
+        # as extra coordinates when we stacked) as attributes again
+        for c in ["image_path", "src_data_path"]:
+            value = da_emb[c].item()
+            da_emb = da_emb.reset_coords(c, drop=True)
+            da_emb.attrs[c] = value
+        # not sure why this is necessary, but for some reason xarray doesn't
+        # overwrite this variable and then thinks the old coordinates still
+        # exist when we load the file again
+        del da_emb.encoding["coordinates"]
+
+        da_emb.to_netcdf(self.output().fn)
 
     @property
-    def input_path(self):
+    def emb_input_path(self):
         return self.input().fn
-
-    def output(self):
-        model_name = Path(self.model_path).name.replace(".pkl", "")
-
-        fn = "{}.{}_step.{}.nc".format(
-            self.scene_id,
-            self.step_size,
-            self._build_transform_identifier(),
-        )
-
-        if self.pretrained_model is not None:
-            name = self.pretrained_model
-            p = Path(self.dataset_path) / "embeddings" / "rect" / model_name / name / fn
-        else:
-            p = Path(self.dataset_path) / "embeddings" / "rect" / model_name / fn
-
-        return XArrayTarget(str(p))
-
-    def _get_pretrained_model_path(self):
-        """Return path to where pretrained transform models are expected to
-        reside"""
-        return Path(self.dataset_path) / "transform_models"
 
 
 class CreateAllPredictionMapsDataTransformed(EmbeddingTransform):
-    dataset_path = luigi.Parameter()
-    model_path = luigi.Parameter()
-    step_size = luigi.Parameter()
+    data_path = luigi.OptionalParameter(default=".")
+    embedding_model_path = luigi.Parameter()
+    step_size = luigi.IntParameter()
 
     def requires(self):
         return AggregateFullDatasetImagePredictionMapData(
-            dataset_path=self.dataset_path,
-            model_path=self.model_path,
+            data_path=self.data_path,
+            model_path=self.embedding_model_path,
             step_size=self.step_size,
         )
 
     @property
-    def input_path(self):
+    def emb_input_path(self):
         return self.input().fn
-
-    def output(self):
-        model_name = Path(self.model_path).name.replace(".pkl", "")
-        fn = "all_embeddings.{}_step.{}.nc".format(
-            self.step_size,
-            self._build_transform_identifier(),
-        )
-        p_root = (
-            Path(self.dataset_path)
-            / "embeddings"
-            / "rect"
-            / model_name
-            / "components_map"
-        )
-        if self.pretrained_transform_model is not None:
-            p = p_root / self.pretrained_transform_model / fn
-        else:
-            p = p_root / fn
-        return XArrayTarget(str(p))

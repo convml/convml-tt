@@ -2,7 +2,48 @@
 
 ## [Unreleased](https://github.com/convml/convml_tt/tree/HEAD)
 
-[Full Changelog](https://github.com/convml/convml_tt/compare/v0.10.1...HEAD)
+[Full Changelog](https://github.com/convml/convml_tt/compare/v0.11.0...HEAD)
+
+*new features*
+
+- annotated scatterplot now uses matplotlib's AnnotationBbox which means that
+  annotated scatterplots can be rescaled (with say `ax.set_xlim`) with
+  annotations staying in place and keep a fixed size
+  [\#58](https://github.com/convml/convml_tt/pull/59)
+
+*maintenance*
+
+- Move all tile and cartesian regridded data generation to a separate package
+  [convml-data](https://github.com/convml/convml-data)
+  [\#56](https://github.com/convml/convml_tt/pull/56)
+
+- Fix CI testing by switching to microconda and unpinning pytorch version
+  (since kornia now supports pytorch==1.8.0) and switch to pre-commit for
+  linting while fixing linting issues picked up during this switch.
+  [\#60](https://github.com/convml/convml_tt/pull/60)
+
+- Move examples downloading functionality into package instead of relying on
+  torchvision since the code in there keeps changing and breaking our examples
+  [\#61](https://github.com/convml/convml_tt/pull/61)
+
+## [v0.11.0](https://github.com/convml/convml_tt/tree/v0.11.0)
+
+[Full Changelog](https://github.com/convml/convml_tt/compare/v0.10.1...v0.11.0)
+
+*new features*
+
+- Annotated scatterplots now work for `data.dataset.MovingWindowImageTilingDataset`s
+  [\#52](https://github.com/convml/convml_tt/pull/52)
+
+- `utils.get_embeddings` now uses GPU for producing the embeddings if one is
+  available, drastically speeding up inference time.
+  [\#53](https://github.com/convml/convml_tt/pull/53)
+
+*breaking changes*
+
+- `utils.make_sliding_tile_model_predictions` has been removed in favour of
+  using `utils.get_embeddings` directly
+  [\#54](https://github.com/convml/convml_tt/pull/54)
 
 
 ## [v0.10.1](https://github.com/convml/convml_tt/tree/v0.10.1)
@@ -133,7 +174,7 @@ Specifically this includes:
 - `pytorch.Dataset` (`convml_tt.data.TripletDataset`) for handling loading of individual triplet datasets (and one for single-tile datasets). This has the option to load all data into a single numpy memory-mapped array to reduce number of disc reads
 
 - `pytorch_lightning.LightningDataModule` (`convml_tt.data.TripletDataModule`) for handling transform, batching and splitting data for train/test
-  
+
   - includes transforms previously provided by fastai now using the
     [kornia](https://kornia.github.io/) library
   - correct normalisation when using pretrained network is used

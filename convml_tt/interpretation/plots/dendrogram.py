@@ -2,10 +2,9 @@
 # coding: utf-8
 import matplotlib.pyplot as plt
 import numpy as np
-
 from scipy.cluster import hierarchy as hc
 
-from ...data.dataset import ImageSingletDataset, TileType, ImageTripletDataset
+from ...data.dataset import ImageSingletDataset, ImageTripletDataset, TileType
 
 
 def _make_letter_labels(n_labels):

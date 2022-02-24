@@ -4,16 +4,15 @@ pytorch
 """
 import enum
 from pathlib import Path
-import numpy as np
-from tqdm import tqdm
 
+import numpy as np
 import parse
 from PIL import Image
 from torch.utils.data.dataset import Dataset
 from torchvision import transforms as tv_transforms
+from tqdm import tqdm
 
-
-TILE_FILENAME_FORMAT = "{triplet_id:05d}_{tile_type}.png"
+from .common import TILE_IDENTIFIER_FORMAT
 
 
 def get_load_transforms():
@@ -38,14 +37,13 @@ class TileType(enum.Enum):
     DISTANT = 2
 
 
-def _find_tile_files(data_dir, stage):
+def _find_tile_files(data_dir, stage, ext="png"):
     # dictionary to hold lists with filepaths for each tile type
     file_paths = {tile_type: [] for tile_type in TileType}
 
-    ext = TILE_FILENAME_FORMAT.split(".")[-1]
     full_path = Path(data_dir) / stage
     for f_path in sorted(full_path.glob(f"*.{ext}"), key=lambda p: p.name):
-        file_info = parse.parse(TILE_FILENAME_FORMAT, f_path.name)
+        file_info = parse.parse(TILE_IDENTIFIER_FORMAT + f".{ext}", f_path.name)
         tile_name = file_info["tile_type"]
         try:
             tile_type = TileType[tile_name.upper()]
@@ -94,6 +92,15 @@ class ImageTripletDataset(_ImageDatasetBase):
 
         if set(n_tiles.values()) == {0}:
             raise FileNotFoundError(f"No {stage} data was found in `{data_dir}`")
+
+    def make_singlet_dataset(self, tile_type):
+        """Produce an ImageSingletDataset for a particular tile type"""
+        return ImageSingletDataset(
+            data_dir=self.data_dir,
+            tile_type=tile_type,
+            stage=self.stage,
+            transform=self.transform,
+        )
 
     def get_image(self, index, tile_type):
         image_file_path = self.file_paths[tile_type][index]

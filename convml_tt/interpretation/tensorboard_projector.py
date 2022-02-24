@@ -1,22 +1,23 @@
 # from torch.utils.tensorboard import SummaryWriter
-from tensorboardX import SummaryWriter
+import hashlib
 from pathlib import Path
-import xarray as xr
+
 import numpy as np
 import torch
-import hashlib
+import xarray as xr
+from tensorboardX import SummaryWriter
 from tqdm import tqdm
 
 from convml_tt.data.dataset import ImageTripletDataset
-from convml_tt.data.transforms import get_transforms
-from convml_tt.utils import get_embeddings
-from convml_tt.system import TripletTrainerModel
 from convml_tt.data.examples import (
-    fetch_example_dataset,
     ExampleData,
-    load_pretrained_model,
     PretrainedModel,
+    fetch_example_dataset,
+    load_pretrained_model,
 )
+from convml_tt.data.transforms import get_transforms
+from convml_tt.system import TripletTrainerModel
+from convml_tt.utils import get_embeddings
 
 
 def vector_norm(x, dim, ord=None):
@@ -75,13 +76,12 @@ def main2(embs_path):
     data_path = da_embs.data_dir
     dset = ImageTripletDataset(data_dir=data_path, stage="train", transform=None)
 
-    da_embs_neardiff = da_embs.sel(tile_type="anchor") - da_embs.sel(tile_type="neighbor")
+    da_embs_neardiff = da_embs.sel(tile_type="anchor") - da_embs.sel(
+        tile_type="neighbor"
+    )
     da_embs_neardiff_mag = vector_norm(da_embs_neardiff, dim="emb_dim")
 
-    ds = xr.Dataset(dict(
-        emb=da_embs,
-        an_dist=da_embs_neardiff_mag
-    ))
+    ds = xr.Dataset(dict(emb=da_embs, an_dist=da_embs_neardiff_mag))
 
     ds = ds.where(ds.an_dist < 0.1, drop=True)
     print(ds.tile_id.count())

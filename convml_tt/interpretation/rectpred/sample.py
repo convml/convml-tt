@@ -6,15 +6,16 @@ during training
 """
 
 from pathlib import Path
-from PIL import Image
-import matplotlib.pyplot as plt
 
-from convml_tt.interpretation.rectpred.transform import apply_transform
-from convml_tt.utils import make_sliding_tile_model_predictions
-from convml_tt.system import TripletTrainerModel
-from convml_tt.interpretation.rectpred.plot import make_rgb
+import matplotlib.pyplot as plt
+from PIL import Image
+
 from convml_tt.data.dataset import MovingWindowImageTilingDataset
 from convml_tt.data.transforms import get_transforms as get_model_transforms
+from convml_tt.interpretation.rectpred.plot import make_rgb
+from convml_tt.interpretation.rectpred.transform import apply_transform
+from convml_tt.system import TripletTrainerModel
+from convml_tt.utils import make_sliding_tile_model_predictions
 
 DEFAULT_IMAGE_PATH = Path(__file__).parent.parent / "doc" / "goes16_202002051400.png"
 
@@ -30,9 +31,7 @@ def make_plot(model, image_path, N_tile, prediction_batch_size=128):
     tile_dataset = MovingWindowImageTilingDataset(
         img=img, transform=transforms, step=step, N_tile=N_tile
     )
-    da_emb = make_sliding_tile_model_predictions(
-        tile_dataset=tile_dataset, model=model
-    )
+    da_emb = make_sliding_tile_model_predictions(tile_dataset=tile_dataset, model=model)
 
     da_emb_pca = apply_transform(da_emb, "pca")
 

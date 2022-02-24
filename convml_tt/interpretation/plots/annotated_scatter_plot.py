@@ -1,10 +1,10 @@
 from collections import OrderedDict
-import enum
 
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 import xarray as xr
+from matplotlib.offsetbox import AnnotationBbox, OffsetImage
 
 from ...data.dataset import ImageSingletDataset
 from .mpl_autopos_annotation import calc_offset_points
@@ -35,7 +35,7 @@ def find_nearest_tile(x_sample, y_sample, x, y, dim="tile_id", scaling=1.0):
     return dl.isel(**{dim: dl.argmin(dim=dim)})[dim]
 
 
-def annotated_scatter_plot(
+def annotated_scatter_plot(  # noqa
     x,
     y,
     points,
@@ -91,6 +91,19 @@ def annotated_scatter_plot(
             f"Couldn't find the required values {required_vars} in attr of "
             "`x` or `y`. Either set these or provide a `tile_dataset`"
         )
+
+    if x.shape != y.shape:
+        raise Exception(f"x and y don't have the same shape ({x.shape} != {y.shape})")
+    elif x.dims != y.dims:
+        raise Exception(
+            f"x and y don't have the same dimensions ({x.dims} != {y.dims})"
+        )
+    elif len(x.shape) != 1:
+        # looks like the embeddings provided have been unstacked (for example
+        # they're representing embeddings in a 2D domain). Let's see if we can
+        # stack them into a single 1D array
+        x = x.stack(sample=x.dims)
+        y = y.stack(sample=y.dims)
 
     def _is_array(v):
         return isinstance(v, np.ndarray) or (type(v) == list and type(v[0]) == int)
@@ -209,27 +222,37 @@ def annotated_scatter_plot(
         if zorder is not None:
             ax_zorder = zorder.sel(tile_id=tile_id)
             ax_kwargs["zorder"] = ax_zorder
-        ax1 = fig.add_axes([xp - 0.5 * size, yh - size * 0.5, size, size], **ax_kwargs)
-        ax1.set_aspect(1)
-        ax1.axison = False
+
+        img_idx = int(tile_id.values)
+        img = tile_dataset.get_image(index=img_idx)
+        oim = OffsetImage(img, zoom=size)
+        oim.image.axes = ax
+
+        ab = AnnotationBbox(
+            oim,
+            [x_, y_],
+            xybox=(0.0, 0.0),
+            xycoords="data",
+            boxcoords="offset points",
+            pad=0.0,
+            bboxprops=dict(color="none"),
+        )
+        ax.add_artist(ab)
 
         if hue is not None:
             label_text = hue.sel(tile_id=tile_id).item()
             if isinstance(label_text, xr.DataArray):
                 label_text = label_text.values
-            ax1.text(
+            ab.text(
                 0.1,
                 0.15,
                 label_text,
-                transform=ax1.transAxes,
+                transform=ab.transAxes,
                 bbox={"facecolor": "white", "alpha": 0.6, "pad": 2},
             )
 
-        img_idx = int(tile_id.values)
-        img = tile_dataset.get_image(index=img_idx)
-
         # img = Image.open(tiles_path/"{:05d}_anchor.png".format())
-        ax1.imshow(img)
+        # ax1.imshow(img)
 
     # ensure that adding the points doesn't change the axis limits since we
     # calculated the offset for the annotations

@@ -2,13 +2,14 @@
 Example on how to train convml_tt with logging on weights & biases
 (https://wandb.ai)
 """
+import os
+from pathlib import Path
+
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger
-from pathlib import Path
-import os
 
-from .system import TripletTrainerModel, TripletTrainerDataModule, HeadFineTuner
 from . import __version__, trainer_logging
+from .system import HeadFineTuner, TripletTrainerDataModule, TripletTrainerModel
 from .trainer_onecycle import OneCycleTrainer
 
 
@@ -24,12 +25,6 @@ def main(args=None):
         default=False,
         action="store_true",
         help="Log training to Weights & Biases",
-    )
-    parser.add_argument(
-        "--sample-rectpred-plot-image-path",
-        default=None,
-        type=Path,
-        help="Use this image to produce a rectpred example at the beginning and end of training",
     )
     parser.add_argument(
         "--log-dendrogram",
@@ -116,22 +111,15 @@ def main(args=None):
             {"convml_tt__version": __version__}
         )
 
-    rectpred_logger = None
-    if args.sample_rectpred_plot_image_path:
-        rectpred_logger = trainer_logging.make_rectpred_logger(
-            args.sample_rectpred_plot_image_path
-        )
-        rectpred_logger(model=model, stage="start")
-
     dendrogram_logger = None
     if args.log_dendrogram:
-        rectpred_logger = trainer_logging.make_dendrogram_logger(datamodule=datamodule)
-        rectpred_logger(model=model, stage="start")
+        dendrogram_logger = trainer_logging.make_dendrogram_logger(
+            datamodule=datamodule
+        )
+        dendrogram_logger(model=model, stage="start")
 
     trainer.fit(model=model, datamodule=datamodule)
 
-    if rectpred_logger:
-        rectpred_logger(model=model, stage="end")
     if dendrogram_logger:
         dendrogram_logger(model=model, stage="end")
 

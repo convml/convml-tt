@@ -1,5 +1,5 @@
-from convml_tt.trainer import main as trainer_main
 from convml_tt.data.examples import main as data_examples_main
+from convml_tt.trainer import main as trainer_main
 
 
 def test_cli():
