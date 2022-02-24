@@ -73,7 +73,7 @@ def make_isomap_reference_plot(da_embs, tile_size=0.02, dl=0.1, ax=None):
     if "triplet_part" in da_embs.dims:
         da_embs = da_embs.rename(triplet_part="tile_type")
 
-    if not "tile_type" in da_embs.coords:
+    if "tile_type" not in da_embs.coords:
         raise Exception(
             "To create an isomap embedding plot you need to provide a triplet embeddings. "
             "Expected to find a `tile_type` coordinate, but it it wasn't found"
@@ -132,9 +132,7 @@ def make_isomap_reference_plot(da_embs, tile_size=0.02, dl=0.1, ax=None):
     return fig, ax, model_isomap
 
 
-def plot_embs_on_isomap_manifold(
-    da_embs_triplets, da_embs, dl=0.1, tile_size=0.1
-):
+def plot_embs_on_isomap_manifold(da_embs_triplets, da_embs, dl=0.1, tile_size=0.1):
     if len(da_embs.dims) > 2:
         raise Exception(
             "The embeddings provided should only have a single dimension besides"
