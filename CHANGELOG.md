@@ -1,6 +1,6 @@
 # Changelog
 
-## [v0.11.0](https://github.com/convml/convml_tt/tree/HEAD)
+## [Unreleased](https://github.com/convml/convml_tt/tree/HEAD)
 
 [Full Changelog](https://github.com/convml/convml_tt/compare/v0.11.0...HEAD)
 
@@ -12,6 +12,10 @@
   [\#58](https://github.com/convml/convml_tt/pull/59)
 
 *maintenance*
+
+- Move all tile and cartesian regridded data generation to a separate package
+  [convml-data](https://github.com/convml/convml-data)
+  [\#56](https://github.com/convml/convml_tt/pull/56)
 
 - Fix CI testing by switching to microconda and unpinning pytorch version
   (since kornia now supports pytorch==1.8.0) and switch to pre-commit for
