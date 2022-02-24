@@ -70,7 +70,7 @@ def main(args=None):
 
     trainer_kws = dict()
     if args.log_to_wandb:
-        trainer_kws["logger"] = WandbLogger(project=args.project)
+        trainer_kws["logger"] = WandbLogger(project=args.project, log_model=True)
 
     if "pretrained" in args and args.pretrained:
         trainer_kws["callbacks"] = [HeadFineTuner()]
