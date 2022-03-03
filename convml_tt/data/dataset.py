@@ -85,9 +85,25 @@ class ImageTripletDataset(_ImageDatasetBase):
         self.file_paths = _find_tile_files(data_dir=data_dir, stage=stage)
         n_tiles = {name: len(files) for (name, files) in self.file_paths.items()}
         if not len(set(n_tiles.values())) == 1:
+            tiles_per_triplet = {}
+            for tile_type, file_paths in self.file_paths.items():
+                for fp in file_paths:
+                    fn_parts = parse.parse(TILE_IDENTIFIER_FORMAT, fp.name)
+                    tiles_per_triplet.setdefault(fn_parts["triplet_id"], []).append(
+                        tile_type
+                    )
+
+            triplets_without_three_tiles = [
+                (triplet_id, tiles_in_triplet)
+                for (triplet_id, tiles_in_triplet) in tiles_per_triplet.items()
+                if len(tiles_in_triplet) < 3
+            ]
+
             raise Exception(
-                f"A different number of tiles of each type were found ({n_tiles})"
+                f"A different number of tiles of each type were found ({n_tiles}). "
+                f"The following triplet ids have fewer than three tiles: {triplets_without_three_tiles}"
             )
+
         self.num_items = list(n_tiles.values())[0]
 
         if set(n_tiles.values()) == {0}:
