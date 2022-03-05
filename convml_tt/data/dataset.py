@@ -79,7 +79,9 @@ class ImageTripletDataset(_ImageDatasetBase):
 
     TRIPLET_META_FILENAME_FORMAT = "{triplet_id:05d}_meta.yaml"
 
-    def __init__(self, data_dir, stage="train", transform=None):
+    def __init__(
+        self, data_dir, stage="train", transform=None, skip_incomplete_triplets=False
+    ):
         super().__init__(data_dir=data_dir, stage=stage, transform=transform)
 
         self.file_paths = _find_tile_files(data_dir=data_dir, stage=stage)
@@ -89,20 +91,30 @@ class ImageTripletDataset(_ImageDatasetBase):
             for tile_type, file_paths in self.file_paths.items():
                 for fp in file_paths:
                     fn_parts = parse.parse(TILE_IDENTIFIER_FORMAT, fp.name)
-                    tiles_per_triplet.setdefault(fn_parts["triplet_id"], []).append(
-                        tile_type
-                    )
+                    tiles_per_triplet.setdefault(fn_parts["triplet_id"], []).append(fp)
 
-            triplets_without_three_tiles = [
-                (triplet_id, tiles_in_triplet)
+            triplets_without_three_tiles = {
+                triplet_id: tiles_in_triplet
                 for (triplet_id, tiles_in_triplet) in tiles_per_triplet.items()
                 if len(tiles_in_triplet) < 3
-            ]
+            }
 
-            raise Exception(
-                f"A different number of tiles of each type were found ({n_tiles}). "
-                f"The following triplet ids have fewer than three tiles: {triplets_without_three_tiles}"
-            )
+            filepaths_to_remove = triplets_without_three_tiles.values()
+
+            if skip_incomplete_triplets:
+                self.file_paths = {
+                    tile_type: [
+                        fp
+                        for fp in tile_type_filepaths
+                        if fp not in filepaths_to_remove
+                    ]
+                    for (tile_type, tile_type_filepaths) in self.file_paths.items()
+                }
+            else:
+                raise Exception(
+                    f"A different number of tiles of each type were found ({n_tiles}). "
+                    f"The following triplet ids have fewer than three tiles: {triplets_without_three_tiles}"
+                )
 
         self.num_items = list(n_tiles.values())[0]
 
