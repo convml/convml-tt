@@ -6,6 +6,10 @@
 
 *new features*
 
+- Add option for reduced precision training (16bit) which enables training on
+  hardware with less memory available
+  [\#62](https://github.com/convml/convml_tt/pull/62)
+
 - Add new isomap 2D embedding manifold plot which takes the best (nearest
   anchor-neighbor) triplets and plots these at a uniform sampling across an
   isomap 2D extracted embedding manifold
