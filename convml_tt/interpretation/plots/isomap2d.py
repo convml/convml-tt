@@ -26,6 +26,7 @@ def sample_best_triplets(
     x_range=(-1.0, 1.0),
     y_range=(-1.0, 1.0),
     var="emb_pca",
+    min_point_density=1.0e-3,
 ):
     assert "emb" in ds and "an_dist" in ds
 
@@ -60,7 +61,7 @@ def sample_best_triplets(
 
                 x_p, y_p = da_x_tile.sel(tile_id=tid), da_y_tile.sel(tile_id=tid)
 
-                if kde([x_p, y_p]) < 1.0e-7:
+                if kde([x_p, y_p]) < min_point_density:
                     continue
 
                 tile_ids_new.append(tid)
@@ -69,7 +70,15 @@ def sample_best_triplets(
     return tile_ids_new
 
 
-def make_isomap_reference_plot(da_embs, tile_size=0.02, dl=0.1, ax=None):
+def make_isomap_reference_plot(
+    da_embs,
+    tile_size=0.02,
+    dl=0.1,
+    ax=None,
+    data_dir="from_embeddings",
+    anchor_neighbor_max_dist=0.1,
+    min_point_density=1.0e-3,
+):
     if "triplet_part" in da_embs.dims:
         da_embs = da_embs.rename(triplet_part="tile_type")
 
@@ -108,8 +117,9 @@ def make_isomap_reference_plot(da_embs, tile_size=0.02, dl=0.1, ax=None):
         y_dim=1,
         ds=ds,
         dl=dl,
-        an_dist_max=0.8,
+        an_dist_max=anchor_neighbor_max_dist,
         var="emb_isomap",
+        min_point_density=min_point_density,
     )
 
     x = ds.emb_isomap.sel(isomap_dim=0)
@@ -123,7 +133,10 @@ def make_isomap_reference_plot(da_embs, tile_size=0.02, dl=0.1, ax=None):
     x.attrs["tile_type"] = "ANCHOR"
     y.attrs["tile_type"] = "ANCHOR"
     x.attrs["stage"] = da_embs.stage
-    x.attrs["data_dir"] = da_embs.data_dir
+    if data_dir == "from_embeddings":
+        x.attrs["data_dir"] = da_embs.data_dir
+    else:
+        x.attrs["data_dir"] = data_dir
 
     _ = annotated_scatter_plot(
         x=x, y=y, points=tile_ids_sampled, ax=ax, autopos_method=None, size=tile_size
