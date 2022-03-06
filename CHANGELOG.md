@@ -27,6 +27,9 @@
 
 *maintenance*
 
+- Add CI action to automatically publish tagged releases on pypi
+  [\#63](https://github.com/convml/convml_tt/pull/63)
+
 - Move all tile and cartesian regridded data generation to a separate package
   [convml-data](https://github.com/convml/convml-data)
   [\#56](https://github.com/convml/convml_tt/pull/56)
