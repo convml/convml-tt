@@ -47,6 +47,12 @@ def main(args=None):
         action="store_true",
         help="Use one-cycle learning rate scheduling",
     )
+    parser.add_argument(
+        "--precision",
+        default=32,
+        type=int,
+        help="Floating point precision to use during training",
+    )
 
     if os.environ.get("FROM_CHECKPOINT"):
         parser.add_argument(
@@ -70,7 +76,7 @@ def main(args=None):
 
     trainer_kws = dict()
     if args.log_to_wandb:
-        trainer_kws["logger"] = WandbLogger(project=args.project)
+        trainer_kws["logger"] = WandbLogger(project=args.project, log_model=True)
 
     if "pretrained" in args and args.pretrained:
         trainer_kws["callbacks"] = [HeadFineTuner()]
