@@ -16,6 +16,11 @@
   annotations staying in place and keep a fixed size
   [\#58](https://github.com/convml/convml_tt/pull/59)
 
+*general improvements*
+
+- Option to skip tile triplets with missing tiles when creating `TripletDataset`
+  [\#64](https://github.com/convml/convml_tt/pull/64)
+
 *maintenance*
 
 - Move all tile and cartesian regridded data generation to a separate package
