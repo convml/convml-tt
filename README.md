@@ -10,8 +10,9 @@ easier to modify and carry out further research on the technique.
 
 ## Getting started
 
-To use the `convml_tt` codebase you will first need to install pytorch which
-can most easily by done with [conda](https://www.anaconda.com/distribution/).
+To use the `convml_tt` codebase you will first need to install
+[pytorch](https://pytorch.org/) which can most easily by done with
+[conda](https://www.anaconda.com/distribution/).
 
 1. Once conda is installed you can create a conda environment:
 
@@ -27,13 +28,13 @@ pytorch packages:
 2a. For GPU-based trained and inference:
 
 ```bash
-conda install pytorch torchvision>=0.4.0
+conda install pytorch "torchvision>=0.4.0" cudatoolkit -c pytorch
 ```
 
 2b. For CPU-based training and inference:
 
 ```bash
-conda install pytorch torchvision>=0.4.0
+conda install pytorch "torchvision>=0.4.0" cpuonly -c pytorch
 ```
 
 3. With the environment set up and pytorch installed you can now install
