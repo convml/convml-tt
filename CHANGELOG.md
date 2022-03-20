@@ -20,6 +20,13 @@
   annotations staying in place and keep a fixed size
   [\#58](https://github.com/convml/convml_tt/pull/59)
 
+*bugfixes*
+
+- Fix bug in dendrogram plot where wrong tiles were shown when creating a
+  dendrogram from a data-array of embedding vectors that have been filtered (so
+  that the tile ids don't just from 0, 1, 2 etc)
+  [\#67](https://github.com/convml/convml_tt/pull/67)
+
 *general improvements*
 
 - Option to skip tile triplets with missing tiles when creating `TripletDataset`
