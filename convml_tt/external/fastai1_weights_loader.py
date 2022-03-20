@@ -44,7 +44,6 @@ def model_from_saved_weights(path):
     model_hash = hashlib.md5(open(path, "rb").read()).hexdigest()
     if model_hash == "d23b8370173082774052974f4729733e":
         scaling = 1.0e3
-        scaling = 1.0
     else:
         scaling = 1.0e0
 
