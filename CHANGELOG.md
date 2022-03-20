@@ -27,6 +27,10 @@
 
 *maintenance*
 
+- Ensure loading of fastai v1 models (from weights) also works when we have a
+  GPU available
+  [\#68](https://github.com/convml/convml_tt/pull/68)
+
 - Add CI action to automatically publish tagged releases on pypi
   [\#63](https://github.com/convml/convml_tt/pull/63)
 
