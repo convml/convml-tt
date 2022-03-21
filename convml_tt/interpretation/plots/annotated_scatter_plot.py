@@ -247,23 +247,13 @@ def annotated_scatter_plot(  # noqa
                 TextArea(label_text),
                 [x_, y_],
                 xybox=(0, 0),
-                box_alignment=(size * 20.0, size * 10.0),
+                box_alignment=(size * 16.0, size * 10.0),
                 xycoords="data",
                 boxcoords="offset points",
                 pad=0.2,
                 bboxprops={"facecolor": "white", "alpha": 0.6},
-                # dict(color="none"),
             )
             ax.add_artist(ab_text)
-            # ab.text(
-            # 0.1,
-            # 0.15,
-            # transform=ab.transAxes,
-            # bbox=,
-            # )
-
-        # img = Image.open(tiles_path/"{:05d}_anchor.png".format())
-        # ax1.imshow(img)
 
     # ensure that adding the points doesn't change the axis limits since we
     # calculated the offset for the annotations
