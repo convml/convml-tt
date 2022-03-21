@@ -1,8 +1,8 @@
 # Changelog
 
-## [Unreleased](https://github.com/convml/convml_tt/tree/HEAD)
+## [v0.12.0](https://github.com/convml/convml_tt/tree/v0.12.0)
 
-[Full Changelog](https://github.com/convml/convml_tt/compare/v0.11.0...HEAD)
+[Full Changelog](https://github.com/convml/convml_tt/compare/v0.11.0...v0.12.0)
 
 *new features*
 
@@ -20,12 +20,23 @@
   annotations staying in place and keep a fixed size
   [\#58](https://github.com/convml/convml_tt/pull/59)
 
+*bugfixes*
+
+- Fix bug in dendrogram plot where wrong tiles were shown when creating a
+  dendrogram from a data-array of embedding vectors that have been filtered (so
+  that the tile ids don't just from 0, 1, 2 etc)
+  [\#67](https://github.com/convml/convml_tt/pull/67)
+
 *general improvements*
 
 - Option to skip tile triplets with missing tiles when creating `TripletDataset`
   [\#64](https://github.com/convml/convml_tt/pull/64)
 
 *maintenance*
+
+- Ensure loading of fastai v1 models (from weights) also works when we have a
+  GPU available
+  [\#68](https://github.com/convml/convml_tt/pull/68)
 
 - Add CI action to automatically publish tagged releases on pypi
   [\#63](https://github.com/convml/convml_tt/pull/63)

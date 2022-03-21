@@ -262,9 +262,15 @@ def dendrogram(
         **kwargs
     )
 
-    tile_idxs_per_cluster = _find_leaf_indxs_and_fig_posns(
+    # the indecies returned when finding the leaf indecies below number from
+    # zero, but we want the actual tile IDs and so need to map into those here
+    idxs_per_cluster = _find_leaf_indxs_and_fig_posns(
         Z=Z, ddata=ddata, ax=ax_dendrogram
     )
+
+    tile_idxs_per_cluster = {}
+    for c_id, idxs in idxs_per_cluster.items():
+        tile_idxs_per_cluster[c_id] = da_embeddings.isel(tile_id=idxs).tile_id.values
 
     # the dendrogram plot uses the below transform for how to position the leaf
     # cluster points

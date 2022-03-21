@@ -10,58 +10,49 @@ easier to modify and carry out further research on the technique.
 
 ## Getting started
 
-The easiest way to work with `convml_tt` is to set up a conda environment with
-the necessary dependencies and then install `convml_tt` into this environment
-with pip.
+To use the `convml_tt` codebase you will first need to install
+[pytorch](https://pytorch.org/) which can most easily by done with
+[conda](https://www.anaconda.com/distribution/).
 
-**1. Check out `convml_tt` from github**
-
-```bash
-git clone https://github.com/leifdenby/convml_tt
-cd convml_tt
-```
-
-**2. Install dependecies**
-
-To train the model and do the model interpretation there are number of python
-modules which are needed. All the necessary dependencies can be installed with
-[conda](https://www.anaconda.com/distribution/). Once conda is installed you
-can create an environment depending on whether you will be doing GPU or
-CPU-based training
-
-For GPU-based training:
+1. Once conda is installed you can create a conda environment:
 
 ```bash
-conda env create -f environment-gpu.yml
-conda activate convml_tt
+conda env create -n convml-tt
+conda activate convml-tt
 ```
 
-For CPU-based training:
+Into this conda environment you the need to install pytorch. Depending on
+whether you have access to a GPU or not you will need to install different
+pytorch packages:
+
+2a. For GPU-based trained and inference:
 
 ```bash
-conda env create -f environment-cpu.yml
-conda activate convml_tt
+conda install pytorch "torchvision>=0.4.0" cudatoolkit -c pytorch
 ```
 
-**3. Install `convml_tt`**
-
-Once you have a conda environment set up and **activated** you can install
-`convml_tt` through pip with:
+2b. For CPU-based training and inference:
 
 ```bash
-pip install .
+conda install pytorch "torchvision>=0.4.0" cpuonly -c pytorch
 ```
 
-You will now have `convml_tt` available whenever you activate the `convml_tt`
-conda environment. You will have the *base* components of `convml_tt`
+3. With the environment set up and pytorch installed you can now install
+   `convml-tt` directly from [pypi](https://pypi.org/) using pip (note if you
+   are planning on modifying the `convml-tt` functionality you will want to
+   download the `convml-tt` source code and install from a local copy instead
+   of from pypi. See [development instructions]() for more details):
+
+```bash
+python -m pip install convml-tt
+```
+
+You will now have `convml-tt` available whenever you activate the `convml-tt`
+conda environment. You will have the *base* components of `convml-tt`
 installed which enable training the model on a existing triplet-dataset
-and making predictions with a trained model. To produce training data for
-`convml_tt` more dependecies are required depending on the kind of input
-data you want to use (see "Creating training data" below).
-
-**NOTE ON DEVELOPING `convml_tt`**: if you plan on modifying the `convml_tt`
-code yourself you add the `-e` flag above (i.e. use `pip install -e .`) so that
-any changes you make are automatically picked up.
+and making predictions with a trained model. Functionality to create training
+data is contained in a separate package called
+[convml-data](https://github.com/convml/convml-data)
 
 
 ## Training
@@ -70,7 +61,7 @@ Below are details on how to obtain training data and how to train the model
 
 ### Training data
 
-#### Example dataset
+### Example dataset
 
 A few example training datasets can be downloaded using the following
 command
@@ -78,29 +69,6 @@ command
 ```bash
 python -m convml_tt.data.examples
 ```
-
-
-#### Creating training data from GOES-16 satellite observations
-
-**NB**: dataset creation doesn't currently work as it is being refactored
-
-To work with satellite data you will need packages that kind read this
-data, reproject it and plot it on maps. These requires some system
-libraries that can be difficult to install using only `pip`, but can
-easily be installed with conda into your `convml_tt` environment
-
-```bash
-conda install -c conda-forge xesmf cartopy
-```
-
-And then use pip to install the matching python packages
-
-```bash
-pip install ".[sattiles]"
-```
-
-**TODO**: complete rest of guide talking about processing pipeline and
-downloading satellite data
 
 ### Model training
 

@@ -1,3 +1,4 @@
+import hashlib
 import warnings
 
 import torch
@@ -23,11 +24,13 @@ def model_from_saved_weights(path):
     pytorch-lightning's `trainer.save_checkpoint(...)` and
     `TripletTrainerModel.load_checkpoint(...)` should be used.
     """
+    dev = torch.device("cpu")
+
     # pytorch may issue some warnings here, but we just want to load the
     # model anyway, so hide the wwarnings for now
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        loaded_encoder = torch.load(path)
+        loaded_encoder = torch.load(path).to(dev)
     batch_size = 5
     nx = ny = 256
     # the first layer is the conv1d, find out how many input channels it has
@@ -38,14 +41,20 @@ def model_from_saved_weights(path):
     # weren't part of pytorch 1.0.1 that the old model was created in). We also
     # introduce a scaling layer because the fastai v1 network created values
     # that we're very small
+    model_hash = hashlib.md5(open(path, "rb").read()).hexdigest()
+    if model_hash == "d23b8370173082774052974f4729733e":
+        scaling = 1.0e3
+    else:
+        scaling = 1.0e0
+
     head = loaded_encoder[-1]
     new_head = nn.Sequential(
-        AdaptiveConcatPool2d(size=1), nn.Flatten(), *head, ScalingLayer(1.0e3)
+        AdaptiveConcatPool2d(size=1), nn.Flatten(), *head, ScalingLayer(scaling)
     )
     # we use the backbone as-is
     backbone = loaded_encoder[:-1]
 
-    rand_batch = torch.rand((batch_size, n_input_channels, nx, ny))
+    rand_batch = torch.rand((batch_size, n_input_channels, nx, ny)).to(dev)
     try:
         # check that the model accepts data shaped like a batch and produces the expected output
         # all we know is the weights, so this model won't be possible to train further
