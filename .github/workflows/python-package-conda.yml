@@ -27,7 +27,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Set up conda environment
         run: |
-          mamba env update --file environment-cpu.yml
+          mamba install "torchvision>=0.4.0" pytorch cpuonly -c conda-forge -c pytorch
 
       - run: conda --version
       - run: which python
