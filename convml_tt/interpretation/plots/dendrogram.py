@@ -349,10 +349,10 @@ def dendrogram(
         ax_tiles.legend()
 
     if return_clusters:
-        cluster_idxs = list(tile_idxs_per_cluster.keys())
         if not label_clusters:
-            return fig, cluster_idxs
+            return fig, tile_idxs_per_cluster
         else:
+            cluster_idxs = list(tile_idxs_per_cluster.keys())
             return fig, _make_letter_labels(N_clusters)[cluster_idxs]
     else:
         return fig
