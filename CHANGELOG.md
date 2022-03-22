@@ -20,6 +20,12 @@
   annotations staying in place and keep a fixed size
   [\#58](https://github.com/convml/convml_tt/pull/59)
 
+*breaking changes*
+
+- in line with the rest of the python community (see eg
+  https://github.com/pydata/xarray/issues/6138) support for python 3.7 has been
+  dropped [\#73](https://github.com/convml/convml_tt/pull/73)
+
 *bugfixes*
 
 - Fix bug in dendrogram plot where wrong tiles were shown when creating a

@@ -1,4 +1,6 @@
-from ._version import get_versions
+from importlib.metadata import PackageNotFoundError, version
 
-__version__ = get_versions()["version"]
-del get_versions
+try:
+    __version__ = version("convml_tt")
+except PackageNotFoundError:
+    __version__ = "unknown version"
