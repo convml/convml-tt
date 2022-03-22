@@ -32,6 +32,10 @@
 - Option to skip tile triplets with missing tiles when creating `TripletDataset`
   [\#64](https://github.com/convml/convml_tt/pull/64)
 
+- Improve dendrogram plot to give ability to return tile-clusters as
+  `xr.DataArray` and annotated scatter plot to support text labels
+  [\#70](https://github.com/convml/convml_tt/pull/70)
+
 *maintenance*
 
 - Ensure loading of fastai v1 models (from weights) also works when we have a
