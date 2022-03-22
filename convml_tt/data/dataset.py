@@ -41,7 +41,10 @@ def _find_tile_files(data_dir, stage, ext="png"):
     # dictionary to hold lists with filepaths for each tile type
     file_paths = {tile_type: [] for tile_type in TileType}
 
-    full_path = Path(data_dir) / stage
+    full_path = Path(data_dir)
+    if stage is not None:
+        full_path = full_path / stage
+
     for f_path in sorted(full_path.glob(f"*.{ext}"), key=lambda p: p.name):
         file_info = parse.parse(TILE_IDENTIFIER_FORMAT + f".{ext}", f_path.name)
         tile_name = file_info["tile_type"]
@@ -119,7 +122,8 @@ class ImageTripletDataset(_ImageDatasetBase):
         self.num_items = list(n_tiles.values())[0]
 
         if set(n_tiles.values()) == {0}:
-            raise FileNotFoundError(f"No {stage} data was found in `{data_dir}`")
+            stage_s = stage is not None and f" {stage}" or ""
+            raise FileNotFoundError(f"No {stage_s} data was found in `{data_dir}`")
 
     def make_singlet_dataset(self, tile_type):
         """Produce an ImageSingletDataset for a particular tile type"""
@@ -229,7 +233,8 @@ class ImageSingletDataset(_ImageDatasetBase):
         self.tile_type = tile_type
 
         if self.num_items == 0:
-            raise Exception(f"No {stage} data was found")
+            stage_s = stage is not None and f" {stage}" or ""
+            raise FileNotFoundError(f"No {stage_s} data was found in `{data_dir}`")
 
     def get_image(self, index):
         image_file_path = self.file_paths[index]
