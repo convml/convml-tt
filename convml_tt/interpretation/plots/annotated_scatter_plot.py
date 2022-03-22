@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 import xarray as xr
-from matplotlib.offsetbox import AnnotationBbox, OffsetImage
+from matplotlib.offsetbox import AnnotationBbox, OffsetImage, TextArea
 
 from ...data.dataset import ImageSingletDataset
 from .mpl_autopos_annotation import calc_offset_points
@@ -243,16 +243,17 @@ def annotated_scatter_plot(  # noqa
             label_text = hue.sel(tile_id=tile_id).item()
             if isinstance(label_text, xr.DataArray):
                 label_text = label_text.values
-            ab.text(
-                0.1,
-                0.15,
-                label_text,
-                transform=ab.transAxes,
-                bbox={"facecolor": "white", "alpha": 0.6, "pad": 2},
+            ab_text = AnnotationBbox(
+                TextArea(label_text),
+                [x_, y_],
+                xybox=(0, 0),
+                box_alignment=(size * 16.0, size * 10.0),
+                xycoords="data",
+                boxcoords="offset points",
+                pad=0.2,
+                bboxprops={"facecolor": "white", "alpha": 0.6},
             )
-
-        # img = Image.open(tiles_path/"{:05d}_anchor.png".format())
-        # ax1.imshow(img)
+            ax.add_artist(ab_text)
 
     # ensure that adding the points doesn't change the axis limits since we
     # calculated the offset for the annotations

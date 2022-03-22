@@ -2,6 +2,7 @@
 # coding: utf-8
 import matplotlib.pyplot as plt
 import numpy as np
+import xarray as xr
 from scipy.cluster import hierarchy as hc
 
 from ...data.dataset import ImageSingletDataset, ImageTripletDataset, TileType
@@ -165,8 +166,12 @@ def dendrogram(
             distance is largest in the embedding space
     show_legend:
         add a colour-legend for the different cluster IDs
+    label_clusters:
+        create letter-based cluster identifiers (A, B, C...) and put these on
+        the figure
     return_clusters:
-        return the associated clustering of tile IDs as a 1D numpy array
+        return the associated tile ids associated with each cluster in the
+        branch nodes of the dendrogram as an xarray.DataArray
     color:
         change the colour of the dendrogram lines
 
@@ -349,10 +354,28 @@ def dendrogram(
         ax_tiles.legend()
 
     if return_clusters:
-        cluster_idxs = list(tile_idxs_per_cluster.keys())
-        if not label_clusters:
-            return fig, cluster_idxs
-        else:
-            return fig, _make_letter_labels(N_clusters)[cluster_idxs]
+        arr_clusters = np.empty(int(da_embeddings.tile_id.count()))
+        if label_clusters:
+            cluster_labels = _make_letter_labels(N_clusters)
+            tile_idxs_per_cluster = dict(
+                [
+                    (cluster_labels[c_id], tile_ids)
+                    for (c_id, tile_ids) in tile_idxs_per_cluster.items()
+                ]
+            )
+
+        label_type = type(list(tile_idxs_per_cluster.keys())[0])
+        arr_clusters = np.empty(int(da_embeddings.tile_id.count()), dtype=label_type)
+        for (c_label, c_tile_ids) in tile_idxs_per_cluster.items():
+            for t_id in c_tile_ids:
+                arr_clusters[t_id] = c_label
+
+        da_clusters = xr.DataArray(
+            arr_clusters,
+            dims=("tile_id"),
+            coords=dict(tile_id=da_embeddings.tile_id),
+        )
+
+        return fig, da_clusters
     else:
         return fig
