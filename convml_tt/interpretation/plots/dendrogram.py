@@ -57,7 +57,7 @@ def _find_tile_indecies(
     elif sampling_method == "center_dist":
         emb_in_cluster = da_clustering.sel(tile_id=img_idxs_in_cluster)
         d_emb = emb_in_cluster.mean(dim="tile_id") - emb_in_cluster
-        center_dist = np.sqrt(d_emb ** 2.0).sum(dim="emb_dim")
+        center_dist = np.sqrt(d_emb**2.0).sum(dim="emb_dim")
         emb_in_cluster["dist_to_center"] = center_dist
         img_idxs = emb_in_cluster.sortby("dist_to_center").tile_id.values[:n_samples]
     elif sampling_method in ["best_triplets", "worst_triplets"]:
@@ -70,7 +70,7 @@ def _find_tile_indecies(
         da_emb_dist = da_emb_in_cluster.sel(tile_type="anchor") - da_emb_in_cluster.sel(
             tile_type="neighbor"
         )
-        near_dist = np.sqrt(da_emb_dist ** 2.0).sum(dim="emb_dim")
+        near_dist = np.sqrt(da_emb_dist**2.0).sum(dim="emb_dim")
         da_emb_in_cluster["near_dist"] = near_dist
         img_idxs_all = da_emb_in_cluster.sortby("near_dist").tile_id.values
         if sampling_method == "best_triplets":
@@ -82,7 +82,7 @@ def _find_tile_indecies(
         da_emb_dist = da_emb_in_cluster.sel(tile_type="anchor") - da_emb_in_cluster.sel(
             tile_type="neighbor"
         )
-        near_dist = np.sqrt(da_emb_dist ** 2.0).sum(dim="emb_dim")
+        near_dist = np.sqrt(da_emb_dist**2.0).sum(dim="emb_dim")
         da_emb_in_cluster["near_dist"] = near_dist
         img_idxs = da_emb_in_cluster.sortby("near_dist", reverse=True).tile_id.values[
             :n_samples

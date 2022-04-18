@@ -55,7 +55,7 @@ def sample_best_triplets(
             da_lx = da_x_tile - x_pca
             da_ly = da_y_tile - y_pca
 
-            da_l = np.sqrt(da_lx ** 2.0 + da_ly ** 2.0)
+            da_l = np.sqrt(da_lx**2.0 + da_ly**2.0)
             tid = da_l.isel(tile_id=da_l.argmin(dim="tile_id")).tile_id.item()
             if da_l.sel(tile_id=tid) < dl:
 

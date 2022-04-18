@@ -3,16 +3,19 @@ Contains `Dataset` definition for loading sets of triplet files for training in
 pytorch
 """
 import enum
+import warnings
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import parse
+import xarray as xr
 from PIL import Image
 from torch.utils.data.dataset import Dataset
 from torchvision import transforms as tv_transforms
 from tqdm import tqdm
 
-from .common import TILE_IDENTIFIER_FORMAT
+from .common import TRIPLET_TILE_IDENTIFIER_FORMAT
 
 
 def get_load_transforms():
@@ -37,23 +40,102 @@ class TileType(enum.Enum):
     DISTANT = 2
 
 
-def _find_tile_files(data_dir, stage, ext="png"):
-    # dictionary to hold lists with filepaths for each tile type
-    file_paths = {tile_type: [] for tile_type in TileType}
+TRIPLET_TILE_FILENAME_FORMAT = f"{TRIPLET_TILE_IDENTIFIER_FORMAT}.png"
 
-    full_path = Path(data_dir)
-    if stage is not None:
-        full_path = full_path / stage
 
-    for f_path in sorted(full_path.glob(f"*.{ext}"), key=lambda p: p.name):
-        file_info = parse.parse(TILE_IDENTIFIER_FORMAT + f".{ext}", f_path.name)
-        tile_name = file_info["tile_type"]
-        try:
-            tile_type = TileType[tile_name.upper()]
-            file_paths[tile_type].append(f_path)
-        except KeyError:
-            pass
-    return file_paths
+def _find_tile_files(
+    data_path,
+    tile_identifier_format=TRIPLET_TILE_IDENTIFIER_FORMAT,
+    ext="png",
+    read_meta_from_netcdf_source="if_available",
+    progress=False,
+    cache_to_csv=True,
+):
+    """
+    Find all tile files in `data_path` which match the filename
+    format `{tile_identifier_format}.{ext}` and return a `pandas.DataFrame`
+    with the filenames and the meta information
+    parsed from the filename(s). If `read_meta_from_netcdf_source` is `True`
+    then the meta information from the source netCDF files will also
+    be included. Unless `cache_to_csv` is `False` the result will be stored
+    in a CSV file called `meta.csv` in `data_path`.
+    """
+    data_path = Path(data_path)
+    fpaths_ext = sorted(data_path.glob(f"*.{ext}"), key=lambda p: p.name)
+
+    df_tiles = None
+    fpath_csv = data_path / "meta.csv"
+    if cache_to_csv and fpath_csv.exists():
+        if cache_to_csv == "overwrite":
+            fpath_csv.unlink()
+        else:
+            df_tiles = pd.read_csv(fpath_csv)
+
+    if progress:
+        progress_fn = tqdm
+    else:
+        progress_fn = lambda x: x
+
+    # attempt to parse meta information from filenames of all files
+    # for those where the filename doesn't match the correct format
+    # the result of `parse.parse` will be None
+    fpaths_meta = {}
+    for fpath in progress_fn(fpaths_ext):
+        filename_meta = parse.parse(tile_identifier_format + f".{ext}", fpath.name)
+        if filename_meta is not None:
+            fpaths_meta[fpath] = filename_meta.named
+
+    # if we're loading from a CSV file check that it mentions the
+    # same files
+    if df_tiles is not None:
+        expected_fpaths = set([str(fp) for fp in fpaths_meta.keys()])
+        actual_fpaths = set(df_tiles.filepath)
+        difference_fpaths = expected_fpaths.difference(actual_fpaths)
+        if len(difference_fpaths) == 0:
+            return df_tiles
+        else:
+            print(difference_fpaths)
+            warnings.warn(
+                "Stored CSV of meta information doesn't match the files in "
+                "the provided `data_path. Recreating meta info CSV file"
+            )
+            df_tiles = None
+
+    # parse meta info from the filenames (and optionally the source
+    # netcdf files)
+    tiles_meta = {"filepath": []}
+    for fpath, filename_meta in progress_fn(fpaths_meta.items()):
+        if filename_meta is not None:
+            tiles_meta["filepath"].append(fpath)
+            tiles_meta
+            for meta_field, meta_value in filename_meta.items():
+                tiles_meta.setdefault(meta_field, []).append(meta_value)
+
+            if read_meta_from_netcdf_source:
+                fpath_netcdf = fpath.parent / fpath.name.replace(f".{ext}", ".nc")
+
+                ds_src = None
+                try:
+                    ds_src = xr.open_dataset(fpath_netcdf)
+                except Exception:
+                    if read_meta_from_netcdf_source == "if_available":
+                        pass
+                    else:
+                        raise
+
+                if ds_src is not None:
+                    if len(ds_src.data_vars) == 1:
+                        src_attrs = ds_src[list(ds_src.data_vars)[0]].attrs
+                    else:
+                        src_attrs = ds_src.attrs
+
+                    for meta_field, meta_value in src_attrs.items():
+                        tiles_meta.setdefault(meta_field, []).append(meta_value)
+
+    df_tiles = pd.DataFrame(tiles_meta)
+    if cache_to_csv:
+        df_tiles.to_csv(fpath_csv, index=False)
+    return df_tiles
 
 
 class _ImageDatasetBase(Dataset):
@@ -72,7 +154,7 @@ class _ImageDatasetBase(Dataset):
         return im_as_im
 
     def __len__(self):
-        return self.num_items
+        return len(self.df_tiles.index)
 
 
 class ImageTripletDataset(_ImageDatasetBase):
@@ -87,41 +169,30 @@ class ImageTripletDataset(_ImageDatasetBase):
     ):
         super().__init__(data_dir=data_dir, stage=stage, transform=transform)
 
-        self.file_paths = _find_tile_files(data_dir=data_dir, stage=stage)
-        n_tiles = {name: len(files) for (name, files) in self.file_paths.items()}
-        if not len(set(n_tiles.values())) == 1:
-            tiles_per_triplet = {}
-            for tile_type, file_paths in self.file_paths.items():
-                for fp in file_paths:
-                    fn_parts = parse.parse(TILE_IDENTIFIER_FORMAT, fp.name)
-                    tiles_per_triplet.setdefault(fn_parts["triplet_id"], []).append(fp)
+        if stage is not None:
+            tiles_data_path = Path(data_dir) / stage
+        else:
+            tiles_data_path = Path(data_dir)
 
-            triplets_without_three_tiles = {
-                triplet_id: tiles_in_triplet
-                for (triplet_id, tiles_in_triplet) in tiles_per_triplet.items()
-                if len(tiles_in_triplet) < 3
-            }
+        df_tiles_singles = _find_tile_files(
+            tiles_data_path, tile_identifier_format=TRIPLET_TILE_IDENTIFIER_FORMAT
+        )
+        # pivot so that we group the tiles by triplet
+        self.df_tiles = df_tiles_singles.pivot(index="triplet_id", columns="tile_type")
 
-            filepaths_to_remove = triplets_without_three_tiles.values()
+        # make the index be called "tile_id" rather than "triplet_id"
+        self.df_tiles = self.df_tiles.rename(columns=dict(triplet_id="tile_id"))
 
-            if skip_incomplete_triplets:
-                self.file_paths = {
-                    tile_type: [
-                        fp
-                        for fp in tile_type_filepaths
-                        if fp not in filepaths_to_remove
-                    ]
-                    for (tile_type, tile_type_filepaths) in self.file_paths.items()
-                }
-            else:
+        df_missing_triplet_parts = self.df_tiles[self.df_tiles.isnull().any(axis=1)]
+        if df_missing_triplet_parts.count().max() > 0:
+            if not skip_incomplete_triplets:
                 raise Exception(
-                    f"A different number of tiles of each type were found ({n_tiles}). "
-                    f"The following triplet ids have fewer than three tiles: {triplets_without_three_tiles}"
+                    f"Some triplets don't have all three tiles: {df_missing_triplet_parts}"
                 )
+            else:
+                raise NotImplementedError()
 
-        self.num_items = list(n_tiles.values())[0]
-
-        if set(n_tiles.values()) == {0}:
+        if len(self) == 0:
             stage_s = stage is not None and f" {stage}" or ""
             raise FileNotFoundError(f"No {stage_s} data was found in `{data_dir}`")
 
@@ -134,13 +205,15 @@ class ImageTripletDataset(_ImageDatasetBase):
             transform=self.transform,
         )
 
-    def get_image(self, index, tile_type):
-        image_file_path = self.file_paths[tile_type][index]
+    def get_image(self, tile_id, tile_type):
+        tile_type_s = tile_type.name.lower()
+        image_file_path = self.df_tiles["filepath"][tile_type_s].loc[tile_id]
         return self._read_image(image_file_path)
 
     def _get_image_tensor(self, index, tile_type):
+        tile_id = self.df_tiles.index[index]
         return self._image_load_transforms(
-            self.get_image(index=index, tile_type=tile_type)
+            self.get_image(tile_id=tile_id, tile_type=tile_type)
         )
 
     def __getitem__(self, index):
@@ -152,6 +225,62 @@ class ImageTripletDataset(_ImageDatasetBase):
             item_contents = [self.transform(v) for v in item_contents]
 
         return item_contents
+
+
+class ImageSingletDataset(_ImageDatasetBase):
+    def __init__(
+        self,
+        data_dir,
+        tile_type: TileType,
+        stage="train",
+        transform=None,
+        tile_identifier_format=TRIPLET_TILE_IDENTIFIER_FORMAT,
+    ):
+        super().__init__(data_dir=data_dir, stage=stage, transform=transform)
+
+        if "triplet_id" in tile_identifier_format and tile_type is None:
+            raise Exception(
+                "You must select a tile-type when creating a singlet dataset from"
+                " a dataset made of triplets"
+            )
+
+        if tile_type is not None and type(tile_type) == str:
+            tile_type = TileType[tile_type]
+
+        if stage is not None:
+            tiles_data_path = Path(data_dir) / stage
+        else:
+            tiles_data_path = Path(data_dir)
+
+        self.df_tiles = _find_tile_files(
+            tiles_data_path, tile_identifier_format=tile_identifier_format
+        )
+
+        if tile_type is not None:
+            self.df_tiles = (
+                self.df_tiles[self.df_tiles.tile_type == str(tile_type.name.lower())]
+                .rename(columns=dict(triplet_id="tile_id"))
+                .set_index("tile_id")
+            )
+        else:
+            self.df_tiles = self.df_tiles.set_index("tile_id")
+        self.tile_type = tile_type
+
+        if len(self) == 0:
+            stage_s = stage is not None and f" {stage}" or ""
+            raise FileNotFoundError(f"No {stage_s} data was found in `{data_dir}`")
+
+    def get_image(self, tile_id):
+        image_file_path = self.df_tiles.filepath.loc[tile_id]
+        return self._read_image(image_file_path)
+
+    def __getitem__(self, index):
+        tile_id = self.df_tiles.index[index]
+        item = self._image_load_transforms(self.get_image(tile_id=tile_id))
+
+        if self.transform:
+            item = self.transform(item)
+        return item
 
 
 class MemoryMappedImageTripletDataset(ImageTripletDataset):
@@ -213,39 +342,6 @@ class MemoryMappedImageTripletDataset(ImageTripletDataset):
             item_contents = [self.transform(v) for v in item_contents]
 
         return item_contents
-
-
-class ImageSingletDataset(_ImageDatasetBase):
-    def __init__(
-        self,
-        data_dir,
-        tile_type: TileType,
-        stage="train",
-        transform=None,
-    ):
-        super().__init__(data_dir=data_dir, stage=stage, transform=transform)
-
-        if type(tile_type) == str:
-            tile_type = TileType[tile_type]
-
-        self.file_paths = _find_tile_files(data_dir=data_dir, stage=stage)[tile_type]
-        self.num_items = len(self.file_paths)
-        self.tile_type = tile_type
-
-        if self.num_items == 0:
-            stage_s = stage is not None and f" {stage}" or ""
-            raise FileNotFoundError(f"No {stage_s} data was found in `{data_dir}`")
-
-    def get_image(self, index):
-        image_file_path = self.file_paths[index]
-        return self._read_image(image_file_path)
-
-    def __getitem__(self, index):
-        item = self._image_load_transforms(self.get_image(index=index))
-
-        if self.transform:
-            item = self.transform(item)
-        return item
 
 
 class MovingWindowImageTilingDataset(ImageSingletDataset):
