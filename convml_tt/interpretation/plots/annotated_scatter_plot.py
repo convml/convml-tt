@@ -223,8 +223,7 @@ def annotated_scatter_plot(  # noqa
             ax_zorder = zorder.sel(tile_id=tile_id)
             ax_kwargs["zorder"] = ax_zorder
 
-        img_idx = int(tile_id.values)
-        img = tile_dataset.get_image(index=img_idx)
+        img = tile_dataset.get_image(tile_id=int(tile_id))
         oim = OffsetImage(img, zoom=size)
         oim.image.axes = ax
 

@@ -78,7 +78,10 @@ def get_embeddings(
         gpus = 0
     trainer = pl.Trainer(gpus=gpus)
 
-    tile_ids = np.arange(len(tile_dataloader.dataset))
+    # by using the index of the source pd.DataFrame here we can ensure that the
+    # tile_id comes from the filename rather than simple the number for each
+    # sample in the dataset
+    tile_ids = tile_dataset.df_tiles.index
     coords = dict(tile_id=tile_ids)
 
     if isinstance(tile_dataset, ImageSingletDataset):
