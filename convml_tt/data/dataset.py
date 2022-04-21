@@ -61,7 +61,10 @@ def _find_tile_files(
     in a CSV file called `meta.csv` in `data_path`.
     """
     data_path = Path(data_path)
-    fpaths_ext = sorted(data_path.glob(f"*.{ext}"), key=lambda p: p.name)
+    fpaths_ext = [
+        fp.relative_to(data_path)
+        for fp in sorted(data_path.glob(f"*.{ext}"), key=lambda p: p.name)
+    ]
 
     df_tiles = None
     fpath_csv = data_path / "meta.csv"
@@ -94,7 +97,6 @@ def _find_tile_files(
         if len(difference_fpaths) == 0:
             return df_tiles
         else:
-            print(difference_fpaths)
             warnings.warn(
                 "Stored CSV of meta information doesn't match the files in "
                 "the provided `data_path. Recreating meta info CSV file"
@@ -170,12 +172,12 @@ class ImageTripletDataset(_ImageDatasetBase):
         super().__init__(data_dir=data_dir, stage=stage, transform=transform)
 
         if stage is not None:
-            tiles_data_path = Path(data_dir) / stage
+            self.tiles_data_path = Path(data_dir) / stage
         else:
-            tiles_data_path = Path(data_dir)
+            self.tiles_data_path = Path(data_dir)
 
         df_tiles_singles = _find_tile_files(
-            tiles_data_path, tile_identifier_format=TRIPLET_TILE_IDENTIFIER_FORMAT
+            self.tiles_data_path, tile_identifier_format=TRIPLET_TILE_IDENTIFIER_FORMAT
         )
         # pivot so that we group the tiles by triplet
         self.df_tiles = df_tiles_singles.pivot(index="triplet_id", columns="tile_type")
@@ -207,7 +209,9 @@ class ImageTripletDataset(_ImageDatasetBase):
 
     def get_image(self, tile_id, tile_type):
         tile_type_s = tile_type.name.lower()
-        image_file_path = self.df_tiles["filepath"][tile_type_s].loc[tile_id]
+        image_file_path = (
+            self.tiles_data_path / self.df_tiles["filepath"][tile_type_s].loc[tile_id]
+        )
         return self._read_image(image_file_path)
 
     def _get_image_tensor(self, index, tile_type):
@@ -248,12 +252,12 @@ class ImageSingletDataset(_ImageDatasetBase):
             tile_type = TileType[tile_type]
 
         if stage is not None:
-            tiles_data_path = Path(data_dir) / stage
+            self.tiles_data_path = Path(data_dir) / stage
         else:
-            tiles_data_path = Path(data_dir)
+            self.tiles_data_path = Path(data_dir)
 
         self.df_tiles = _find_tile_files(
-            tiles_data_path, tile_identifier_format=tile_identifier_format
+            self.tiles_data_path, tile_identifier_format=tile_identifier_format
         )
 
         if tile_type is not None:
@@ -271,7 +275,7 @@ class ImageSingletDataset(_ImageDatasetBase):
             raise FileNotFoundError(f"No {stage_s} data was found in `{data_dir}`")
 
     def get_image(self, tile_id):
-        image_file_path = self.df_tiles.filepath.loc[tile_id]
+        image_file_path = self.tiles_data_path / self.df_tiles.filepath.loc[tile_id]
         return self._read_image(image_file_path)
 
     def __getitem__(self, index):
