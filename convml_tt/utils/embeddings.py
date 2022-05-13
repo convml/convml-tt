@@ -103,11 +103,11 @@ def get_embeddings(
     embeddings = np.vstack([batch.detach().numpy() for batch in batched_results])
 
     attrs = {}
-    if hasattr(tile_dataset, "tile_type"):
+    if getattr(tile_dataset, "tile_type", None):
         attrs["tile_type"] = tile_dataset.tile_type.name
-    if hasattr(tile_dataset, "stage"):
+    if getattr(tile_dataset, "stage", None):
         attrs["stage"] = tile_dataset.stage
-    if hasattr(tile_dataset, "data_dir"):
+    if getattr(tile_dataset, "data_dir", None):
         attrs["data_dir"] = str(Path(tile_dataset.data_dir).absolute())
 
     da_emb = xr.DataArray(embeddings, dims=dims, coords=coords, attrs=attrs)
