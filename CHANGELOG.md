@@ -4,6 +4,15 @@
 
 [Full Changelog](https://github.com/convml/convml_tt/compare/v0.12.0...)
 
+*new features*
+
+- Refactor `TripletDataset` and `SingleDataset` to support creation of meta
+  information from tile yaml-files as `pandas.DataFrame` (available as
+  `.df_tiles` on loaded dataset). This enables use of meta information for
+  example when plotting and adding meta information to produced embedding
+  `xr.DataArray`s
+  [\#74](https://github.com/convml/convml_tt/pull/74)
+
 *maintenance*
 
 - Update black to v22.3.0
