@@ -6,6 +6,11 @@
 
 *new features*
 
+- Add more manifold transform options (LLE, LTSA, Hessian-LLE, MDS, TSNE)
+  available in `interpretation.embedding_transforms` and add generic manifold
+  plotting routine `interpretation.plots.manifold2d`
+  [\#76](https://github.com/convml/convml_tt/pull/76)
+
 - Refactor `TripletDataset` and `SingleDataset` to support creation of meta
   information from tile yaml-files as `pandas.DataFrame` (available as
   `.df_tiles` on loaded dataset). This enables use of meta information for
