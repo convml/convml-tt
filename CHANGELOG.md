@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased](https://github.com/convml/convml_tt/tree/HEAD)
+
+[Full Changelog](https://github.com/convml/convml_tt/compare/v0.12.0...)
+
+*maintenance*
+
+- Update black to v22.3.0
+  [\#75](https://github.com/convml/convml_tt/pull/75)
+
+
 ## [v0.12.0](https://github.com/convml/convml_tt/tree/v0.12.0)
 
 [Full Changelog](https://github.com/convml/convml_tt/compare/v0.11.0...v0.12.0)
