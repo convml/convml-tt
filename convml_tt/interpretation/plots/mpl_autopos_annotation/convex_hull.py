@@ -68,7 +68,7 @@ def calc_point_offsets(points, scale=0.2, show_plot=False):
     points_s = np.array([x_s, y_s]).T
 
     lx, ly = np.max(x_s) - np.min(x_s), np.max(y_s) - np.min(y_s)
-    ln = np.sqrt(lx ** 2.0 + ly ** 2.0)
+    ln = np.sqrt(lx**2.0 + ly**2.0)
 
     offset_points = []
 
