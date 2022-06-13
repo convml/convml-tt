@@ -324,7 +324,7 @@ class MemoryMappedImageTripletDataset(ImageTripletDataset):
 
             for i in tqdm(range(n_samples), desc="creating memory-mapped file"):
                 for t_i, tile_type in enumerate(TileType):
-                    img_data = self.get_image(index=i, tile_type=tile_type)
+                    img_data = self.get_image(tile_id=i, tile_type=tile_type)
                     # make sure we strip of the alpha channel if it is there
                     self._data[i, t_i] = np.array(img_data)[:, :, :nc]
 
