@@ -303,7 +303,7 @@ class MemoryMappedImageTripletDataset(ImageTripletDataset):
 
     def _preload_all_tile_image_data(self):
         # load the first image to get the shape
-        img0 = self.get_image(index=0, tile_type=TileType.ANCHOR)
+        img0 = self.get_image(tile_id=0, tile_type=TileType.ANCHOR)
         img0_arr = np.array(img0)
         (nx, ny, _) = img0_arr.shape
         nc = 3
