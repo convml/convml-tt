@@ -50,6 +50,7 @@ def _find_tile_files(
     read_meta_from_netcdf_source="if_available",
     progress=False,
     cache_to_csv=True,
+    aux_accessor=None,
 ):
     """
     Find all tile files in `data_path` which match the filename
@@ -133,6 +134,10 @@ def _find_tile_files(
 
                     for meta_field, meta_value in src_attrs.items():
                         tiles_meta.setdefault(meta_field, []).append(meta_value)
+
+            if aux_accessor is not None:
+                for k, v in aux_accessor(fpath).items():
+                    tiles_meta.setdefault(k, []).append(v)
 
     df_tiles = pd.DataFrame(tiles_meta)
     if cache_to_csv:
@@ -230,6 +235,10 @@ class ImageTripletDataset(_ImageDatasetBase):
 
         return item_contents
 
+    @property
+    def index(self):
+        return self.df_tiles.index
+
 
 class ImageSingletDataset(_ImageDatasetBase):
     def __init__(
@@ -285,6 +294,10 @@ class ImageSingletDataset(_ImageDatasetBase):
         if self.transform:
             item = self.transform(item)
         return item
+
+    @property
+    def index(self):
+        return self.df_tiles.index
 
 
 class MemoryMappedImageTripletDataset(ImageTripletDataset):
@@ -351,21 +364,43 @@ class MemoryMappedImageTripletDataset(ImageTripletDataset):
 class MovingWindowImageTilingDataset(ImageSingletDataset):
     def __init__(
         self,
-        img,
+        data_dir,
         transform=None,
         step=(50, 50),
         N_tile=(256, 256),
+        rect_indentifier="{scene_id}",
     ):
         """
-        Produce moving-window iling dataset with with step-size defined by
-        `step` and tile-size `N_tile`.
+        Produce moving-window tiling dataset with with step-size defined by
+        `step` and tile-size `N_tile` with all scene images found in
+        `data_dir`.
+
+        NB: currently all images are loaded into memory when data-loader is
+        created. This might not work on machines with little RAM.
         """
 
         super(ImageSingletDataset).__init__()
-        self.nx, self.ny = img.size
+
+        def get_rect_info(fpath):
+            img = Image.open(Path(data_dir) / fpath)
+            nx, ny = img.size
+            return dict(nx=nx, ny=ny)
+
+        self.df_rect_images = _find_tile_files(
+            data_dir,
+            tile_identifier_format=rect_indentifier,
+            aux_accessor=get_rect_info,
+        ).set_index("scene_id")
+        self.transform = transform
+
+        # for now we require that all rect images have the same shape
+        nxs = set(self.df_rect_images["nx"].values)
+        nys = set(self.df_rect_images["ny"].values)
+        assert len(nxs) == len(nys) == 1
+        self.nx, self.ny = list(nxs)[0], list(nys)[0]
+
         self.nxt, self.nyt = N_tile
         self.x_step, self.y_step = step
-        self.img = img
 
         # the starting image x-index for tile with tile x-index `i`
         self.img_idx_tile_i = np.arange(0, self.nx - self.nxt + 1, self.x_step)
@@ -375,44 +410,104 @@ class MovingWindowImageTilingDataset(ImageSingletDataset):
         # number of tiles in x- and y-direction
         self.nt_x = len(self.img_idx_tile_i)
         self.nt_y = len(self.img_idx_tile_j)
+        self.n_scenes = len(self.df_rect_images)
 
-        self.num_items = self.nt_x * self.nt_y
+        self.num_items = self.nt_x * self.nt_y * self.n_scenes
 
         image_load_transforms = get_load_transforms()
-        self.img_data_normed = image_load_transforms(self.img)
-        self.transform = transform
+        self.img_data_normed = {}
+        self.img = {}
+        for index in self.df_rect_images.index:
+            fpath = self.df_rect_images.loc[index].filepath
+            self.img[index] = Image.open(Path(data_dir) / fpath)
+            self.img_data_normed[index] = image_load_transforms(self.img[index])
 
-    def index_to_img_ij(self, index):
+    def spatial_index_to_img_ij(self, spatial_index):
         """
         Turn the tile_id (running from 0 to the number of tiles) into the
         (i,j)-index for the tile
         """
         # tile-index in (i,j) running for the number of tiles in each direction
-        j = index // self.nt_x
-        i = index - self.nt_x * j
+        j = spatial_index // self.nt_x
+        i = spatial_index - self.nt_x * j
 
         # indecies into tile shape
         i_img = self.img_idx_tile_i[i]
         j_img = self.img_idx_tile_j[j]
         return i_img, j_img
 
+    def index_to_spatial_and_scene_index(self, index):
+        ntiles_per_scene = self.nt_x * self.nt_y
+        scene_index = index // ntiles_per_scene
+        spatial_index = index % ntiles_per_scene
+
+        return self.df_rect_images.index[scene_index], spatial_index
+
     def get_image(self, index):
-        x_slice, y_slice = self._get_image_tiling_slices(index=index)
+        scene_index, spatial_index = self.index_to_spatial_and_scene_index(index=index)
+
+        x_slice, y_slice = self._get_image_tiling_slices(spatial_index=spatial_index)
         # for a PIL image we need the unnormalized image data
-        img_data = np.array(self.img)
+        img_data = np.array(self.img[scene_index])
         # PIL images have shape [height, width, #channels]
         img_data_tile = img_data[y_slice, x_slice, :]
         return Image.fromarray(img_data_tile)
 
-    def _get_image_tiling_slices(self, index):
-        i_img, j_img = self.index_to_img_ij(index=index)
+    def _get_image_tiling_slices(self, spatial_index):
+        i_img, j_img = self.spatial_index_to_img_ij(spatial_index=spatial_index)
 
         x_slice = slice(i_img, i_img + self.nxt)
         y_slice = slice(j_img, j_img + self.nyt)
         return (x_slice, y_slice)
 
-    def __getitem__(self, index):
-        x_slice, y_slice = self._get_image_tiling_slices(index=index)
-        img_data_tile = self.img_data_normed[:, y_slice, x_slice]
+    def __len__(self):
+        return self.num_items
 
-        return self.transform(img_data_tile)
+    def __getitem__(self, index):
+        scene_index, spatial_index = self.index_to_spatial_and_scene_index(index=index)
+
+        x_slice, y_slice = self._get_image_tiling_slices(spatial_index=spatial_index)
+        img_data_tile = self.img_data_normed[scene_index][:, y_slice, x_slice]
+
+        if self.transform is not None:
+            img_data_tile = self.transform(img_data_tile)
+        return img_data_tile
+
+    def unstack_predictions(self, da_emb):
+        scene_id, spatial_index = self.index_to_spatial_and_scene_index(
+            da_emb.tile_id.values
+        )
+
+        # "unstack" the 2D array with coords (tile_id, emb_dim) to have coords (i0,
+        # j0, emb_dim), where `i0` and `j0` represent the index of the pixel in the
+        # original image at the center of each tile
+        i_img_tile, j_img_tile = self.spatial_index_to_img_ij(
+            spatial_index=spatial_index
+        )
+        i_img_tile_center = (i_img_tile + 0.5 * self.nxt).astype(int)
+        j_img_tile_center = (j_img_tile + 0.5 * self.nyt).astype(int)
+        da_emb_copy = da_emb.copy()
+        da_emb_copy["i0"] = ("tile_id"), i_img_tile_center
+        da_emb_copy["j0"] = ("tile_id"), j_img_tile_center
+
+        # because we want to retain the tile id for later we make a copy here (the
+        # coordinate itself will disappear when we unstack). Need to take the
+        # `values` otherwise the unstacking fails (because xarray is confused about
+        # the copy of the coordinate)
+        da_emb_copy["tile_id_copy"] = ("tile_id"), da_emb_copy.tile_id.values
+        da_emb_copy["scene_id"] = ("tile_id"), scene_id
+        da_emb_unstacked = da_emb_copy.set_index(
+            tile_id=("scene_id", "i0", "j0")
+        ).unstack("tile_id")
+        da_emb_unstacked = da_emb_unstacked.rename(tile_id_copy="tile_id")
+
+        da_emb_unstacked.attrs["tile_nx"] = self.nxt
+        da_emb_unstacked.attrs["tile_ny"] = self.nyt
+        da_emb_unstacked.attrs.update(da_emb.attrs)
+        return da_emb_unstacked
+
+    @property
+    def index(self):
+        # TODO: shouldn't recreate this on every call, maybe we should create a
+        # dataframe for all the tiles
+        return np.arange(len(self))
