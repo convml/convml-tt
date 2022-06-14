@@ -161,6 +161,7 @@ class ImagePredictionMapImageTiles(luigi.Task):
     step_size = luigi.IntParameter(default=10)
 
     def run(self):
+        raise NotImplementedError("changed dataloader")
         img = Image.open(self.image_path)
 
         N_tile = (256, 256)
@@ -172,7 +173,7 @@ class ImagePredictionMapImageTiles(luigi.Task):
         )
         for n in range(len(tile_dataset)):
             tile_img = tile_dataset.get_image(n)
-            i, j = tile_dataset.index_to_img_ij(n)
+            i, j = tile_dataset.spatial_index_to_img_ij(n)
             filename = IMAGE_TILE_FILENAME_FORMAT.format(i0=i, j0=j)
             tile_filepath = Path(self.output().fn).parent / filename
             tile_img.save(str(tile_filepath))

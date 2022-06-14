@@ -46,9 +46,9 @@ def grid_overview(
         ax = axes.flatten()[n]
         ax.axison = False
         if isinstance(tile_dataset, ImageTripletDataset):
-            tile_image = tile_dataset.get_image(index=i, tile_type=tile_type)
+            tile_image = tile_dataset.get_image(tile_id=i, tile_type=tile_type)
         elif isinstance(tile_dataset, ImageSingletDataset):
-            tile_image = tile_dataset.get_image(index=i)
+            tile_image = tile_dataset.get_image(tile_id=i)
         else:
             raise NotImplementedError(tile_dataset)
 
@@ -62,7 +62,10 @@ def grid_overview(
         elif type(label) == list:
             label_text = label[n]
         else:
-            raise NotImplementedError(label)
+            if "{" in label:
+                label_text = label.format(**tile_dataset.df_tiles.loc[i].to_dict())
+            else:
+                label_text = tile_dataset.df_tiles.loc[i][label]
 
         if label_text:
             ax.text(

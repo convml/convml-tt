@@ -78,7 +78,10 @@ def get_embeddings(
         gpus = 0
     trainer = pl.Trainer(gpus=gpus)
 
-    tile_ids = np.arange(len(tile_dataloader.dataset))
+    # by using the index of the source pd.DataFrame here we can ensure that the
+    # tile_id comes from the filename rather than simple the number for each
+    # sample in the dataset
+    tile_ids = tile_dataset.index
     coords = dict(tile_id=tile_ids)
 
     if isinstance(tile_dataset, ImageSingletDataset):
@@ -87,7 +90,7 @@ def get_embeddings(
         dims = ("tile_type", "tile_id", "emb_dim")
         coords["tile_type"] = ["anchor", "neighbor", "distant"]
     else:
-        raise NotImplementedError(tile_dataset)
+        raise NotImplementedError(type(tile_dataset))
 
     batched_results = []
     # XXX: this is a hack. There appears to be somesort of race condition
@@ -100,35 +103,17 @@ def get_embeddings(
     embeddings = np.vstack([batch.detach().numpy() for batch in batched_results])
 
     attrs = {}
-    if hasattr(tile_dataset, "tile_type"):
+    if getattr(tile_dataset, "tile_type", None):
         attrs["tile_type"] = tile_dataset.tile_type.name
-    if hasattr(tile_dataset, "stage"):
+    if getattr(tile_dataset, "stage", None):
         attrs["stage"] = tile_dataset.stage
-    if hasattr(tile_dataset, "data_dir"):
+    if getattr(tile_dataset, "data_dir", None):
         attrs["data_dir"] = str(Path(tile_dataset.data_dir).absolute())
 
     da_emb = xr.DataArray(embeddings, dims=dims, coords=coords, attrs=attrs)
 
     if isinstance(tile_dataset, MovingWindowImageTilingDataset):
-        # "unstack" the 2D array with coords (tile_id, emb_dim) to have coords (i0,
-        # j0, emb_dim), where `i0` and `j0` represent the index of the pixel in the
-        # original image at the center of each tile
-        i_img_tile, j_img_tile = tile_dataset.index_to_img_ij(da_emb.tile_id.values)
-        i_img_tile_center = (i_img_tile + 0.5 * tile_dataset.nxt).astype(int)
-        j_img_tile_center = (j_img_tile + 0.5 * tile_dataset.nyt).astype(int)
-        da_emb["i0"] = ("tile_id"), i_img_tile_center
-        da_emb["j0"] = ("tile_id"), j_img_tile_center
-
-        # because we want to retain the tile id for later we make a copy here (the
-        # coordinate itself will disappear when we unstack). Need to take the
-        # `values` otherwise the unstacking fails (because xarray is confused about
-        # the copy of the coordinate)
-        da_emb["tile_id_copy"] = ("tile_id"), da_emb.tile_id.values
-        da_emb = da_emb.set_index(tile_id=("i0", "j0")).unstack("tile_id")
-        da_emb = da_emb.rename(tile_id_copy="tile_id")
-
-        da_emb.attrs["tile_nx"] = tile_dataset.nxt
-        da_emb.attrs["tile_ny"] = tile_dataset.nyt
+        da_emb = tile_dataset.add_tiling_coords_to_embedding_dataarray(da_emb)
 
     return da_emb
 

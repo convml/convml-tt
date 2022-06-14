@@ -4,6 +4,22 @@
 
 [Full Changelog](https://github.com/convml/convml_tt/compare/v0.12.0...)
 
+*new features*
+
+- Refactor `TripletDataset` and `SingleDataset` to support creation of meta
+  information from tile yaml-files as `pandas.DataFrame` (available as
+  `.df_tiles` on loaded dataset). This enables use of meta information for
+  example when plotting and adding meta information to produced embedding
+  `xr.DataArray`s
+  [\#74](https://github.com/convml/convml_tt/pull/74)
+
+- All tile-datasets (`convml_tt.data.dataset.ImageTripletDataset`,
+  `convml_tt.data.dataset.ImageSingleDataset` and
+  `convml_tt.data.dataset.MovingWindowImageTilingDataset`) now internall use a
+  pandas `DataFrame` to hold information about individual source files. This
+  makes it easier to for example add meta-information into embedding DataArrays
+  produced from a dataset. [\#74](https://github.com/convml/convml_tt/pull/74)
+
 *maintenance*
 
 - Update black to v22.3.0
