@@ -18,6 +18,13 @@
   `xr.DataArray`s
   [\#74](https://github.com/convml/convml_tt/pull/74)
 
+- All tile-datasets (`convml_tt.data.dataset.ImageTripletDataset`,
+  `convml_tt.data.dataset.ImageSingleDataset` and
+  `convml_tt.data.dataset.MovingWindowImageTilingDataset`) now internall use a
+  pandas `DataFrame` to hold information about individual source files. This
+  makes it easier to for example add meta-information into embedding DataArrays
+  produced from a dataset. [\#74](https://github.com/convml/convml_tt/pull/74)
+
 *maintenance*
 
 - Update black to v22.3.0

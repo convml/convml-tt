@@ -32,41 +32,41 @@ def _fix_labels(ax, tile_idxs_per_cluster, label_clusters=False):
     return new_labels
 
 
-def _get_tile_image(tile_dataset, i, tile_type):
+def _get_tile_image(tile_dataset, tile_id, tile_type):
     if isinstance(tile_dataset, ImageTripletDataset):
         tile_image = tile_dataset.get_image(
-            index=i, tile_type=TileType[tile_type.upper()]
+            tile_id=tile_id, tile_type=TileType[tile_type.upper()]
         )
     elif isinstance(tile_dataset, ImageSingletDataset):
-        tile_image = tile_dataset.get_image(index=i)
+        tile_image = tile_dataset.get_image(tile_id=tile_id)
     else:
         raise NotImplementedError(tile_dataset)
     return tile_image
 
 
 def _find_tile_indecies(
-    img_idxs_in_cluster, n_samples, sampling_method, da_clustering, da_embeddings
+    tile_idxs_in_cluster, n_samples, sampling_method, da_clustering, da_embeddings
 ):
     if sampling_method == "random":
         try:
-            img_idxs = np.random.choice(
-                img_idxs_in_cluster, size=n_samples, replace=False
+            tile_idxs = np.random.choice(
+                tile_idxs_in_cluster, size=n_samples, replace=False
             )
         except ValueError:
-            img_idxs = img_idxs_in_cluster
+            tile_idxs = tile_idxs_in_cluster
     elif sampling_method == "center_dist":
-        emb_in_cluster = da_clustering.sel(tile_id=img_idxs_in_cluster)
+        emb_in_cluster = da_clustering.sel(tile_id=tile_idxs_in_cluster)
         d_emb = emb_in_cluster.mean(dim="tile_id") - emb_in_cluster
         center_dist = np.sqrt(d_emb**2.0).sum(dim="emb_dim")
         emb_in_cluster["dist_to_center"] = center_dist
-        img_idxs = emb_in_cluster.sortby("dist_to_center").tile_id.values[:n_samples]
+        tile_idxs = emb_in_cluster.sortby("dist_to_center").tile_id.values[:n_samples]
     elif sampling_method in ["best_triplets", "worst_triplets"]:
         if "tile_type" not in da_embeddings.coords:
             raise Exception(
                 "Selection method based on triplets can only be used when"
                 " passing in embeddings for triplets"
             )
-        da_emb_in_cluster = da_embeddings.sel(tile_id=img_idxs_in_cluster)
+        da_emb_in_cluster = da_embeddings.sel(tile_id=tile_idxs_in_cluster)
         da_emb_dist = da_emb_in_cluster.sel(tile_type="anchor") - da_emb_in_cluster.sel(
             tile_type="neighbor"
         )
@@ -74,23 +74,23 @@ def _find_tile_indecies(
         da_emb_in_cluster["near_dist"] = near_dist
         img_idxs_all = da_emb_in_cluster.sortby("near_dist").tile_id.values
         if sampling_method == "best_triplets":
-            img_idxs = img_idxs_all[:n_samples]
+            tile_idxs = img_idxs_all[:n_samples]
         else:
-            img_idxs = img_idxs_all[::-1][:n_samples]
+            tile_idxs = img_idxs_all[::-1][:n_samples]
     elif sampling_method == "worst_triplets":
-        da_emb_in_cluster = da_embeddings.sel(tile_id=img_idxs_in_cluster)
+        da_emb_in_cluster = da_embeddings.sel(tile_id=tile_idxs_in_cluster)
         da_emb_dist = da_emb_in_cluster.sel(tile_type="anchor") - da_emb_in_cluster.sel(
             tile_type="neighbor"
         )
         near_dist = np.sqrt(da_emb_dist**2.0).sum(dim="emb_dim")
         da_emb_in_cluster["near_dist"] = near_dist
-        img_idxs = da_emb_in_cluster.sortby("near_dist", reverse=True).tile_id.values[
+        tile_idxs = da_emb_in_cluster.sortby("near_dist", reverse=True).tile_id.values[
             :n_samples
         ]
     else:
         raise NotImplementedError(sampling_method)
 
-    return img_idxs
+    return tile_idxs
 
 
 def _find_leaf_indxs_and_fig_posns(Z, ddata, ax):
@@ -300,10 +300,10 @@ def dendrogram(
     N_clusters = len(tile_idxs_per_cluster)
 
     for cluster_id in np.arange(N_clusters):
-        img_idxs_in_cluster = tile_idxs_per_cluster[cluster_id]
+        tile_idxs_in_cluster = tile_idxs_per_cluster[cluster_id]
 
-        img_idxs = _find_tile_indecies(
-            img_idxs_in_cluster=img_idxs_in_cluster,
+        tile_ids = _find_tile_indecies(
+            tile_idxs_in_cluster=tile_idxs_in_cluster,
             n_samples=n_samples,
             sampling_method=sampling_method,
             da_clustering=da_clustering,
@@ -322,9 +322,9 @@ def dendrogram(
         if show_legend:
             ax_tiles.scatter(*leaf_xy, marker="s", label=cluster_id, s=100)
 
-        for n, img_idx in enumerate(img_idxs):
+        for n, img_idx in enumerate(tile_ids):
             img = _get_tile_image(
-                tile_dataset=tile_dataset, i=img_idx, tile_type=tile_type
+                tile_dataset=tile_dataset, tile_id=img_idx, tile_type=tile_type
             )
 
             xp, yh = tile_start_xy
