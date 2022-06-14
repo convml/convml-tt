@@ -54,7 +54,7 @@ def sample_best_triplets(
             da_lx = da_x_tile - x_pca
             da_ly = da_y_tile - y_pca
 
-            da_l = np.sqrt(da_lx ** 2.0 + da_ly ** 2.0)
+            da_l = np.sqrt(da_lx**2.0 + da_ly**2.0)
             tid = da_l.isel(tile_id=da_l.argmin(dim="tile_id")).tile_id.item()
             if da_l.sel(tile_id=tid) < dl:
 
@@ -101,10 +101,6 @@ def make_manifold_reference_plot(
     )
 
     da_embs_anchor = da_embs.sel(tile_type="anchor")
-
-    # da_embs_anchor = embedding_transforms.apply_transform(
-    # da_embs_anchor, transform_type="standard_scaler"
-    # ).rename(dict(standard_scaler_dim="emb_dim"))
 
     emb_manifold_var = "emb_anchor_manifold"
     manifold_dim = f"{method}_dim"

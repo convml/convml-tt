@@ -16,7 +16,7 @@ def make_isomap_reference_plot(
     anchor_neighbor_max_dist=0.1,
     min_point_density=1.0e-3,
 ):
-    make_manifold_reference_plot(
+    return make_manifold_reference_plot(
         da_embs=da_embs,
         tile_size=tile_size,
         dl=dl,
@@ -48,18 +48,10 @@ def plot_embs_on_isomap_manifold(da_embs_triplets, da_embs, dl=0.1, tile_size=0.
         transform_type="isomap",
         pretrained_model=model_isomap,
     )
-    # ax_overlay = ax.inset_axes([0., 0., 1.0, 1.0], transform=ax.transAxes, zorder=10e9)
-    ax_overlay = fig.add_axes(ax.get_position(), zorder=4, transform=ax.transAxes)
-
     x = da_embs_isomap.sel(isomap_dim=0)
     y = da_embs_isomap.sel(isomap_dim=1)
-    ax_overlay.plot(x, y, color="lightgreen", marker=".")
-    ax_overlay.plot(x[0], y[0], color="lightgreen", marker="o", markersize=15)
-
-    ax_overlay.patch.set_alpha(0.0)
-    ax_overlay.set_xlim(ax.get_xlim())
-    ax_overlay.set_ylim(ax.get_ylim())
-    ax_overlay.axis("off")
+    ax.plot(x, y, color="lightgreen", marker=".")
+    ax.plot(x[0], y[0], color="lightgreen", marker="o", markersize=15)
 
     return fig, ax
 
