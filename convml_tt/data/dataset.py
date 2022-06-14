@@ -479,6 +479,10 @@ class MovingWindowImageTilingDataset(ImageSingletDataset):
         the 2D array with coords (tile_id, emb_dim) to have coords (scene_id,
         i0, j0, emb_dim), where `i0` and `j0` represent the index of the
         pixel in the original image at the center of each tile
+
+        To unstack, first set the index `tile_id` to use the `scene_id`, `i0`
+        and `j0` as a MultiIndex and then unstack `tile_id`
+        >>> da_emb.set_index(tile_id=("scene_id", "i0", "j0")).unstack("tile_id")
         """
         scene_id, spatial_index = self.index_to_spatial_and_scene_index(
             da_emb.tile_id.values
@@ -494,7 +498,6 @@ class MovingWindowImageTilingDataset(ImageSingletDataset):
         da_emb_copy["j0"] = ("tile_id"), j_img_tile_center
 
         da_emb_copy["scene_id"] = ("tile_id"), scene_id
-        da_emb_copy = da_emb_copy.set_index(tile_id=("scene_id", "i0", "j0"))
 
         da_emb_copy.attrs["tile_nx"] = self.nxt
         da_emb_copy.attrs["tile_ny"] = self.nyt
