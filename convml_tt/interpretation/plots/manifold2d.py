@@ -3,8 +3,10 @@
 
 import matplotlib.pyplot as plt
 import numpy as np
-import scipy.stats
+import seaborn as sns
+import statsmodels.distributions.empirical_distribution as edf
 import xarray as xr
+from scipy.interpolate import interp1d
 
 from .. import embedding_transforms
 from . import annotated_scatter_plot
@@ -16,6 +18,50 @@ def _vector_norm(x, dim, ord=None):
     )
 
 
+def interp_ecfd(sample):
+    # https://stackoverflow.com/a/44163082
+    sample_edf = edf.ECDF(sample)
+    slope_changes = sorted(set(sample))
+    sample_edf_values_at_slope_changes = [sample_edf(item) for item in slope_changes]
+    inverted_edf = interp1d(sample_edf_values_at_slope_changes, slope_changes)
+    return inverted_edf
+
+
+def make_emb_dist_plot(da_an_dist, da_ad_dist, an_dist_threshold, ax=None):
+    # anchor neighbour distance distribution
+
+    if ax is None:
+        fig, ax = plt.subplots()
+    else:
+        fig = ax.figure
+
+    n_peak_widths = 5
+    n_bins_till_peak = 5
+
+    xlim_max = an_dist_threshold * n_peak_widths
+
+    kwargs = dict(
+        ax=ax,
+        range=(0, xlim_max),
+        bins=n_bins_till_peak * n_peak_widths,
+        histtype="step",
+    )
+    da_an_dist.plot.hist(label="a-n dist", color="b", **kwargs)
+    da_ad_dist.plot.hist(label="a-d dist", color="g", **kwargs)
+    ax.legend()
+
+    ax.set_xlim(0, xlim_max)
+    ax.set_ylabel("num pairs [1]")
+
+    ax_twin = ax.twinx()
+    sns.ecdfplot(da_an_dist, ax=ax_twin, color="b")
+
+    ax_twin.axvline(an_dist_threshold, color="b", linestyle="--")
+    sns.ecdfplot(da_ad_dist, ax=ax_twin, color="g")
+
+    return (fig, ax)
+
+
 def sample_best_triplets(
     x_dim,
     y_dim,
@@ -25,17 +71,11 @@ def sample_best_triplets(
     x_range=(-1.0, 1.0),
     y_range=(-1.0, 1.0),
     var="emb_pca",
-    min_point_density=1.0e-3,
 ):
     assert "emb" in ds and "an_dist" in ds
 
     tile_ids_close = ds.an_dist.tile_id.where(ds.an_dist < an_dist_max, drop=True)
     tile_ids_close = tile_ids_close.values.tolist()
-
-    bad_tiles = [8801, 4779, 8498]
-    for tile_id_bad in bad_tiles:
-        if tile_id_bad in tile_ids_close:
-            tile_ids_close.remove(tile_id_bad)
 
     # work out what the dimension of the embedding vector is called
     dim = list((set(ds[var].dims).difference(ds.an_dist.dims)))[0]
@@ -43,7 +83,7 @@ def sample_best_triplets(
     da_x = ds[var].sel({dim: x_dim})
     da_y = ds[var].sel({dim: y_dim})
 
-    kde = scipy.stats.gaussian_kde([da_x, da_y])
+    # kde = scipy.stats.gaussian_kde([da_x, da_y])
     tile_ids_new = []
 
     da_x_tile = da_x.sel(tile_id=tile_ids_close)
@@ -56,13 +96,7 @@ def sample_best_triplets(
 
             da_l = np.sqrt(da_lx**2.0 + da_ly**2.0)
             tid = da_l.isel(tile_id=da_l.argmin(dim="tile_id")).tile_id.item()
-            if da_l.sel(tile_id=tid) < dl:
-
-                x_p, y_p = da_x_tile.sel(tile_id=tid), da_y_tile.sel(tile_id=tid)
-
-                if kde([x_p, y_p]) < min_point_density:
-                    continue
-
+            if da_l.sel(tile_id=tid) < dl / 2.0:
                 tile_ids_new.append(tid)
 
     tile_ids_new = list(set(tile_ids_new))
@@ -75,9 +109,9 @@ def make_manifold_reference_plot(
     dl=0.1,
     ax=None,
     data_dir="from_embeddings",
-    anchor_neighbor_max_dist=0.1,
-    min_point_density=1.0e-3,
+    an_dist_ecdf_threshold=0.3,
     method="isomap",
+    inset_triplet_distance_distributions=True,
 ):
     if "triplet_part" in da_embs.dims:
         da_embs = da_embs.rename(triplet_part="tile_type")
@@ -88,15 +122,23 @@ def make_manifold_reference_plot(
             "Expected to find a `tile_type` coordinate, but it it wasn't found"
         )
 
-    da_embs_neardiff = da_embs.sel(tile_type="anchor") - da_embs.sel(
-        tile_type="neighbor"
+    da_an_dist = _vector_norm(
+        da_embs.sel(tile_type="anchor") - da_embs.sel(tile_type="neighbor"),
+        dim="emb_dim",
     )
-    da_embs_neardiff_mag = _vector_norm(da_embs_neardiff, dim="emb_dim")
+
+    an_dist_threshold = interp_ecfd(da_an_dist.values)(an_dist_ecdf_threshold)
+
+    if inset_triplet_distance_distributions:
+        da_ad_dist = _vector_norm(
+            da_embs.sel(tile_type="anchor") - da_embs.sel(tile_type="distant"),
+            dim="emb_dim",
+        )
 
     ds = xr.Dataset(
         dict(
             emb=da_embs,
-            an_dist=da_embs_neardiff_mag,
+            an_dist=da_an_dist,
         )
     )
 
@@ -122,9 +164,8 @@ def make_manifold_reference_plot(
         y_dim=1,
         ds=ds,
         dl=dl,
-        an_dist_max=anchor_neighbor_max_dist,
+        an_dist_max=an_dist_threshold,
         var=emb_manifold_var,
-        min_point_density=min_point_density,
     )
 
     x = ds[emb_manifold_var].sel({manifold_dim: 0})
@@ -146,5 +187,14 @@ def make_manifold_reference_plot(
     _ = annotated_scatter_plot(
         x=x, y=y, points=tile_ids_sampled, ax=ax, autopos_method=None, size=tile_size
     )
+
+    if inset_triplet_distance_distributions:
+        ax_triplet_dists_inset = ax.inset_axes([0.8, 0.8, 0.15, 0.15])
+        make_emb_dist_plot(
+            da_an_dist=da_an_dist,
+            da_ad_dist=da_ad_dist,
+            an_dist_threshold=an_dist_threshold,
+            ax=ax_triplet_dists_inset,
+        )
 
     return fig, ax, embedding_transform_model

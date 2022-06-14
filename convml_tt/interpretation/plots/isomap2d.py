@@ -13,22 +13,33 @@ def make_isomap_reference_plot(
     dl=0.1,
     ax=None,
     data_dir="from_embeddings",
-    anchor_neighbor_max_dist=0.1,
-    min_point_density=1.0e-3,
+    an_dist_ecdf_threshold=0.3,
+    inset_triplet_distance_distributions=True,
 ):
+    """
+    Use triplet embeddings in `da_embs` to produce a 2D isomap manifold plot
+    picking from the fraction (`an_dist_ecdf_threshold`) of anchor tiles which
+    are nearest to the neighbour tile.
+    """
     return make_manifold_reference_plot(
         da_embs=da_embs,
         tile_size=tile_size,
         dl=dl,
         ax=ax,
         data_dir=data_dir,
-        anchor_neighbor_max_dist=anchor_neighbor_max_dist,
-        min_point_density=min_point_density,
+        an_dist_ecdf_threshold=an_dist_ecdf_threshold,
         method="isomap",
+        inset_triplet_distance_distributions=inset_triplet_distance_distributions,
     )
 
 
-def plot_embs_on_isomap_manifold(da_embs_triplets, da_embs, dl=0.1, tile_size=0.1):
+def plot_embs_on_isomap_manifold(
+    da_embs_triplets,
+    da_embs,
+    an_dist_ecdf_threshold=0.3,
+    tile_size=0.1,
+    inset_triplet_distance_distributions=True,
+):
     if len(da_embs.dims) > 2:
         raise Exception(
             "The embeddings provided should only have a single dimension besides"
@@ -38,9 +49,10 @@ def plot_embs_on_isomap_manifold(da_embs_triplets, da_embs, dl=0.1, tile_size=0.
 
     fig, ax, model_isomap = make_isomap_reference_plot(
         da_embs_triplets=da_embs_triplets,
-        dl=dl,
+        an_dist_ecdf_threshold=an_dist_ecdf_threshold,
         tile_size=tile_size,
         method="isomap",
+        inset_triplet_distance_distributions=inset_triplet_distance_distributions,
     )
 
     da_embs_isomap = embedding_transforms.apply_transform(
