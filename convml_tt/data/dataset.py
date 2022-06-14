@@ -473,14 +473,17 @@ class MovingWindowImageTilingDataset(ImageSingletDataset):
             img_data_tile = self.transform(img_data_tile)
         return img_data_tile
 
-    def unstack_predictions(self, da_emb):
+    def add_tiling_coords_to_embedding_dataarray(self, da_emb):
+        """
+        add coordinates to embedding xr.DataArray so that we can "unstack"
+        the 2D array with coords (tile_id, emb_dim) to have coords (scene_id,
+        i0, j0, emb_dim), where `i0` and `j0` represent the index of the
+        pixel in the original image at the center of each tile
+        """
         scene_id, spatial_index = self.index_to_spatial_and_scene_index(
             da_emb.tile_id.values
         )
 
-        # "unstack" the 2D array with coords (tile_id, emb_dim) to have coords (i0,
-        # j0, emb_dim), where `i0` and `j0` represent the index of the pixel in the
-        # original image at the center of each tile
         i_img_tile, j_img_tile = self.spatial_index_to_img_ij(
             spatial_index=spatial_index
         )
@@ -490,21 +493,12 @@ class MovingWindowImageTilingDataset(ImageSingletDataset):
         da_emb_copy["i0"] = ("tile_id"), i_img_tile_center
         da_emb_copy["j0"] = ("tile_id"), j_img_tile_center
 
-        # because we want to retain the tile id for later we make a copy here (the
-        # coordinate itself will disappear when we unstack). Need to take the
-        # `values` otherwise the unstacking fails (because xarray is confused about
-        # the copy of the coordinate)
-        da_emb_copy["tile_id_copy"] = ("tile_id"), da_emb_copy.tile_id.values
         da_emb_copy["scene_id"] = ("tile_id"), scene_id
-        da_emb_unstacked = da_emb_copy.set_index(
-            tile_id=("scene_id", "i0", "j0")
-        ).unstack("tile_id")
-        da_emb_unstacked = da_emb_unstacked.rename(tile_id_copy="tile_id")
+        da_emb_copy = da_emb_copy.set_index(tile_id=("scene_id", "i0", "j0"))
 
-        da_emb_unstacked.attrs["tile_nx"] = self.nxt
-        da_emb_unstacked.attrs["tile_ny"] = self.nyt
-        da_emb_unstacked.attrs.update(da_emb.attrs)
-        return da_emb_unstacked
+        da_emb_copy.attrs["tile_nx"] = self.nxt
+        da_emb_copy.attrs["tile_ny"] = self.nyt
+        return da_emb_copy
 
     @property
     def index(self):

@@ -113,7 +113,7 @@ def get_embeddings(
     da_emb = xr.DataArray(embeddings, dims=dims, coords=coords, attrs=attrs)
 
     if isinstance(tile_dataset, MovingWindowImageTilingDataset):
-        da_emb = tile_dataset.unstack_predictions(da_emb=da_emb)
+        da_emb = tile_dataset.add_tiling_coords_to_embedding_dataarray(da_emb)
 
     return da_emb
 
