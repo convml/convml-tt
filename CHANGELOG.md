@@ -8,7 +8,9 @@
 
 - Add more manifold transform options (LLE, LTSA, Hessian-LLE, MDS, TSNE)
   available in `interpretation.embedding_transforms` and add generic manifold
-  plotting routine `interpretation.plots.manifold2d`
+  plotting routine `interpretation.plots.manifold2d`. In addition, manifold
+  plots now use a fraction of the cumulative distribution of anchor-neighbor
+  tiles to determine which tiles to render
   [\#76](https://github.com/convml/convml_tt/pull/76)
 
 - Refactor `TripletDataset` and `SingleDataset` to support creation of meta
