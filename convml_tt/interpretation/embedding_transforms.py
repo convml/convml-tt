@@ -8,8 +8,27 @@ try:
     HAS_HDBSCAN = True
 except ImportError:
     HAS_HDBSCAN = False
+from functools import partial
+
 import sklearn.cluster
 import xarray as xr
+from sklearn import manifold
+from sklearn.preprocessing import StandardScaler
+
+LLE = partial(
+    manifold.LocallyLinearEmbedding,
+    eigen_solver="auto",
+)
+
+MANIFOLD_TRANSFORMS = dict(
+    lle=partial(LLE, method="standard"),
+    ltsa=partial(LLE, method="ltsa"),
+    hessian_lle=partial(LLE, method="hessian"),
+    modified_lle=partial(LLE, method="modified"),
+    isomap=manifold.Isomap,
+    mds=partial(manifold.MDS, max_iter=100, n_init=1),
+    tsne=partial(manifold.TSNE, init="pca", random_state=0),
+)
 
 
 def _apply_transform_function(da, fn, transform_name, emb_coord="emb_dim"):
@@ -88,12 +107,12 @@ def apply_transform(
                 coords=dict(n=da.stack(dict(n=da.dims)).n),
             ).unstack("n")
 
-    elif transform_type == "isomap":
+    elif transform_type in MANIFOLD_TRANSFORMS:
         if pretrained_model is not None:
             model = pretrained_model
             fn_transform = model.transform
         else:
-            model = sklearn.manifold.Isomap(**kwargs)
+            model = MANIFOLD_TRANSFORMS[transform_type](**kwargs)
             fn_transform = model.fit_transform
 
     elif transform_type == "pca_hdbscan":
@@ -116,6 +135,14 @@ def apply_transform(
         def add_meta(da):
             da.attrs["notes"] = "used PCA before HDBSCAN"
 
+    elif transform_type == "standard_scaler":
+        if pretrained_model is not None:
+            model = pretrained_model
+            fn_transform = model.transform
+        else:
+            model = StandardScaler()
+            fn_transform = model.fit_transform
+
     else:
         raise NotImplementedError(transform_type)
 
@@ -136,7 +163,7 @@ def apply_transform(
     da_transformed.attrs["transform_type"] = transform_type
 
     if kwargs:
-        s = ",".join([f"{k}={v}" for (k, v) in kwargs])
+        s = ",".join([f"{k}={v}" for (k, v) in kwargs.items()])
         da_transformed.attrs["transform_extra_args"] = s
 
     # explicitly copy over coords and attrs that we might want to retain
