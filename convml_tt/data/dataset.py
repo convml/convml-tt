@@ -422,6 +422,8 @@ class MovingWindowImageTilingDataset(ImageSingletDataset):
             self.img[index] = Image.open(Path(data_dir) / fpath)
             self.img_data_normed[index] = image_load_transforms(self.img[index])
 
+        self.df_tiles = self._generate_tiles_dataframe()
+
     def spatial_index_to_img_ij(self, spatial_index):
         """
         Turn the tile_id (running from 0 to the number of tiles) into the
@@ -443,8 +445,10 @@ class MovingWindowImageTilingDataset(ImageSingletDataset):
 
         return self.df_rect_images.index[scene_index], spatial_index
 
-    def get_image(self, index):
-        scene_index, spatial_index = self.index_to_spatial_and_scene_index(index=index)
+    def get_image(self, tile_id):
+        scene_index, spatial_index = self.index_to_spatial_and_scene_index(
+            index=tile_id
+        )
 
         x_slice, y_slice = self._get_image_tiling_slices(spatial_index=spatial_index)
         # for a PIL image we need the unnormalized image data
@@ -508,3 +512,17 @@ class MovingWindowImageTilingDataset(ImageSingletDataset):
         # TODO: shouldn't recreate this on every call, maybe we should create a
         # dataframe for all the tiles
         return np.arange(len(self))
+
+    def _generate_tiles_dataframe(self):
+        tile_ids = np.arange(len(self))
+        scene_id, spatial_index = self.index_to_spatial_and_scene_index(tile_ids)
+        ij_index = self.spatial_index_to_img_ij(spatial_index)
+
+        ds_tiles = xr.Dataset(coords=dict(tile_id=tile_ids))
+        ds_tiles["scene_id"] = ("tile_id",), scene_id
+        ds_tiles["scene_filepath"] = ("tile_id",), self.df_rect_images.loc[
+            scene_id
+        ].filepath
+        ds_tiles["i"] = ("tile_id",), ij_index[0]
+        ds_tiles["j"] = ("tile_id",), ij_index[1]
+        return ds_tiles.to_dataframe()
