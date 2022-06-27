@@ -20,6 +20,7 @@
   makes it easier to for example add meta-information into embedding DataArrays
   produced from a dataset. [\#74](https://github.com/convml/convml_tt/pull/74)
   [\#77](https://github.com/convml/convml_tt/pull/77)
+  [\#78](https://github.com/convml/convml_tt/pull/78)
 
 *maintenance*
 
