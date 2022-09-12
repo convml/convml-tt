@@ -412,7 +412,7 @@ class MovingWindowImageTilingDataset(ImageSingletDataset):
         self.nt_y = len(self.img_idx_tile_j)
         self.n_scenes = len(self.df_rect_images)
 
-        self.num_items = self.nt_x * self.nt_y * self.n_scenes
+        self.df_tiles = self._generate_tiles_dataframe()
 
         image_load_transforms = get_load_transforms()
         self.img_data_normed = {}
@@ -421,8 +421,6 @@ class MovingWindowImageTilingDataset(ImageSingletDataset):
             fpath = self.df_rect_images.loc[index].filepath
             self.img[index] = Image.open(Path(data_dir) / fpath)
             self.img_data_normed[index] = image_load_transforms(self.img[index])
-
-        self.df_tiles = self._generate_tiles_dataframe()
 
     def spatial_index_to_img_ij(self, spatial_index):
         """
@@ -465,7 +463,7 @@ class MovingWindowImageTilingDataset(ImageSingletDataset):
         return (x_slice, y_slice)
 
     def __len__(self):
-        return self.num_items
+        return len(self.df_tiles)
 
     def __getitem__(self, index):
         scene_index, spatial_index = self.index_to_spatial_and_scene_index(index=index)
@@ -514,7 +512,9 @@ class MovingWindowImageTilingDataset(ImageSingletDataset):
         return np.arange(len(self))
 
     def _generate_tiles_dataframe(self):
-        tile_ids = np.arange(len(self))
+        num_items = self.nt_x * self.nt_y * self.n_scenes
+
+        tile_ids = np.arange(num_items)
         scene_id, spatial_index = self.index_to_spatial_and_scene_index(tile_ids)
         ij_index = self.spatial_index_to_img_ij(spatial_index)
 
