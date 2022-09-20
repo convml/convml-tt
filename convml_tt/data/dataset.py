@@ -248,6 +248,7 @@ class ImageSingletDataset(_ImageDatasetBase):
         stage="train",
         transform=None,
         tile_identifier_format=TRIPLET_TILE_IDENTIFIER_FORMAT,
+        filter_func=None,
     ):
         super().__init__(data_dir=data_dir, stage=stage, transform=transform)
 
@@ -278,6 +279,9 @@ class ImageSingletDataset(_ImageDatasetBase):
         else:
             self.df_tiles = self.df_tiles.set_index("tile_id")
         self.tile_type = tile_type
+
+        if filter_func is not None:
+            self.df_tiles = filter_func(df_tiles=self.df_tiles)
 
         if len(self) == 0:
             stage_s = stage is not None and f" {stage}" or ""
