@@ -112,6 +112,7 @@ def make_manifold_reference_plot(
     an_dist_ecdf_threshold=0.3,
     method="isomap",
     inset_triplet_distance_distributions=True,
+    da_embs_manifold=None,
 ):
     if "triplet_part" in da_embs.dims:
         da_embs = da_embs.rename(triplet_part="tile_type")
@@ -142,20 +143,32 @@ def make_manifold_reference_plot(
         )
     )
 
-    da_embs_anchor = da_embs.sel(tile_type="anchor")
-
-    emb_manifold_var = "emb_anchor_manifold"
     manifold_dim = f"{method}_dim"
+    emb_manifold_var = "emb_anchor_manifold"
 
-    (
-        ds[emb_manifold_var],
-        embedding_transform_model,
-    ) = embedding_transforms.apply_transform(
-        da=da_embs_anchor,
-        transform_type=method,
-        n_components=2,
-        return_model=True,
-    )
+    if da_embs_manifold is None:
+        da_embs_anchor = da_embs.sel(tile_type="anchor")
+
+        (
+            da_embs_manifold,
+            embedding_transform_model,
+        ) = embedding_transforms.apply_transform(
+            da=da_embs_anchor,
+            transform_type=method,
+            n_components=2,
+            return_model=True,
+        )
+    else:
+        method_precomputed = da_embs_manifold.transform_type
+        if method_precomputed != method:
+            raise Exception(
+                "Method used to produce transformed embeddings in provided file"
+                " does not match the method selected for the embedding manifold plot"
+                " {method_precomputed} != {method}"
+            )
+        embedding_transform_model = None
+
+    ds[emb_manifold_var] = da_embs_manifold
 
     tile_ids_sampled = sample_best_triplets(
         x_range=(-1.5, 1.5),
