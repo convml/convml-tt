@@ -27,6 +27,10 @@
 - Update black to v22.3.0
   [\#75](https://github.com/convml/convml_tt/pull/75)
 
+- Fix example data and pretrained model download issue by avoiding check of SSL
+  certificate of homepages.see.leeds.ac.uk
+  [\#79](https://github.com/convml/convml-tt/pull/79)
+
 
 ## [v0.12.0](https://github.com/convml/convml_tt/tree/v0.12.0)
 
