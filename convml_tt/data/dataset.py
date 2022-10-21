@@ -373,7 +373,7 @@ class MovingWindowImageTilingDataset(ImageSingletDataset):
         step=(50, 50),
         N_tile=(256, 256),
         rect_indentifier="{scene_id}",
-        filter_func=None
+        filter_func=None,
     ):
         """
         Produce moving-window tiling dataset with with step-size defined by
