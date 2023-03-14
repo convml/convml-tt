@@ -6,7 +6,7 @@ import torch
 
 
 class AddOneCycleSchedulerCallback(pl.Callback):
-    def on_before_accelerator_backend_setup(self, trainer, pl_module):
+    def setup(self, trainer, pl_module, stage):
         max_lr = getattr(pl_module, "lr", None)
         if max_lr is None:
             raise Exception(
