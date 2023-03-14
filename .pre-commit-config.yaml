@@ -1,20 +1,20 @@
 # https://pre-commit.com/
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.0.1
+    rev: v4.4.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-yaml
   # isort should run before black as black sometimes tweaks the isort output
   - repo: https://github.com/PyCQA/isort
-    rev: 5.10.1
+    rev: 5.12.0
     hooks:
       - id: isort
         exclude: ^(Metrics/)
   # https://github.com/python/black#version-control-integration
   - repo: https://github.com/psf/black
-    rev: 22.3.0
+    rev: 23.1.0
     hooks:
       - id: black
         additional_dependencies: ['click==8.0.4']
@@ -22,7 +22,7 @@ repos:
         exclude: ^(Metrics/)
         additional_dependencies: ['click==8.0.4']
   - repo: https://github.com/PyCQA/flake8
-    rev: 4.0.1
+    rev: 6.0.0
     hooks:
       - id: flake8
         exclude: ^(Metrics/)

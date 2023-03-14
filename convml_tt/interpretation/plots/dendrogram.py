@@ -20,7 +20,7 @@ def _fix_labels(ax, tile_idxs_per_cluster, label_clusters=False):
     """
     new_labels = []
 
-    for (i, cluster_label) in enumerate(ax.get_xticklabels()):
+    for i, cluster_label in enumerate(ax.get_xticklabels()):
         cluster_id = int(cluster_label.get_text())
         items_cluster = tile_idxs_per_cluster[cluster_id]
         num_items_in_leaf = len(items_cluster)
@@ -366,7 +366,7 @@ def dendrogram(
 
         label_type = type(list(tile_idxs_per_cluster.keys())[0])
         arr_clusters = np.empty(int(da_embeddings.tile_id.count()), dtype=label_type)
-        for (c_label, c_tile_ids) in tile_idxs_per_cluster.items():
+        for c_label, c_tile_ids in tile_idxs_per_cluster.items():
             for t_id in c_tile_ids:
                 arr_clusters[t_id] = c_label
 

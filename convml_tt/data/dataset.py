@@ -327,7 +327,6 @@ class MemoryMappedImageTripletDataset(ImageTripletDataset):
         mm_dtype = "float32"
 
         if not self.mm_filepath.exists():
-
             self._data = np.memmap(
                 str(self.mm_filepath),
                 dtype=mm_dtype,

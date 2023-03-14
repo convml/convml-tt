@@ -61,7 +61,6 @@ def main(model_path, image_path):
 
 
 if __name__ == "__main__":
-
     import argparse
     import glob
 
