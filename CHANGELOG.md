@@ -4,6 +4,12 @@
 
 [Full Changelog](https://github.com/convml/convml_tt/compare/HEAD...v0.13.0)
 
+*bugfiesx*
+
+- For image sliding-window (tiling) datasets use the loaded dataframe
+  describing the tiling to set the tile size
+  [\#80](https://github.com/convml/convml-tt/pull/80)
+
 *maintenance*
 
 - Support pytorch-lightning >1.8, Update README with new cudatoolkit install,
