@@ -169,7 +169,7 @@ def apply_transform(
     # explicitly copy over coords and attrs that we might want to retain
     for c in ["image_path", "src_data_path", "tile_id", "i0", "j0"]:
         if c in da.coords or c in da.attrs:
-            da_transformed[c] = da[c]
+            da_transformed[c] = getattr(da, c)  # getattr can get both coords and attrs
 
     if return_model:
         return da_transformed, model
