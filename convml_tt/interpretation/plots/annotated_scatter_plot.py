@@ -261,8 +261,8 @@ def annotated_scatter_plot(  # noqa
 
     if hue is not None:
         sns.scatterplot(
-            x,
-            y,
+            x=x,
+            y=y,
             hue=hue.values,
             ax=ax,
             alpha=0.4,

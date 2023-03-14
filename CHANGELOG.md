@@ -4,7 +4,7 @@
 
 [Full Changelog](https://github.com/convml/convml_tt/compare/HEAD...v0.13.0)
 
-*bugfiesx*
+*bugfixes*
 
 - For image sliding-window (tiling) datasets use the loaded dataframe
   describing the tiling to set the tile size
