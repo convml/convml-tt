@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased](https://github.com/convml/convml_tt/tree/HEAD)
+
+[Full Changelog](https://github.com/convml/convml_tt/compare/HEAD...v0.13.0)
+
+*maintenance*
+
+- Support pytorch-lightning >1.8, Update README with new cudatoolkit install,
+  Update setup.cfg to reflect package changes and update pre-commit and linting
+  tools [\#81](https://github.com/convml/convml-tt/pull/81)
+
+
 ## [v0.13.0](https://github.com/convml/convml_tt/tree/v0.13.0)
 
 [Full Changelog](https://github.com/convml/convml_tt/compare/v0.13.0...v0.12.0)
