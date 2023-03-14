@@ -128,7 +128,6 @@ if __name__ == "__main__":
     args = argparser.parse_args()
 
     if not Path("tmap.faerun").exists():
-
         da = xr.open_dataarray(args.filename)
 
         # if "scene_id" in da_emb.coords:

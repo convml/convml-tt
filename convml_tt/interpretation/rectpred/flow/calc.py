@@ -90,7 +90,6 @@ def track_features(
     flags=0,
     min_eig_thr=1e-4,
 ):
-
     prvs_img = prvs_image.copy()
     next_img = next_image.copy()
     p0 = np.copy(points)

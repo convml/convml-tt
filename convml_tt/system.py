@@ -92,7 +92,6 @@ class TripletTrainerModel(pl.LightningModule):
             )
 
     def _create_head_layers(self, n_features_backbone):
-
         if self.hparams.head_type == "linear":
             # make "head" block which takes features of the encoder (resnet18 has
             # 512), uses adaptive pooling to reduce the x- and y-dimension, and
