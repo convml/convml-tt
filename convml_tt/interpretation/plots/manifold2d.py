@@ -1,17 +1,16 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+import warnings
+
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 import statsmodels.distributions.empirical_distribution as edf
 import xarray as xr
-from scipy.interpolate import interp1d
 from PIL import Image
+from scipy.interpolate import interp1d
 from tqdm import tqdm
-
-
-import warnings
 
 from .. import embedding_transforms
 from . import annotated_scatter_plot
@@ -99,7 +98,7 @@ def sample_best_triplets(
             da_lx = da_x_tile - x_pca
             da_ly = da_y_tile - y_pca
 
-            da_l = np.sqrt(da_lx ** 2.0 + da_ly ** 2.0)
+            da_l = np.sqrt(da_lx**2.0 + da_ly**2.0)
             tid = da_l.isel(tile_id=da_l.argmin(dim="tile_id")).tile_id.item()
             if da_l.sel(tile_id=tid) < dl / 2.0:
                 tile_ids_new.append(tid)
@@ -126,7 +125,6 @@ def _get_an_dist(da_embs):
 
 
 def _get_anchor_embs_on_manifold(da_embs, method):
-    manifold_dim = f"{method}_dim"
     da_embs_anchor = da_embs.sel(tile_type="anchor")
 
     (
@@ -172,6 +170,7 @@ def make_scatter_based_manifold_reference_plot(
     if da_embs_manifold is None:
         da_embs_manifold, embedding_transform_model = _get_anchor_embs_on_manifold(
             da_embs=da_embs, method=method
+        )
     else:
         method_precomputed = da_embs_manifold.transform_type
         if method_precomputed != method:
@@ -196,6 +195,7 @@ def make_scatter_based_manifold_reference_plot(
         var=emb_manifold_var,
     )
 
+    manifold_dim = f"{method}_dim"
     x = ds[emb_manifold_var].sel({manifold_dim: 0})
     y = ds[emb_manifold_var].sel({manifold_dim: 1})
 
@@ -229,18 +229,18 @@ def make_scatter_based_manifold_reference_plot(
 
 
 def make_grid_based_manifold_image_slow(
-    da_embs_manifold, da_an_dist, l=3.0, n_min=16, N=16, px=32
+    da_embs_manifold, da_an_dist, lxy=3.0, n_min=16, N=16, px=32
 ):
     """
     Create grid-based manifold image. Reference implementation which is quite slow
 
-    l: total xy-range
+    lxy: total xy-range
     n_min: minimum number of tiles in bin required to render tile for bin
     N: grid xy-size
     px: number of pixels per image (must be power of 2)
     """
     Nx = Ny = N
-    lx = ly = l
+    lx = ly = lxy
 
     dx = lx / Nx
     dy = ly / Ny
@@ -291,18 +291,18 @@ def make_grid_based_manifold_image_slow(
 
 
 def make_grid_based_manifold_image(
-    da_embs_manifold, da_an_dist, l=3.0, n_min=16, N=16, px=32
+    da_embs_manifold, da_an_dist, lxy=3.0, n_min=16, N=16, px=32
 ):
     """
     Create grid-based manifold image
 
-    l: total xy-range
+    lxy: total xy-range
     n_min: minimum number of tiles in bin required to render tile for bin
     N: grid xy-size
     px: number of pixels per image (must be power of 2)
     """
     Nx = Ny = N
-    lx = ly = l
+    lx = ly = lxy
     dx = lx / Nx
     dy = ly / Ny
 
@@ -393,12 +393,12 @@ def make_grid_based_manifold_plot(
     da_y = da_embs_manifold.sel({manifold_dim: 1})
     l_max = np.max(np.abs([da_x.min(), da_x.max(), da_y.min(), da_y.max()]))
     N = int(l_max * 2.2 / dx)
-    l = N * dx
+    lxy = N * dx
 
     img, (xlim, ylim) = make_grid_based_manifold_image(
         da_embs_manifold=da_embs_manifold,
         da_an_dist=da_an_dist,
-        l=l,
+        lxy=lxy,
         n_min=n_min,
         N=N,
         px=px,
@@ -406,7 +406,7 @@ def make_grid_based_manifold_plot(
     )
 
     if ax is None:
-        fig, ax = plt.subplots(figsize=(5,5))
+        fig, ax = plt.subplots(figsize=(5, 5))
     else:
         fig = ax.figure
 
@@ -430,14 +430,23 @@ def make_manifold_reference_plot(
     dx=0.05,
     **kwargs,
 ):
-
     if plot_type == "scatter":
         return make_scatter_based_manifold_reference_plot(
-            ax=ax, da_embs=da_embs, da_embs_manifold=da_embs_manifold, dl=dx, method=method, **kwargs
+            ax=ax,
+            da_embs=da_embs,
+            da_embs_manifold=da_embs_manifold,
+            dl=dx,
+            method=method,
+            **kwargs,
         )
     elif plot_type == "grid":
         return make_grid_based_manifold_plot(
-            ax=ax, da_embs=da_embs, da_embs_manifold=da_embs_manifold, dx=dx, method=method, **kwargs
+            ax=ax,
+            da_embs=da_embs,
+            da_embs_manifold=da_embs_manifold,
+            dx=dx,
+            method=method,
+            **kwargs,
         )
 
     else:

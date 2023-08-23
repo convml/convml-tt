@@ -48,7 +48,7 @@ def annotated_scatter_plot(  # noqa
     hue_palette="hls",
     tile_dataset: ImageSingletDataset = None,
     zorder=None,
-    only_annotations=False
+    only_annotations=False,
 ):
     """
     create scatter plot from values in `x` and `y` picking out points to
