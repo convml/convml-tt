@@ -7,6 +7,11 @@ import seaborn as sns
 import statsmodels.distributions.empirical_distribution as edf
 import xarray as xr
 from scipy.interpolate import interp1d
+from PIL import Image
+from tqdm import tqdm
+
+
+import warnings
 
 from .. import embedding_transforms
 from . import annotated_scatter_plot
@@ -94,7 +99,7 @@ def sample_best_triplets(
             da_lx = da_x_tile - x_pca
             da_ly = da_y_tile - y_pca
 
-            da_l = np.sqrt(da_lx**2.0 + da_ly**2.0)
+            da_l = np.sqrt(da_lx ** 2.0 + da_ly ** 2.0)
             tid = da_l.isel(tile_id=da_l.argmin(dim="tile_id")).tile_id.item()
             if da_l.sel(tile_id=tid) < dl / 2.0:
                 tile_ids_new.append(tid)
@@ -103,16 +108,7 @@ def sample_best_triplets(
     return tile_ids_new
 
 
-def make_manifold_reference_plot(
-    da_embs,
-    tile_size=0.02,
-    dl=0.1,
-    ax=None,
-    data_dir="from_embeddings",
-    an_dist_ecdf_threshold=0.3,
-    method="isomap",
-    inset_triplet_distance_distributions=True,
-):
+def _get_an_dist(da_embs):
     if "triplet_part" in da_embs.dims:
         da_embs = da_embs.rename(triplet_part="tile_type")
 
@@ -121,12 +117,43 @@ def make_manifold_reference_plot(
             "To create an isomap embedding plot you need to provide a triplet embeddings. "
             "Expected to find a `tile_type` coordinate, but it it wasn't found"
         )
-
     da_an_dist = _vector_norm(
         da_embs.sel(tile_type="anchor") - da_embs.sel(tile_type="neighbor"),
         dim="emb_dim",
     )
 
+    return da_an_dist
+
+
+def _get_anchor_embs_on_manifold(da_embs, method):
+    manifold_dim = f"{method}_dim"
+    da_embs_anchor = da_embs.sel(tile_type="anchor")
+
+    (
+        da_embs_manifold,
+        embedding_transform_model,
+    ) = embedding_transforms.apply_transform(
+        da=da_embs_anchor,
+        transform_type=method,
+        n_components=2,
+        return_model=True,
+    )
+
+    return da_embs_manifold, embedding_transform_model
+
+
+def make_scatter_based_manifold_reference_plot(
+    da_embs,
+    tile_size=0.02,
+    dl=0.1,
+    ax=None,
+    data_dir="from_embeddings",
+    an_dist_ecdf_threshold=0.3,
+    method="isomap",
+    inset_triplet_distance_distributions=True,
+    da_embs_manifold=None,
+):
+    da_an_dist = _get_an_dist(da_embs=da_embs)
     an_dist_threshold = interp_ecfd(da_an_dist.values)(an_dist_ecdf_threshold)
 
     if inset_triplet_distance_distributions:
@@ -142,20 +169,22 @@ def make_manifold_reference_plot(
         )
     )
 
-    da_embs_anchor = da_embs.sel(tile_type="anchor")
+    if da_embs_manifold is None:
+        da_embs_manifold, embedding_transform_model = _get_anchor_embs_on_manifold(
+            da_embs=da_embs, method=method
+        )
+    else:
+        method_precomputed = da_embs_manifold.transform_type
+        if method_precomputed != method:
+            raise Exception(
+                "Method used to produce transformed embeddings in provided file"
+                " does not match the method selected for the embedding manifold plot"
+                " {method_precomputed} != {method}"
+            )
+        embedding_transform_model = None
 
     emb_manifold_var = "emb_anchor_manifold"
-    manifold_dim = f"{method}_dim"
-
-    (
-        ds[emb_manifold_var],
-        embedding_transform_model,
-    ) = embedding_transforms.apply_transform(
-        da=da_embs_anchor,
-        transform_type=method,
-        n_components=2,
-        return_model=True,
-    )
+    ds[emb_manifold_var] = da_embs_manifold
 
     tile_ids_sampled = sample_best_triplets(
         x_range=(-1.5, 1.5),
@@ -198,3 +227,219 @@ def make_manifold_reference_plot(
         )
 
     return fig, ax, embedding_transform_model
+
+
+def make_grid_based_manifold_image_slow(
+    da_embs_manifold, da_an_dist, l=3.0, n_min=16, N=16, px=32
+):
+    """
+    Create grid-based manifold image. Reference implementation which is quite slow
+
+    l: total xy-range
+    n_min: minimum number of tiles in bin required to render tile for bin
+    N: grid xy-size
+    px: number of pixels per image (must be power of 2)
+    """
+    Nx = Ny = N
+    lx = ly = l
+
+    dx = lx / Nx
+    dy = ly / Ny
+
+    sx = px * Nx
+    sy = px * Ny
+
+    img_arr = np.zeros((sx, sy, 4)).astype(np.uint8)
+    n_tiles = np.zeros((Nx, Ny))
+
+    da_x = da_embs_manifold.sel(isomap_dim=0)
+    da_y = da_embs_manifold.sel(isomap_dim=1)
+
+    xlim = -lx / 2.0, -lx / 2.0 + Nx * dx
+    ylim = -ly / 2.0, -ly / 2.0 + Ny * dy
+
+    for i in tqdm(range(Nx), total=Nx):
+        for j in range(Ny):
+            xmin = -lx / 2.0 + i * dx
+            xmax = xmin + dx
+            ymin = -ly / 2.0 + j * dy
+            ymax = ymin + dy
+
+            mask = (xmin < da_x) * (da_x < xmax) * (ymin < da_y) * (da_y < ymax)
+            da_tiles = da_embs_manifold.where(mask, drop=True)
+            if da_tiles.count() < n_min:
+                continue
+
+            da_an_dist_selected = da_an_dist.sel(tile_id=da_tiles.tile_id)
+            da_an_dist_selected = da_an_dist_selected.sortby(da_an_dist_selected)
+            da_tile = da_an_dist_selected.isel(tile_id=0)
+
+            fp = f"{da_embs_manifold.data_dir}/{da_embs_manifold.stage}/{da_tile.triplet_tile_id}.png"
+            img = Image.open(fp)
+            img_arr_raw = np.array(img)
+            img_size = img_arr_raw.shape[:2]
+
+            assert img_size[0] == img_size[1]
+            step = img_size[0] // px
+
+            img_arr[i * px : (i + 1) * px, j * px : (j + 1) * px] = img_arr_raw[
+                ::step, ::step
+            ]
+            n_tiles[i, j] = da_tiles.count()
+
+    img_manifold = Image.fromarray(np.flipud(np.swapaxes(img_arr, 0, 1)))
+    return img_manifold, (xlim, ylim)
+
+
+def make_grid_based_manifold_image(
+    da_embs_manifold, da_an_dist, l=3.0, n_min=16, N=16, px=32
+):
+    """
+    Create grid-based manifold image
+
+    l: total xy-range
+    n_min: minimum number of tiles in bin required to render tile for bin
+    N: grid xy-size
+    px: number of pixels per image (must be power of 2)
+    """
+    Nx = Ny = N
+    lx = ly = l
+    dx = lx / Nx
+    dy = ly / Ny
+
+    sx = px * Nx
+    sy = px * Ny
+
+    img_arr = np.zeros((sx, sy, 4)).astype(np.uint8)
+    n_tiles = np.zeros((Nx, Ny))
+
+    da2 = da_embs_manifold.copy().rename(tile_id="ixy")
+
+    da_x = da2.sel(isomap_dim=0)
+    da_y = da2.sel(isomap_dim=1)
+
+    xmin = -lx / 2.0
+    xmax = lx / 2.0
+    ymin = -ly / 2.0
+    ymax = ly / 2.0
+
+    da_ix = ((da_x - xmin) / dx).astype(int)
+    da_iy = ((da_y - ymin) / dy).astype(int)
+
+    xlim = xmin, xmax
+    ylim = ymin, ymax
+
+    da2.coords["ix"] = da_ix
+    da2.coords["iy"] = da_iy
+    da2.coords["tile_id"] = da2.ixy
+    da2 = da2.set_index(ixy=("ix", "iy"))
+
+    for i in tqdm(range(Nx), total=Nx):
+        for j in range(Ny):
+            try:
+                with warnings.catch_warnings():
+                    warnings.filterwarnings("ignore")
+                    da_tiles = (
+                        da2.sel(ixy=(i, j))
+                        .swap_dims(ixy="tile_id")
+                        .drop(["ixy", "ix", "iy"])
+                    )
+            except KeyError:
+                continue
+            if da_tiles.count() < n_min:
+                continue
+
+            da_an_dist_selected = da_an_dist.sel(tile_id=da_tiles.tile_id)
+            da_an_dist_selected = da_an_dist_selected.sortby(da_an_dist_selected)
+            da_tile = da_an_dist_selected.isel(tile_id=0)
+
+            fp = f"{da_embs_manifold.data_dir}/{da_embs_manifold.stage}/{da_tile.triplet_tile_id}.png"
+            img = Image.open(fp)
+            img_arr_raw = np.array(img)
+            img_size = img_arr_raw.shape[:2]
+
+            assert img_size[0] == img_size[1]
+            step = img_size[0] // px
+
+            img_arr[i * px : (i + 1) * px, j * px : (j + 1) * px] = img_arr_raw[
+                ::step, ::step
+            ]
+            n_tiles[i, j] = da_tiles.count()
+
+    return Image.fromarray(np.flipud(np.swapaxes(img_arr, 0, 1))), (xlim, ylim)
+
+
+def make_grid_based_manifold_plot(
+    da_embs,
+    da_embs_manifold=None,
+    ax=None,
+    dx=0.05,
+    n_min=1,
+    px=32,
+    pt_c=(0.0, 0.0),
+    method="isomap",
+    **kwargs,
+):
+    da_an_dist = _get_an_dist(da_embs=da_embs)
+
+    if da_embs_manifold is None:
+        da_embs_manifold, embedding_transform_model = _get_anchor_embs_on_manifold(
+            da_embs=da_embs, method=method
+        )
+    else:
+        embedding_transform_model = None
+
+    manifold_dim = f"{method}_dim"
+    da_x = da_embs_manifold.sel({manifold_dim: 0})
+    da_y = da_embs_manifold.sel({manifold_dim: 1})
+    l_max = np.max(np.abs([da_x.min(), da_x.max(), da_y.min(), da_y.max()]))
+    N = int(l_max * 2.2 / dx)
+    l = N * dx
+
+    img, (xlim, ylim) = make_grid_based_manifold_image(
+        da_embs_manifold=da_embs_manifold,
+        da_an_dist=da_an_dist,
+        l=l,
+        n_min=n_min,
+        N=N,
+        px=px,
+        **kwargs,
+    )
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(5,5))
+    else:
+        fig = ax.figure
+
+    lx = ly = 2.0
+    ax.imshow(img, extent=[*xlim, *ylim])
+    ax.set_xlim(pt_c[0] - lx / 2.0, pt_c[0] + lx / 2.0)
+    ax.set_ylim(pt_c[1] - ly / 2.0, pt_c[1] + ly / 2.0)
+    ax.set_aspect(1)
+    sns.despine(offset=10)
+    fig.tight_layout()
+
+    return fig, ax, embedding_transform_model
+
+
+def make_manifold_reference_plot(
+    da_embs,
+    ax=None,
+    method="isomap",
+    da_embs_manifold=None,
+    plot_type="grid",
+    dx=0.05,
+    **kwargs,
+):
+
+    if plot_type == "scatter":
+        return make_scatter_based_manifold_reference_plot(
+            ax=ax, da_embs=da_embs, da_embs_manifold=da_embs_manifold, dl=dx, method=method, **kwargs
+        )
+    elif plot_type == "grid":
+        return make_grid_based_manifold_plot(
+            ax=ax, da_embs=da_embs, da_embs_manifold=da_embs_manifold, dx=dx, method=method, **kwargs
+        )
+
+    else:
+        raise NotImplementedError(plot_type)

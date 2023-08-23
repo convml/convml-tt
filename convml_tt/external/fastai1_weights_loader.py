@@ -30,7 +30,7 @@ def model_from_saved_weights(path):
     # model anyway, so hide the wwarnings for now
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        loaded_encoder = torch.load(path).to(dev)
+        loaded_encoder = torch.load(path, map_location=dev)
     batch_size = 5
     nx = ny = 256
     # the first layer is the conv1d, find out how many input channels it has
