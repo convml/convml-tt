@@ -273,7 +273,8 @@ def make_grid_based_manifold_image_slow(
             da_an_dist_selected = da_an_dist_selected.sortby(da_an_dist_selected)
             da_tile = da_an_dist_selected.isel(tile_id=0)
 
-            fp = f"{da_embs_manifold.data_dir}/{da_embs_manifold.stage}/{da_tile.triplet_tile_id}.png"
+            triplet_tile_id = da_tile.triplet_tile_id.item()
+            fp = f"{da_embs_manifold.data_dir}/{da_embs_manifold.stage}/{triplet_tile_id}.png"
             img = Image.open(fp)
             img_arr_raw = np.array(img)
             img_size = img_arr_raw.shape[:2]
@@ -352,7 +353,8 @@ def make_grid_based_manifold_image(
             da_an_dist_selected = da_an_dist_selected.sortby(da_an_dist_selected)
             da_tile = da_an_dist_selected.isel(tile_id=0)
 
-            fp = f"{da_embs_manifold.data_dir}/{da_embs_manifold.stage}/{da_tile.triplet_tile_id}.png"
+            triplet_tile_id = da_tile.triplet_tile_id.item()
+            fp = f"{da_embs_manifold.data_dir}/{da_embs_manifold.stage}/{triplet_tile_id}.png"
             img = Image.open(fp)
             img_arr_raw = np.array(img)
             img_size = img_arr_raw.shape[:2]
