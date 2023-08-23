@@ -7,6 +7,7 @@ import os
 import os.path
 import pathlib
 import re
+import ssl
 import tarfile
 import urllib
 import urllib.error
@@ -33,10 +34,18 @@ from tqdm.auto import tqdm
 USER_AGENT = "pytorch/vision"
 
 
+# disable SSL cert check for now because something appears to be wrong with
+# homepages.see.leeds.ac.uk certificate
+# https://www.digicert.com/help/
+ctx = ssl.create_default_context()
+ctx.check_hostname = False
+ctx.verify_mode = ssl.CERT_NONE
+
+
 def _urlretrieve(url: str, filename: str, chunk_size: int = 1024) -> None:
     with open(filename, "wb") as fh:
         with urllib.request.urlopen(
-            urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+            urllib.request.Request(url, headers={"User-Agent": USER_AGENT}), context=ctx
         ) as response:
             with tqdm(total=response.length) as pbar:
                 for chunk in iter(lambda: response.read(chunk_size), ""):
@@ -84,7 +93,7 @@ def _get_redirect_url(url: str, max_hops: int = 3) -> str:
 
     for _ in range(max_hops + 1):
         with urllib.request.urlopen(
-            urllib.request.Request(url, headers=headers)
+            urllib.request.Request(url, headers=headers), context=ctx
         ) as response:
             if response.url == url or response.url is None:
                 return url

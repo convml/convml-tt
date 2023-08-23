@@ -172,7 +172,6 @@ def make_scatter_based_manifold_reference_plot(
     if da_embs_manifold is None:
         da_embs_manifold, embedding_transform_model = _get_anchor_embs_on_manifold(
             da_embs=da_embs, method=method
-        )
     else:
         method_precomputed = da_embs_manifold.transform_type
         if method_precomputed != method:

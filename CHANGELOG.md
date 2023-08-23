@@ -1,8 +1,25 @@
 # Changelog
 
-## [Unreleased](https://github.com/convml/convml_tt/tree/HEAD)
+## [v0.13.1](https://github.com/convml/convml_tt/tree/v0.13.1)
 
-[Full Changelog](https://github.com/convml/convml_tt/compare/v0.12.0...)
+[Full Changelog](https://github.com/convml/convml_tt/compare/v0.13.1...v0.13.0)
+
+*bugfixes*
+
+- For image sliding-window (tiling) datasets use the loaded dataframe
+  describing the tiling to set the tile size
+  [\#80](https://github.com/convml/convml-tt/pull/80)
+
+*maintenance*
+
+- Support pytorch-lightning >1.8, Update README with new cudatoolkit install,
+  Update setup.cfg to reflect package changes and update pre-commit and linting
+  tools [\#81](https://github.com/convml/convml-tt/pull/81)
+
+
+## [v0.13.0](https://github.com/convml/convml_tt/tree/v0.13.0)
+
+[Full Changelog](https://github.com/convml/convml_tt/compare/v0.13.0...v0.12.0)
 
 *new features*
 
@@ -26,6 +43,10 @@
 
 - Update black to v22.3.0
   [\#75](https://github.com/convml/convml_tt/pull/75)
+
+- Fix example data and pretrained model download issue by avoiding check of SSL
+  certificate of homepages.see.leeds.ac.uk
+  [\#79](https://github.com/convml/convml-tt/pull/79)
 
 
 ## [v0.12.0](https://github.com/convml/convml_tt/tree/v0.12.0)
