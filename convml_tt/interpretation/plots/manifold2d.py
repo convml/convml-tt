@@ -379,6 +379,7 @@ def make_grid_based_manifold_plot(
     px=32,
     pt_c=(0.0, 0.0),
     method="isomap",
+    despine_offset=10,
     **kwargs,
 ):
     da_an_dist = _get_an_dist(da_embs=da_embs)
@@ -417,7 +418,8 @@ def make_grid_based_manifold_plot(
     ax.set_xlim(pt_c[0] - lx / 2.0, pt_c[0] + lx / 2.0)
     ax.set_ylim(pt_c[1] - ly / 2.0, pt_c[1] + ly / 2.0)
     ax.set_aspect(1)
-    sns.despine(offset=10)
+    if despine_offset:
+        sns.despine(offset=despine_offset)
     fig.tight_layout()
 
     return fig, ax, embedding_transform_model
