@@ -6,7 +6,6 @@ from pathlib import Path
 
 import numpy as np
 import pytorch_lightning as pl
-import torch
 import xarray as xr
 from torch.utils.data import DataLoader
 
@@ -72,11 +71,7 @@ def get_embeddings(
     )
     batched_results = []
 
-    if torch.cuda.is_available():
-        gpus = 1
-    else:
-        gpus = 0
-    trainer = pl.Trainer(gpus=gpus)
+    trainer = pl.Trainer(devices=1, accelerator="auto")
 
     # by using the index of the source pd.DataFrame here we can ensure that the
     # tile_id comes from the filename rather than simple the number for each
