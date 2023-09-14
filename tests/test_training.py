@@ -20,13 +20,13 @@ from convml_tt.trainer_onecycle import OneCycleTrainer
 from convml_tt.utils import get_embeddings
 
 if torch.cuda.is_available():
-    N_GPUS = 1
+    DEVICES = 1
 else:
-    N_GPUS = 0
+    DEVICES = None
 
 
 def test_train_new():
-    trainer = pl.Trainer(max_epochs=5, devices=N_GPUS)
+    trainer = pl.Trainer(max_epochs=5, devices=DEVICES)
     arch = "resnet18"
     model = TripletTrainerModel(pretrained=False, base_arch=arch)
     data_path = fetch_example_dataset(dataset=ExampleData.TINY10)
@@ -37,7 +37,7 @@ def test_train_new():
 
 
 def test_train_new_anti_aliased():
-    trainer = pl.Trainer(max_epochs=5, devices=N_GPUS)
+    trainer = pl.Trainer(max_epochs=5, devices=DEVICES)
     arch = "resnet18"
     model = TripletTrainerModel(
         pretrained=False, base_arch=arch, anti_aliased_backbone=True
@@ -50,7 +50,7 @@ def test_train_new_anti_aliased():
 
 
 def test_train_new_with_preloading():
-    trainer = pl.Trainer(max_epochs=5, devices=N_GPUS)
+    trainer = pl.Trainer(max_epochs=5, devices=DEVICES)
     arch = "resnet18"
     model = TripletTrainerModel(pretrained=False, base_arch=arch)
     data_path = fetch_example_dataset(dataset=ExampleData.TINY10)
@@ -61,7 +61,7 @@ def test_train_new_with_preloading():
 
 
 def test_finetune_pretrained():
-    trainer = pl.Trainer(max_epochs=5, callbacks=[HeadFineTuner()], devices=N_GPUS)
+    trainer = pl.Trainer(max_epochs=5, callbacks=[HeadFineTuner()], devices=DEVICES)
     arch = "resnet18"
     model = TripletTrainerModel(pretrained=True, base_arch=arch)
     data_path = fetch_example_dataset(dataset=ExampleData.TINY10)
@@ -120,7 +120,7 @@ def test_load_from_weights():
 
 def test_train_new_onecycle():
     lr_monitor = LearningRateMonitor(logging_interval="step")
-    trainer = OneCycleTrainer(max_epochs=5, callbacks=[lr_monitor], devices=N_GPUS)
+    trainer = OneCycleTrainer(max_epochs=5, callbacks=[lr_monitor], devices=DEVICES)
     arch = "resnet18"
     model = TripletTrainerModel(pretrained=False, base_arch=arch)
     data_path = fetch_example_dataset(dataset=ExampleData.TINY10)
