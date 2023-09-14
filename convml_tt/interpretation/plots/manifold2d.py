@@ -12,6 +12,7 @@ from PIL import Image
 from scipy.interpolate import interp1d
 from tqdm import tqdm
 
+from ...data.common import TRIPLET_TILE_IDENTIFIER_FORMAT
 from .. import embedding_transforms
 from . import annotated_scatter_plot
 
@@ -273,7 +274,13 @@ def make_grid_based_manifold_image_slow(
             da_an_dist_selected = da_an_dist_selected.sortby(da_an_dist_selected)
             da_tile = da_an_dist_selected.isel(tile_id=0)
 
-            triplet_tile_id = da_tile.triplet_tile_id.item()
+            try:
+                triplet_tile_id = da_tile.triplet_tile_id.item()
+            except AttributeError:
+                triplet_tile_id = TRIPLET_TILE_IDENTIFIER_FORMAT.format(
+                    triplet_id=da_tile.tile_id.item(),
+                    tile_type=da_tile.tile_type.item(),
+                )
             fp = f"{da_embs_manifold.data_dir}/{da_embs_manifold.stage}/{triplet_tile_id}.png"
             img = Image.open(fp)
             img_arr_raw = np.array(img)
@@ -292,7 +299,7 @@ def make_grid_based_manifold_image_slow(
 
 
 def make_grid_based_manifold_image(
-    da_embs_manifold, da_an_dist, lxy=3.0, n_min=16, N=16, px=32
+    da_embs_manifold, da_an_dist, lxy=3.0, n_min=16, N=16, px=32, pt_c=[0.0, 0.0]
 ):
     """
     Create grid-based manifold image
@@ -310,6 +317,8 @@ def make_grid_based_manifold_image(
     sx = px * Nx
     sy = px * Ny
 
+    # with 4 channels and all zeros the default will be transparent for points
+    # in the manifold dimensions without data
     img_arr = np.zeros((sx, sy, 4)).astype(np.uint8)
     n_tiles = np.zeros((Nx, Ny))
 
@@ -318,10 +327,10 @@ def make_grid_based_manifold_image(
     da_x = da2.sel(isomap_dim=0)
     da_y = da2.sel(isomap_dim=1)
 
-    xmin = -lx / 2.0
-    xmax = lx / 2.0
-    ymin = -ly / 2.0
-    ymax = ly / 2.0
+    xmin = pt_c[0] - lx / 2.0
+    xmax = pt_c[0] + lx / 2.0
+    ymin = pt_c[1] - ly / 2.0
+    ymax = pt_c[1] + ly / 2.0
 
     da_ix = ((da_x - xmin) / dx).astype(int)
     da_iy = ((da_y - ymin) / dy).astype(int)
@@ -353,18 +362,29 @@ def make_grid_based_manifold_image(
             da_an_dist_selected = da_an_dist_selected.sortby(da_an_dist_selected)
             da_tile = da_an_dist_selected.isel(tile_id=0)
 
-            triplet_tile_id = da_tile.triplet_tile_id.item()
+            try:
+                triplet_tile_id = da_tile.triplet_tile_id.item()
+            except AttributeError:
+                triplet_tile_id = TRIPLET_TILE_IDENTIFIER_FORMAT.format(
+                    triplet_id=da_tile.tile_id.item(),
+                    tile_type=da_tile.tile_type.item(),
+                )
             fp = f"{da_embs_manifold.data_dir}/{da_embs_manifold.stage}/{triplet_tile_id}.png"
             img = Image.open(fp)
-            img_arr_raw = np.array(img)
-            img_size = img_arr_raw.shape[:2]
+            img_arr_raw = np.array(img)[:, :]
+            nx_img, ny_img, nc_img = img_arr_raw.shape
 
-            assert img_size[0] == img_size[1]
-            step = img_size[0] // px
+            assert nx_img == ny_img
+            step = nx_img // px
 
-            img_arr[i * px : (i + 1) * px, j * px : (j + 1) * px] = img_arr_raw[
-                ::step, ::step
-            ]
+            sl_x = slice(i * px, (i + 1) * px)
+            sl_y = slice(j * px, (j + 1) * px)
+
+            img_arr[sl_x, sl_y, :nc_img] = img_arr_raw[::step, ::step]
+            if nc_img == 3:
+                # shouldn't be transparent
+                img_arr[sl_x, sl_y, 3] = 255
+
             n_tiles[i, j] = da_tiles.count()
 
     return Image.fromarray(np.flipud(np.swapaxes(img_arr, 0, 1))), (xlim, ylim)
@@ -380,6 +400,8 @@ def make_grid_based_manifold_plot(
     pt_c=(0.0, 0.0),
     method="isomap",
     despine_offset=10,
+    lxy=None,
+    return_image=False,
     **kwargs,
 ):
     da_an_dist = _get_an_dist(da_embs=da_embs)
@@ -394,17 +416,31 @@ def make_grid_based_manifold_plot(
     manifold_dim = f"{method}_dim"
     da_x = da_embs_manifold.sel({manifold_dim: 0})
     da_y = da_embs_manifold.sel({manifold_dim: 1})
-    l_max = np.max(np.abs([da_x.min(), da_x.max(), da_y.min(), da_y.max()]))
-    N = int(l_max * 2.2 / dx)
+    if lxy is None:
+        d_max = np.max(
+            np.abs(
+                [
+                    pt_c[0] - da_x.min(),
+                    da_x.max() - pt_c[0],
+                    pt_c[1] - da_y.min(),
+                    da_y.max() - pt_c[1],
+                ]
+            )
+        )
+        lxy = d_max * 2.0
+
+    # round to resolution
+    N = int(lxy / dx)
     lxy = N * dx
 
     img, (xlim, ylim) = make_grid_based_manifold_image(
         da_embs_manifold=da_embs_manifold,
         da_an_dist=da_an_dist,
-        lxy=lxy,
+        lxy=lxy + 2.0 * dx,  # pad a bit
         n_min=n_min,
         N=N,
         px=px,
+        pt_c=pt_c,
         **kwargs,
     )
 
@@ -413,7 +449,7 @@ def make_grid_based_manifold_plot(
     else:
         fig = ax.figure
 
-    lx = ly = 2.0
+    lx = ly = lxy
     ax.imshow(img, extent=[*xlim, *ylim])
     ax.set_xlim(pt_c[0] - lx / 2.0, pt_c[0] + lx / 2.0)
     ax.set_ylim(pt_c[1] - ly / 2.0, pt_c[1] + ly / 2.0)
@@ -422,7 +458,10 @@ def make_grid_based_manifold_plot(
         sns.despine(offset=despine_offset)
     fig.tight_layout()
 
-    return fig, ax, embedding_transform_model
+    if not return_image:
+        return fig, ax, embedding_transform_model
+    else:
+        return fig, ax, embedding_transform_model, img, (xlim, ylim)
 
 
 def make_manifold_reference_plot(
