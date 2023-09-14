@@ -73,10 +73,10 @@ def get_embeddings(
     batched_results = []
 
     if torch.cuda.is_available():
-        gpus = 1
+        n_gpus = 1
     else:
-        gpus = 0
-    trainer = pl.Trainer(gpus=gpus)
+        n_gpus = 0
+    trainer = pl.Trainer(devices=n_gpus)
 
     # by using the index of the source pd.DataFrame here we can ensure that the
     # tile_id comes from the filename rather than simple the number for each
