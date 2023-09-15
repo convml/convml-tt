@@ -11,10 +11,14 @@
   axes.
   [\#82](https://github.com/convml/convml_tt/pull/82)
 
+- Make it possible to plot grid-overview into a set of axes defined externall
+  from the function call
+  [\#85](https://github.com/convml/convml_tt/pull/85)
+
 *maintenance*
 
-- Pin to pytorch-lightning < 2.0 to handle breaking changes.
-  [\#84](https://github.com/convml/convml-tt/pull/88)
+- Pin to pytorch-lightning < 2.0 and apply fixes for matplotlib 3.8.0 to handle
+  breaking changes. [\#84](https://github.com/convml/convml-tt/pull/88)
 
 
 ## [v0.13.1](https://github.com/convml/convml_tt/tree/v0.13.1)

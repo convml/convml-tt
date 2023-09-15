@@ -15,6 +15,7 @@ def grid_overview(
     figwidth=16,
     ncols=10,
     label="tile_id",
+    axes=None,
 ):
     """
     Plot a grid overview of the chosen tile at the selected `points`. If
@@ -30,17 +31,35 @@ def grid_overview(
     else:
         raise NotImplementedError(type(points))
 
-    nrows = math.ceil(float(len(idxs)) / float(ncols))
-    figheight = float(figwidth) / ncols * nrows
-    figsize = (figwidth, figheight)
+    N_samples = len(idxs)
+    if axes is not None:
+        # make sure we turns lists into array
+        axes = np.array(axes)
+        if len(axes.flatten()) < N_samples:
+            raise Exception(
+                f"The axes you have provided aren't enough to fit the {N_samples} samples"
+            )
 
-    lspace = 0.05
-    fig, axes = plt.subplots(
-        nrows=nrows,
-        ncols=ncols,
-        figsize=figsize,
-        gridspec_kw=dict(hspace=lspace, wspace=lspace),
-    )
+        if len(axes.shape) == 2:
+            nrows, ncols = axes.shape
+        elif len(axes.shape) == 1:
+            nrows, ncols = len(axes), 1
+        else:
+            raise NotImplementedError(axes.shape)
+
+        fig = axes.flatten()[0].figure
+    else:
+        nrows = math.ceil(float(N_samples) / float(ncols))
+        figheight = float(figwidth) / ncols * nrows
+        figsize = (figwidth, figheight)
+
+        lspace = 0.05
+        fig, axes = plt.subplots(
+            nrows=nrows,
+            ncols=ncols,
+            figsize=figsize,
+            gridspec_kw=dict(hspace=lspace, wspace=lspace),
+        )
 
     for n, i in enumerate(idxs):
         ax = axes.flatten()[n]
