@@ -4,6 +4,12 @@
 
 [Full Changelog](https://github.com/convml/convml_tt/compare/HEAD...v0.13.1)
 
+*new features*
+
+- Make it possible to plot grid-overview into a set of axes defined externall
+  from the function call
+  [\#85](https://github.com/convml/convml_tt/pull/85)
+
 *maintenance*
 
 - Pin to pytorch-lightning < 2.0 to handle breaking changes.
