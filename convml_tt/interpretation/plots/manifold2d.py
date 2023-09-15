@@ -360,18 +360,32 @@ def make_grid_based_manifold_image(
 
             da_an_dist_selected = da_an_dist.sel(tile_id=da_tiles.tile_id)
             da_an_dist_selected = da_an_dist_selected.sortby(da_an_dist_selected)
-            da_tile = da_an_dist_selected.isel(tile_id=0)
 
-            try:
-                triplet_tile_id = da_tile.triplet_tile_id.item()
-            except AttributeError:
-                triplet_tile_id = TRIPLET_TILE_IDENTIFIER_FORMAT.format(
-                    triplet_id=da_tile.tile_id.item(),
-                    tile_type=da_tile.tile_type.item(),
-                )
-            fp = f"{da_embs_manifold.data_dir}/{da_embs_manifold.stage}/{triplet_tile_id}.png"
-            img = Image.open(fp)
-            img_arr_raw = np.array(img)[:, :]
+            # load an image, because some of them were spotted to be
+            # all-white/all-black (I think because of observation error) we
+            # need to check for that so we don't end up with a blank space
+            img_arr_raw = None
+            nn = 0
+            while img_arr_raw is None:
+                da_tile = da_an_dist_selected.isel(tile_id=nn)
+
+                try:
+                    triplet_tile_id = da_tile.triplet_tile_id.item()
+                except AttributeError:
+                    triplet_tile_id = TRIPLET_TILE_IDENTIFIER_FORMAT.format(
+                        triplet_id=da_tile.tile_id.item(),
+                        tile_type=da_tile.tile_type.item(),
+                    )
+                fp = f"{da_embs_manifold.data_dir}/{da_embs_manifold.stage}/{triplet_tile_id}.png"
+                img = Image.open(fp)
+                img_arr_raw = np.array(img)
+
+                if len(np.unique(img_arr_raw[:, :, :2])) == 1:
+                    if da_tiles.count() < nn:
+                        continue
+                    img_arr_raw = None
+                    nn += 1
+
             nx_img, ny_img, nc_img = img_arr_raw.shape
 
             assert nx_img == ny_img
