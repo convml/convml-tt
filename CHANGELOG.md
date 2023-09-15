@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased](https://github.com/convml/convml_tt/tree/HEAD)
+
+[Full Changelog](https://github.com/convml/convml_tt/compare/HEAD...v0.13.1)
+
+*maintenance*
+
+- Pin to pytorch-lightning < 2.0 to handle breaking changes.
+  [\#84](https://github.com/convml/convml-tt/pull/88)
+
+
 ## [v0.13.1](https://github.com/convml/convml_tt/tree/v0.13.1)
 
 [Full Changelog](https://github.com/convml/convml_tt/compare/v0.13.1...v0.13.0)
