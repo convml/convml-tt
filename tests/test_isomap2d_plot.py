@@ -29,4 +29,15 @@ def test_isomap2d():
         prediction_batch_size=4,
     )
 
-    isomap2d.make_isomap_reference_plot(da_embs=da_embs, tile_size=0.1)
+    variants = [
+        dict(plot_type="grid", dx=0.2),
+        dict(
+            plot_type="scatter",
+            dx=0.2,
+            an_dist_ecdf_threshold=0.3,
+            inset_triplet_distance_distributions=True,
+        ),
+    ]
+
+    for variant in variants:
+        isomap2d.make_isomap_reference_plot(da_embs=da_embs, **variant)
