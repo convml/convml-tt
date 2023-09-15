@@ -295,7 +295,7 @@ def dendrogram(
     )
     secax.set_xticklabels([])
     secax.set_xticks([])
-    ax_tiles.get_shared_x_axes().join(secax, ax_tiles)
+    ax_tiles.sharex(secax)
 
     N_clusters = len(tile_idxs_per_cluster)
 

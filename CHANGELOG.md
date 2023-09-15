@@ -12,8 +12,8 @@
 
 *maintenance*
 
-- Pin to pytorch-lightning < 2.0 to handle breaking changes.
-  [\#84](https://github.com/convml/convml-tt/pull/88)
+- Pin to pytorch-lightning < 2.0 and apply fixes for matplotlib 3.8.0 to handle
+  breaking changes. [\#84](https://github.com/convml/convml-tt/pull/88)
 
 
 ## [v0.13.1](https://github.com/convml/convml_tt/tree/v0.13.1)
