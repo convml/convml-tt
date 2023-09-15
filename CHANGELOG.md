@@ -4,6 +4,13 @@
 
 [Full Changelog](https://github.com/convml/convml_tt/compare/HEAD...v0.13.1)
 
+*new features*
+
+- New faster grid-based manifold plot which constructs a single image from
+  individual tile images, rather than plotting individual images as floating
+  axes.
+  [\#82](https://github.com/convml/convml_tt/pull/82)
+
 *maintenance*
 
 - Pin to pytorch-lightning < 2.0 to handle breaking changes.
