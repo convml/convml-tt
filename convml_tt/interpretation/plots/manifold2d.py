@@ -230,7 +230,13 @@ def make_scatter_based_manifold_reference_plot(
 
 
 def make_grid_based_manifold_image_slow(
-    da_embs_manifold, da_an_dist, lxy=3.0, n_min=16, N=16, px=32
+    da_embs_manifold,
+    da_an_dist,
+    lxy=3.0,
+    n_min=16,
+    N=16,
+    px=32,
+    data_dir="from_embeddings",
 ):
     """
     Create grid-based manifold image. Reference implementation which is quite slow
@@ -240,6 +246,9 @@ def make_grid_based_manifold_image_slow(
     N: grid xy-size
     px: number of pixels per image (must be power of 2)
     """
+    if data_dir == "from_embeddings":
+        data_dir = da_embs_manifold.data_dir
+
     Nx = Ny = N
     lx = ly = lxy
 
@@ -281,7 +290,7 @@ def make_grid_based_manifold_image_slow(
                     triplet_id=da_tile.tile_id.item(),
                     tile_type=da_tile.tile_type.item(),
                 )
-            fp = f"{da_embs_manifold.data_dir}/{da_embs_manifold.stage}/{triplet_tile_id}.png"
+            fp = f"{data_dir}/{da_embs_manifold.stage}/{triplet_tile_id}.png"
             img = Image.open(fp)
             img_arr_raw = np.array(img)
             img_size = img_arr_raw.shape[:2]
@@ -299,7 +308,14 @@ def make_grid_based_manifold_image_slow(
 
 
 def make_grid_based_manifold_image(
-    da_embs_manifold, da_an_dist, lxy=3.0, n_min=16, N=16, px=32, pt_c=[0.0, 0.0]
+    da_embs_manifold,
+    da_an_dist,
+    lxy=3.0,
+    n_min=16,
+    N=16,
+    px=32,
+    pt_c=[0.0, 0.0],
+    data_dir="from_embeddings",
 ):
     """
     Create grid-based manifold image
@@ -309,6 +325,9 @@ def make_grid_based_manifold_image(
     N: grid xy-size
     px: number of pixels per image (must be power of 2)
     """
+    if data_dir == "from_embeddings":
+        data_dir = da_embs_manifold.data_dir
+
     Nx = Ny = N
     lx = ly = lxy
     dx = lx / Nx
@@ -376,7 +395,7 @@ def make_grid_based_manifold_image(
                         triplet_id=da_tile.tile_id.item(),
                         tile_type=da_tile.tile_type.item(),
                     )
-                fp = f"{da_embs_manifold.data_dir}/{da_embs_manifold.stage}/{triplet_tile_id}.png"
+                fp = f"{data_dir}/{da_embs_manifold.stage}/{triplet_tile_id}.png"
                 img = Image.open(fp)
                 img_arr_raw = np.array(img)
 
