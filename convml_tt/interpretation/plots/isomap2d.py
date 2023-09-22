@@ -8,13 +8,7 @@ from .manifold2d import make_manifold_reference_plot
 
 
 def make_isomap_reference_plot(
-    da_embs,
-    tile_size=0.02,
-    dl=0.1,
-    ax=None,
-    data_dir="from_embeddings",
-    an_dist_ecdf_threshold=0.3,
-    inset_triplet_distance_distributions=True,
+    da_embs, dx=0.1, ax=None, data_dir="from_embeddings", **kwargs
 ):
     """
     Use triplet embeddings in `da_embs` to produce a 2D isomap manifold plot
@@ -22,24 +16,11 @@ def make_isomap_reference_plot(
     are nearest to the neighbour tile.
     """
     return make_manifold_reference_plot(
-        da_embs=da_embs,
-        tile_size=tile_size,
-        dl=dl,
-        ax=ax,
-        data_dir=data_dir,
-        an_dist_ecdf_threshold=an_dist_ecdf_threshold,
-        method="isomap",
-        inset_triplet_distance_distributions=inset_triplet_distance_distributions,
+        da_embs=da_embs, dx=dx, ax=ax, data_dir=data_dir, method="isomap", **kwargs
     )
 
 
-def plot_embs_on_isomap_manifold(
-    da_embs_triplets,
-    da_embs,
-    an_dist_ecdf_threshold=0.3,
-    tile_size=0.1,
-    inset_triplet_distance_distributions=True,
-):
+def plot_embs_on_isomap_manifold(da_embs_triplets, da_embs, **kwargs):
     if len(da_embs.dims) > 2:
         raise Exception(
             "The embeddings provided should only have a single dimension besides"
@@ -48,11 +29,7 @@ def plot_embs_on_isomap_manifold(
         )
 
     fig, ax, model_isomap = make_isomap_reference_plot(
-        da_embs_triplets=da_embs_triplets,
-        an_dist_ecdf_threshold=an_dist_ecdf_threshold,
-        tile_size=tile_size,
-        method="isomap",
-        inset_triplet_distance_distributions=inset_triplet_distance_distributions,
+        da_embs_triplets=da_embs_triplets, method="isomap", **kwargs
     )
 
     da_embs_isomap = embedding_transforms.apply_transform(

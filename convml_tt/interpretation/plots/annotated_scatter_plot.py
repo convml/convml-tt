@@ -48,6 +48,7 @@ def annotated_scatter_plot(  # noqa
     hue_palette="hls",
     tile_dataset: ImageSingletDataset = None,
     zorder=None,
+    only_annotations=False,
 ):
     """
     create scatter plot from values in `x` and `y` picking out points to
@@ -156,15 +157,16 @@ def annotated_scatter_plot(  # noqa
 
     # we plot points that will be hidden by the tile images because this helps
     # with autoscaling the axes
-    ax.scatter(*pts_offset.T, alpha=0.0)
-    ax.margins(0.2)
-    xlim, ylim = ax.get_xlim(), ax.get_ylim()
+    if not only_annotations:
+        ax.scatter(*pts_offset.T, alpha=0.0)
+        ax.margins(0.2)
+        xlim, ylim = ax.get_xlim(), ax.get_ylim()
 
-    lim_min = min(xlim[0], ylim[0])
-    lim_max = max(xlim[1], ylim[1])
-    xlim = ylim = (lim_min, lim_max)
-    ax.set_xlim(xlim)
-    ax.set_ylim(ylim)
+        lim_min = min(xlim[0], ylim[0])
+        lim_max = max(xlim[1], ylim[1])
+        xlim = ylim = (lim_min, lim_max)
+        ax.set_xlim(xlim)
+        ax.set_ylim(ylim)
 
     def transform(coord):
         return (ax.transData + fig.transFigure.inverted()).transform(coord)
@@ -254,10 +256,11 @@ def annotated_scatter_plot(  # noqa
             )
             ax.add_artist(ab_text)
 
-    # ensure that adding the points doesn't change the axis limits since we
-    # calculated the offset for the annotations
-    ax.set_xlim(xlim)
-    ax.set_ylim(ylim)
+    if not only_annotations:
+        # ensure that adding the points doesn't change the axis limits since
+        # we calculated the offset for the annotations
+        ax.set_xlim(xlim)
+        ax.set_ylim(ylim)
 
     if hue is not None:
         sns.scatterplot(

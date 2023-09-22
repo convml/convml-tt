@@ -6,6 +6,11 @@
 
 *new features*
 
+- New faster grid-based manifold plot which constructs a single image from
+  individual tile images, rather than plotting individual images as floating
+  axes.
+  [\#82](https://github.com/convml/convml_tt/pull/82)
+
 - Make it possible to plot grid-overview into a set of axes defined externall
   from the function call
   [\#85](https://github.com/convml/convml_tt/pull/85)

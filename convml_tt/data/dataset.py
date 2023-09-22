@@ -10,12 +10,16 @@ import numpy as np
 import pandas as pd
 import parse
 import xarray as xr
-from PIL import Image
+from PIL import Image, ImageFile
 from torch.utils.data.dataset import Dataset
 from torchvision import transforms as tv_transforms
 from tqdm import tqdm
 
 from .common import TRIPLET_TILE_IDENTIFIER_FORMAT
+
+# try and handle `OSError: image file is truncated`
+# https://github.com/eriklindernoren/PyTorch-YOLOv3/issues/162
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 
 def get_load_transforms():
