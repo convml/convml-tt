@@ -368,10 +368,11 @@ def make_grid_based_manifold_image(
                 with warnings.catch_warnings():
                     warnings.filterwarnings("ignore")
                     da_tiles = (
-                        da2.sel(ixy=(i, j))
-                        .swap_dims(ixy="tile_id")
-                        .drop(["ixy", "ix", "iy"])
+                        da2.sel(ixy=(i, j)).swap_dims(ixy="tile_id").drop(["ixy"])
                     )
+                    for var in ["ix", "iy"]:
+                        if var in da_tiles:
+                            da_tiles = da_tiles.drop([var])
             except KeyError:
                 continue
             if da_tiles.count() < n_min:
