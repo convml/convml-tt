@@ -1,8 +1,17 @@
 # Changelog
 
-## [Unreleased](https://github.com/convml/convml_tt/tree/HEAD)
+## [v0.14.1](https://github.com/convml/convml_tt/tree/v0.14.1)
 
-[v0.14.0](https://github.com/convml/convml_tt/compare/v0.14.0...v0.13.1)
+[Full Changelog](https://github.com/convml/convml_tt/compare/v0.14.1...v0.14.0)
+
+*maintenance*
+
+- Fix flake8 config so that pre-commit runs [\#86](https://github.com/convml/convml-tt/pull/86)
+
+
+## [v0.14.0](https://github.com/convml/convml_tt/tree/v0.14.0)
+
+[Full Changelog](https://github.com/convml/convml_tt/compare/v0.14.0...v0.13.1)
 
 *new features*
 
