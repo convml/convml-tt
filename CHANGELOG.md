@@ -2,7 +2,7 @@
 
 ## [Unreleased](https://github.com/convml/convml_tt/tree/HEAD)
 
-[Full Changelog](https://github.com/convml/convml_tt/compare/HEAD...v0.13.1)
+[v0.14.0](https://github.com/convml/convml_tt/compare/v0.14.0...v0.13.1)
 
 *new features*
 
