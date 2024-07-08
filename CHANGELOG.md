@@ -4,7 +4,7 @@
 
 *maintenance*
 
-- Handle pytorch-lightning < 2.3.2 issue with numpy v2.0.0 by pinning to numpy<2.0.0
+- Handle pytorch-lightning < 2.1.0 issue with numpy v2.0.0 by pinning to numpy<2.0.0
   [\#87](https://github.com/convml/convml-tt/pull/87)
 
 
