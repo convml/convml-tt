@@ -1,5 +1,13 @@
 # Changelog
 
+## [unreleased](https://github.com/convml/convml-tt/tree/HEAD)
+
+*maintenance*
+
+- Handle pytorch-lightning < 2.1.0 issue with numpy v2.0.0 by pinning to numpy<2.0.0
+  [\#87](https://github.com/convml/convml-tt/pull/87)
+
+
 ## [v0.14.1](https://github.com/convml/convml_tt/tree/v0.14.1)
 
 [Full Changelog](https://github.com/convml/convml_tt/compare/v0.14.1...v0.14.0)
