@@ -1,6 +1,7 @@
 """
 Utility functions for the triplet-trainer
 """
+
 import multiprocessing
 from pathlib import Path
 

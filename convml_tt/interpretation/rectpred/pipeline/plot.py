@@ -1,6 +1,7 @@
 """
 luigi Tasks for running plotting pipeline on rectangular domain datasets
 """
+
 from pathlib import Path
 
 import luigi

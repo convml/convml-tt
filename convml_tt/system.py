@@ -2,6 +2,7 @@
 Contains the main triplet-trainer architecture (TripletTrainerModel) and the datamodule to
 load triplet-datasets (TripletTrainerDataModule)
 """
+
 import argparse
 import pathlib
 

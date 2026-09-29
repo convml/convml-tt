@@ -76,9 +76,9 @@ def grid_overview(
         ax.set_xticklabels([])
         ax.set_yticklabels([])
         label_text = None
-        if type(label) == str and label == "tile_id":
+        if type(label) is str and label == "tile_id":
             label_text = str(i)
-        elif type(label) == list:
+        elif type(label) is list:
             label_text = label[n]
         else:
             if "{" in label:

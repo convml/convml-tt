@@ -5,6 +5,7 @@ The example datasets and pretrained model are hosted on Zenodo:
 - datasets: https://doi.org/10.5281/zenodo.23045530
 - pretrained model: https://doi.org/10.5281/zenodo.23045532
 """
+
 import enum
 from pathlib import Path
 from typing import Union

@@ -68,9 +68,11 @@ def denormalize_triplet(
 ) -> TensorImage:
     "Denormalize `x` with `mean` and `std`."
     return [
-        x_.cpu().float() * std[..., None, None] + mean[..., None, None]
-        if do_x
-        else x_.cpu()
+        (
+            x_.cpu().float() * std[..., None, None] + mean[..., None, None]
+            if do_x
+            else x_.cpu()
+        )
         for x_ in x
     ]
 
@@ -251,7 +253,7 @@ def loss_batch(
         # fastai v1.0.52 introduced the possibility for the backwards step to
         # be optional by returning a tuple here
         # see https://github.com/fastai/fastai/commit/6fcaad870e0e833d325052b57e72e23a450ebc6f#diff-0730afdfa67f9712e46ad7866b0123f8L32
-        if type(loss) == tuple:
+        if type(loss) is tuple:
             loss, skip_bwd = loss
             if not skip_bwd:
                 loss.backward()
