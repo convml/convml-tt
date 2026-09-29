@@ -13,3 +13,7 @@ example_notebooks/*/data/
 wandb/
 convml_tt.egg-info/
 .eggs/
+
+# uv
+.venv/
+uv.lock

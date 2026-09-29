@@ -1,0 +1,91 @@
+[build-system]
+requires = ["setuptools>=64", "setuptools-scm>=8"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "convml-tt"
+dynamic = ["version"]
+description = "Neural Network based study of convective organisation"
+readme = "README.md"
+license = { text = "Apache" }
+authors = [{ name = "Leif Denby", email = "l.c.denby@leeds.ac.uk" }]
+requires-python = ">=3.9"
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering",
+]
+dependencies = [
+    "xarray",
+    "netCDF4",
+    "matplotlib",
+    "pytorch-lightning >= 1.2.0,<2.0.0",
+    "kornia >= 0.5.0",
+    "scikit-learn",
+    "seaborn",
+    "parse",
+    "jupyter",
+    "scikit-image",
+    "antialiased-cnns >= 0.3",
+    # torch v2.6 changed `torch.load` to default to `weights_only=True`, which
+    # pytorch-lightning < 2.0 can't load checkpoints with
+    "torch < 2.6",
+    "torchvision >= 0.4.0",
+    "semver",
+    "statsmodels",
+    # pytorch-lightning < 2.1.0 uses np.Inf which has been removed in v2.0.0
+    "numpy < 2.0.0",
+    # pytorch-lightning < 2.0 imports `pkg_resources`, removed in setuptools v82
+    "setuptools < 82",
+]
+
+[project.optional-dependencies]
+pipeline = ["luigi"]
+# NB: xesmf needs esmpy, which isn't on pypi and must be installed from
+# conda-forge
+sattiles = [
+    "convml-tt[pipeline]",
+    "cartopy",
+    "satpy",
+    "xesmf",
+    "convml-data>=0.2.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/convml/convml-tt"
+
+[dependency-groups]
+test = ["pytest", "nbval"]
+dev = [{ include-group = "test" }, "pre-commit", "ipython"]
+
+[tool.setuptools.packages.find]
+include = ["convml_tt*"]
+
+[tool.setuptools_scm]
+
+[tool.pytest.ini_options]
+python_files = "test_*.py"
+testpaths = ["tests"]
+
+[tool.isort]
+profile = "black"
+skip_gitignore = true
+force_to_top = true
+default_section = "THIRDPARTY"
+known_first_party = "convml_tt"
+
+[tool.pylint.typecheck]
+# List of members which are set dynamically and missed by Pylint inference
+# system, and so shouldn't trigger E1101 when accessed.
+generated-members = ["numpy.*", "torch.*"]
+
+[tool.pylint.basic]
+good-names = ["i", "j", "df", "n_*"]

@@ -144,7 +144,7 @@ def dendrogram(
     return_clusters=False,
     color="black",
     linkage_method="ward",
-    **kwargs
+    **kwargs,
 ):
     """
     Create a dendrogram plot representing the clustering with the embedding
@@ -264,7 +264,7 @@ def dendrogram(
         p=n_clusters_max,
         ax=ax_dendrogram,
         get_leaves=True,
-        **kwargs
+        **kwargs,
     )
 
     # the indecies returned when finding the leaf indecies below number from

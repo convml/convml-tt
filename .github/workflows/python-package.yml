@@ -1,0 +1,30 @@
+name: tests
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.12"]
+    name: Python ${{ matrix.python-version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # Fetch all history for all branches and tags.
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: ${{ matrix.python-version }}
+          activate-environment: true
+
+      - name: install convml_tt
+        run: uv pip install --torch-backend cpu -e . --group test
+
+      - name: cache example data downloaded from Zenodo
+        uses: actions/cache@v6
+        with:
+          path: data/*.tgz
+          key: example-data-${{ hashFiles('convml_tt/data/examples.py') }}
+
+      - name: Test with pytest
+        run: pytest

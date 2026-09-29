@@ -142,7 +142,7 @@ class MultiImageDataBunch(ImageDataBunch):
         rows: int = 5,
         ds_type: DatasetType = DatasetType.Train,
         reverse: bool = False,
-        **kwargs
+        **kwargs,
     ) -> None:
         raise NotImplementedError(
             "Leif: haven't made this work with the triplet trainer yet"
