@@ -1,5 +1,21 @@
 # Changelog
 
+## [v0.14.3](https://github.com/convml/convml-tt/tree/v0.14.3)
+
+[Full Changelog](https://github.com/convml/convml-tt/compare/v0.14.2...v0.14.3)
+
+*maintenance*
+
+- Move hosting of example datasets and pretrained model from
+  homepages.see.leeds.ac.uk (no longer available) to Zenodo
+  ([datasets](https://doi.org/10.5281/zenodo.23045530),
+  [pretrained model](https://doi.org/10.5281/zenodo.23045532)). The `TINY10`
+  and `SMALL100` example datasets have been recreated as subsets of the first
+  10 and 100 training triplets of `LARGE2000S500`, so their md5 checksums have
+  changed. SSL certificate verification during download is re-enabled.
+  Training tests now use `batch_size=3` so that the 9 training triplets of
+  `TINY10` split into full batches.
+
 ## [v0.14.2](https://github.com/convml/convml-tt/tree/v0.14.2)
 
 *maintenance*

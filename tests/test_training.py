@@ -31,7 +31,7 @@ def test_train_new():
     model = TripletTrainerModel(pretrained=False, base_arch=arch)
     data_path = fetch_example_dataset(dataset=ExampleData.TINY10)
     datamodule = TripletTrainerDataModule(
-        data_dir=data_path, batch_size=2, normalize_for_arch=arch
+        data_dir=data_path, batch_size=3, normalize_for_arch=arch
     )
     trainer.fit(model=model, datamodule=datamodule)
 
@@ -44,7 +44,7 @@ def test_train_new_anti_aliased():
     )
     data_path = fetch_example_dataset(dataset=ExampleData.TINY10)
     datamodule = TripletTrainerDataModule(
-        data_dir=data_path, batch_size=2, normalize_for_arch=arch
+        data_dir=data_path, batch_size=3, normalize_for_arch=arch
     )
     trainer.fit(model=model, datamodule=datamodule)
 
@@ -55,7 +55,7 @@ def test_train_new_with_preloading():
     model = TripletTrainerModel(pretrained=False, base_arch=arch)
     data_path = fetch_example_dataset(dataset=ExampleData.TINY10)
     datamodule = TripletTrainerDataModule(
-        data_dir=data_path, batch_size=2, normalize_for_arch=arch, preload_data=True
+        data_dir=data_path, batch_size=3, normalize_for_arch=arch, preload_data=True
     )
     trainer.fit(model=model, datamodule=datamodule)
 
@@ -66,7 +66,7 @@ def test_finetune_pretrained():
     model = TripletTrainerModel(pretrained=True, base_arch=arch)
     data_path = fetch_example_dataset(dataset=ExampleData.TINY10)
     datamodule = TripletTrainerDataModule(
-        data_dir=data_path, batch_size=2, normalize_for_arch=arch
+        data_dir=data_path, batch_size=3, normalize_for_arch=arch
     )
     trainer.fit(model=model, datamodule=datamodule)
 
@@ -125,6 +125,6 @@ def test_train_new_onecycle():
     model = TripletTrainerModel(pretrained=False, base_arch=arch)
     data_path = fetch_example_dataset(dataset=ExampleData.TINY10)
     datamodule = TripletTrainerDataModule(
-        data_dir=data_path, batch_size=2, normalize_for_arch=arch
+        data_dir=data_path, batch_size=3, normalize_for_arch=arch
     )
     trainer.fit(model=model, datamodule=datamodule)
