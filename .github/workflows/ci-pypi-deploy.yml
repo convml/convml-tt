@@ -15,10 +15,12 @@ jobs:
     name: build and upload release to pypi
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
-      - uses: casperdcl/deploy-pypi@v2
+      - uses: actions/checkout@v7
         with:
-          password: ${{ secrets.PYPI_TOKEN }}
-          pip: wheel -w dist/ --no-deps .
-          upload: ${{ github.event_name == 'release' && github.event.action == 'published' }}
+          fetch-depth: 0 # setuptools-scm needs the tags to set the version
+      - uses: astral-sh/setup-uv@v10.2.0
+      - name: build sdist and wheel
+        run: uv build
+      - name: upload to pypi
+        if: github.event_name == 'release' && github.event.action == 'published'
+        run: uv publish --token ${{ secrets.PYPI_TOKEN }}

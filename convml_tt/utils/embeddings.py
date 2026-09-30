@@ -1,12 +1,12 @@
 """
 Utility functions for the triplet-trainer
 """
+
 import multiprocessing
 from pathlib import Path
 
 import numpy as np
 import pytorch_lightning as pl
-import torch
 import xarray as xr
 from torch.utils.data import DataLoader
 
@@ -30,7 +30,7 @@ def get_embeddings(
     reduce the `prediction_batch_size` (you may also increase it to generate
     predictions faster while using more RAM).
 
-    If a GPU is available it will be used. For now we only use a single GPU
+    If a GPU (CUDA or Apple Silicon) is available it will be used. For now we only use a single GPU
     even if multiple are available. By default we will use all available cpu
     cores for the dataloader.
 
@@ -72,11 +72,7 @@ def get_embeddings(
     )
     batched_results = []
 
-    if torch.cuda.is_available():
-        gpus = 1
-    else:
-        gpus = 0
-    trainer = pl.Trainer(gpus=gpus)
+    trainer = pl.Trainer(accelerator="auto", devices=1)
 
     # by using the index of the source pd.DataFrame here we can ensure that the
     # tile_id comes from the filename rather than simple the number for each

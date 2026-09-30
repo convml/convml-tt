@@ -2,6 +2,7 @@
 Utilities for applying transforms on embedding dimensions for data on
 reactangular domains
 """
+
 try:
     import hdbscan
 

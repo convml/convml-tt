@@ -107,10 +107,10 @@ def annotated_scatter_plot(  # noqa
         y = y.stack(sample=y.dims)
 
     def _is_array(v):
-        return isinstance(v, np.ndarray) or (type(v) == list and type(v[0]) == int)
+        return isinstance(v, np.ndarray) or (type(v) is list and type(v[0]) is int)
 
     x_err, y_err, x_c, y_c = None, None, None, None
-    if type(points) == int:
+    if type(points) is int:
         N = len(x)
         idx_sample = np.random.choice(np.arange(N), size=points)
         x_sample, y_sample = x[idx_sample], y[idx_sample]

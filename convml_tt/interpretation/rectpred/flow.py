@@ -7,7 +7,6 @@ using optical-flow methods. Much of this code is based on
 interface
 """
 
-
 from collections import OrderedDict
 from pathlib import Path
 

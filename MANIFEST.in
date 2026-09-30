@@ -1,2 +1,0 @@
-include versioneer.py
-include convml_tt/_version.py
