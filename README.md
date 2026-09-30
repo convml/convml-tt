@@ -20,16 +20,30 @@ source .venv/bin/activate
 uv pip install convml-tt
 ```
 
-By default this installs pytorch built for the platform's default accelerator
-(CUDA on linux). To choose a specific pytorch build (for example CPU-only, or
-a specific CUDA version) use uv's `--torch-backend` flag:
+By default this installs the pytorch build from pypi, which differs by
+platform:
+
+- **linux**: built with CUDA 12.4, so NVIDIA GPUs are used if available
+- **windows**: CPU-only, so to use an NVIDIA GPU you must choose a CUDA build
+  (see below)
+- **macOS**: supports Apple Silicon GPUs through pytorch's
+  [`mps`](https://pytorch.org/docs/stable/notes/mps.html) backend. There are
+  no separate GPU builds for macOS.
+
+To choose a specific pytorch build (for example CPU-only, or a specific CUDA
+version) use uv's `--torch-backend` flag:
 
 ```bash
-uv pip install --torch-backend cpu convml-tt
+uv pip install --torch-backend cpu convml-tt    # CPU-only
+uv pip install --torch-backend cu124 convml-tt  # CUDA 12.4 (also cu118, cu121)
 ```
 
-(to check that GPU support is working you can run `python -c 'import torch;
-print(torch.cuda.is_available())'`)
+When training (`python -m convml_tt.trainer`) and when computing embeddings,
+`convml-tt` uses a CUDA GPU or an Apple Silicon GPU if one is available, and
+otherwise the CPU. Pass `--accelerator {cpu,cuda,mps}` to the trainer to
+choose one explicitly. To check that GPU support is working you can run
+`python -c 'import torch; print(torch.cuda.is_available(),
+torch.backends.mps.is_available())'`.
 
 This installs the *base* components of `convml-tt`, which enable training
 the model on an existing triplet-dataset and making predictions with a
@@ -48,7 +62,10 @@ uv sync
 uv run pre-commit install
 ```
 
-and run the tests with `uv run pytest`.
+and run the tests with `uv run pytest`. `uv sync` installs the default pypi
+build of pytorch (see above). To choose a specific build, pass one of the
+`cpu`, `gpu-cu118`, `gpu-cu121` or `gpu-cu124` extras, e.g. `uv sync --extra
+gpu-cu124` (on macOS the `gpu-*` extras fall back to the default build).
 
 
 ## Training

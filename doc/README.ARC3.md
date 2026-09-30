@@ -145,7 +145,7 @@ tree -d $TMPDIR
 
 # run training
 DATA_PATH="$TMPDIR/Nx256_s200000.0_N500study_N2000train/"
-python -m convml_tt.trainer $DATA_PATH --gpus 1 --num-dataloader-workers 24 --max-epochs 10 --log-to-wandb --batch-size 128
+python -m convml_tt.trainer $DATA_PATH --accelerator cuda --num-dataloader-workers 24 --max-epochs 10 --log-to-wandb --batch-size 128
 ```
 
 The above script ensures you have a node with a GPU, have conda available and

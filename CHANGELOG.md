@@ -17,8 +17,21 @@
   v2.6's `weights_only=True` default) and `setuptools < 82` (pytorch-lightning
   < 2.0 imports `pkg_resources`). `esmpy` is dropped from the `sattiles`
   extra because it isn't on pypi and must be installed from conda-forge.
+  Add `cpu`, `gpu-cu118`, `gpu-cu121` and `gpu-cu124` extras to choose the
+  pytorch build when installing from source with uv, and commit `uv.lock`.
   Update the pre-commit hooks and reformat the code with the new versions.
   [\#90](https://github.com/convml/convml-tt/pull/90)
+
+*new features*
+
+- Use Apple Silicon GPUs (pytorch's `mps` backend) when available, both for
+  training and for computing embeddings. The trainer CLI now takes
+  `--accelerator {auto,cpu,cuda,mps}` (default `auto`) and `--devices N`.
+  `auto` uses a CUDA or Apple Silicon GPU if available, and otherwise the CPU,
+  so training now uses a GPU by default where the CLI previously defaulted to
+  the CPU. `--gpus` is deprecated. Multi-GPU training now correctly uses
+  `strategy="ddp"`; it previously passed `accelerator="ddp"`, which
+  pytorch-lightning no longer accepts.
 
 ## [v0.14.2](https://github.com/convml/convml-tt/tree/v0.14.2)
 
