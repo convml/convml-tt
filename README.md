@@ -10,33 +10,37 @@ easier to modify and carry out further research on the technique.
 
 ## Getting started
 
-`convml-tt` can be installed from [pypi](https://pypi.org/) with pip or
-[uv](https://docs.astral.sh/uv/). Using uv you can create a virtual environment
-and install `convml-tt` into it with:
+The easiest way to get started is with [uv](https://docs.astral.sh/uv/).
+Clone the repository and create an environment with `uv sync`, choosing the
+pytorch build with one of the `cpu`, `gpu-cu118`, `gpu-cu121` or `gpu-cu124`
+extras:
 
 ```bash
-uv venv
-source .venv/bin/activate
-uv pip install convml-tt
+git clone https://github.com/convml/convml-tt
+cd convml-tt
+uv sync --extra cpu        # CPU-only
+uv sync --extra gpu-cu124  # CUDA 12.4 (also gpu-cu118, gpu-cu121)
 ```
 
-By default this installs the pytorch build from pypi, which differs by
-platform:
+Without an extra, `uv sync` installs the default pytorch build from pypi, which
+differs by platform:
 
 - **linux**: built with CUDA 12.4, so NVIDIA GPUs are used if available
-- **windows**: CPU-only, so to use an NVIDIA GPU you must choose a CUDA build
-  (see below)
+- **windows**: the default build only uses the CPU. NVIDIA GPUs can be used
+  on windows too, but you need to install with one of the `gpu-*` extras
+  (e.g. `uv sync --extra gpu-cu124`)
 - **macOS**: supports Apple Silicon GPUs through pytorch's
   [`mps`](https://pytorch.org/docs/stable/notes/mps.html) backend. There are
-  no separate GPU builds for macOS.
+  no separate GPU builds for macOS, so there the `gpu-*` extras fall back to
+  the default build.
 
-To choose a specific pytorch build (for example CPU-only, or a specific CUDA
-version) use uv's `--torch-backend` flag:
-
-```bash
-uv pip install --torch-backend cpu convml-tt    # CPU-only
-uv pip install --torch-backend cu124 convml-tt  # CUDA 12.4 (also cu118, cu121)
-```
+To use `convml-tt` in your own uv project, add it with `uv add convml-tt`.
+The extras above only choose the pytorch build when working in this
+repository, so to choose one in your own project copy the `[tool.uv]`,
+`[[tool.uv.index]]` and `[tool.uv.sources]` configuration from this
+repository's [pyproject.toml](pyproject.toml). The
+[AIMSIR_convml_tt](https://github.com/leifdenby/AIMSIR_convml_tt) exercises
+are an example of this.
 
 When training (`python -m convml_tt.trainer`) and when computing embeddings,
 `convml-tt` uses a CUDA GPU or an Apple Silicon GPU if one is available, and
@@ -52,20 +56,14 @@ separate package called [convml-data](https://github.com/convml/convml-data)
 
 ### Development
 
-To work on `convml-tt` itself, clone the repository and create a development
-environment with [uv](https://docs.astral.sh/uv/):
+To work on `convml-tt` itself, create the environment as above (`uv sync`
+also installs the development tools) and install the pre-commit hooks:
 
 ```bash
-git clone https://github.com/convml/convml-tt
-cd convml-tt
-uv sync
 uv run pre-commit install
 ```
 
-and run the tests with `uv run pytest`. `uv sync` installs the default pypi
-build of pytorch (see above). To choose a specific build, pass one of the
-`cpu`, `gpu-cu118`, `gpu-cu121` or `gpu-cu124` extras, e.g. `uv sync --extra
-gpu-cu124` (on macOS the `gpu-*` extras fall back to the default build).
+and run the tests with `uv run pytest`.
 
 
 ## Training

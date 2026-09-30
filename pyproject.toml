@@ -61,9 +61,9 @@ sattiles = [
 
 # Extras to choose which pytorch build to install. These only choose the
 # pytorch wheel index when installing from source with uv (e.g. `uv sync
-# --extra gpu-cu124`, see `[tool.uv.sources]` below). When installing from
-# pypi, use `uv pip install --torch-backend <backend> convml-tt` instead.
-# Without an extra you get the default pypi build of pytorch, which is CUDA
+# --extra gpu-cu124`, see `[tool.uv.sources]` below). To choose the pytorch
+# build in a project that depends on convml-tt, copy the uv configuration
+# below into that project's pyproject.toml. Without an extra you get the default pypi build of pytorch, which is CUDA
 # 12.4 on linux, CPU-only on windows and supports Apple Silicon GPUs (MPS) on
 # macOS.
 cpu = ["torch<2.6", "torchvision>=0.4.0"]
