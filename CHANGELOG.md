@@ -11,27 +11,19 @@
   `SMALL100` are recreated as subsets of `LARGE2000S500`, so their md5
   checksums have changed.
   [\#89](https://github.com/convml/convml-tt/pull/89)
-- Move packaging from `setup.py`/`setup.cfg` to `pyproject.toml` and CI from
-  conda/mamba to [uv](https://docs.astral.sh/uv/). Require python >= 3.9,
-  `torch < 2.6` (pytorch-lightning < 2.0 can't load checkpoints with torch
-  v2.6's `weights_only=True` default) and `setuptools < 82` (pytorch-lightning
-  < 2.0 imports `pkg_resources`). `esmpy` is dropped from the `sattiles`
-  extra because it isn't on pypi and must be installed from conda-forge.
-  Add `cpu`, `gpu-cu118`, `gpu-cu121` and `gpu-cu124` extras to choose the
-  pytorch build when installing from source with uv, and commit `uv.lock`.
-  Update the pre-commit hooks and reformat the code with the new versions.
+- Move packaging to `pyproject.toml` and CI from conda/mamba to uv, with
+  extras (`cpu`, `gpu-cu118`, `gpu-cu121`, `gpu-cu124`) to choose the
+  pytorch build, and update the pre-commit hooks. Now requires python >= 3.9
+  and `torch < 2.6`, and `esmpy` must be installed from conda-forge for the
+  `sattiles` extra.
   [\#90](https://github.com/convml/convml-tt/pull/90)
 
 *new features*
 
-- Use Apple Silicon GPUs (pytorch's `mps` backend) when available, both for
-  training and for computing embeddings. The trainer CLI now takes
-  `--accelerator {auto,cpu,cuda,mps}` (default `auto`) and `--devices N`.
-  `auto` uses a CUDA or Apple Silicon GPU if available, and otherwise the CPU,
-  so training now uses a GPU by default where the CLI previously defaulted to
-  the CPU. `--gpus` is deprecated. Multi-GPU training now correctly uses
-  `strategy="ddp"`; it previously passed `accelerator="ddp"`, which
-  pytorch-lightning no longer accepts.
+- Use Apple Silicon GPUs (`mps`) when available for training and computing
+  embeddings. The trainer CLI replaces `--gpus` with `--accelerator
+  {auto,cpu,cuda,mps}` (default `auto`, so a GPU is now used by default) and
+  `--devices N`.
   [\#90](https://github.com/convml/convml-tt/pull/90)
 
 ## [v0.14.2](https://github.com/convml/convml-tt/tree/v0.14.2)
