@@ -17,8 +17,9 @@ jobs:
             python-version: "3.12"
           - os: windows-latest
             python-version: "3.12"
-          - os: macos-latest
-            python-version: "3.12"
+          # macOS is left out for now: the test process hangs at exit (after
+          # all tests pass) when using DataLoader workers, see
+          # https://github.com/convml/convml-tt/issues/91
     name: Python ${{ matrix.python-version }} on ${{ matrix.os }}
     defaults:
       run:
