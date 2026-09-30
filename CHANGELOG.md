@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased](https://github.com/convml/convml-tt/tree/HEAD)
+
+[Full Changelog](https://github.com/convml/convml-tt/compare/v0.14.3...HEAD)
+
+*maintenance*
+
+- Update the README to install with `uv sync` and the pytorch-build extras
+  instead of `uv pip install`.
+  [\#97](https://github.com/convml/convml-tt/pull/97)
+
 ## [v0.14.3](https://github.com/convml/convml-tt/tree/v0.14.3)
 
 [Full Changelog](https://github.com/convml/convml-tt/compare/v0.14.2...v0.14.3)
