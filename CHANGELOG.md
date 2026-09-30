@@ -1,5 +1,17 @@
 # Changelog
 
+## [Unreleased](https://github.com/convml/convml-tt/tree/HEAD)
+
+[Full Changelog](https://github.com/convml/convml-tt/compare/v0.14.2...HEAD)
+
+*maintenance*
+
+- Move hosting of example datasets and pretrained model from
+  homepages.see.leeds.ac.uk (no longer available) to Zenodo. `TINY10` and
+  `SMALL100` are recreated as subsets of `LARGE2000S500`, so their md5
+  checksums have changed.
+  [\#89](https://github.com/convml/convml-tt/pull/89)
+
 ## [v0.14.2](https://github.com/convml/convml-tt/tree/v0.14.2)
 
 *maintenance*

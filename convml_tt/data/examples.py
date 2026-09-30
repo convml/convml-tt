@@ -1,5 +1,9 @@
 """
 Example datasets for use with the triplet-trainer
+
+The example datasets and pretrained model are hosted on Zenodo:
+- datasets: https://doi.org/10.5281/zenodo.23045530
+- pretrained model: https://doi.org/10.5281/zenodo.23045532
 """
 import enum
 from pathlib import Path
@@ -8,7 +12,8 @@ from typing import Union
 from ..system import TripletTrainerModel
 from ..utils import download_and_extract_archive
 
-_URL_ROOT = "http://homepages.see.leeds.ac.uk/~earlcd/ml-datasets"
+_DATASETS_URL_ROOT = "https://zenodo.org/records/23045530/files"
+_MODELS_URL_ROOT = "https://zenodo.org/records/23045532/files"
 
 
 class ExampleData(enum.Enum):
@@ -23,8 +28,8 @@ class PretrainedModel(enum.Enum):
 
 # datasets tar-balls with their md5 hash
 _checks = {}
-_checks[ExampleData.TINY10] = "d094cd1b25408517259fc8d8dad63f05"
-_checks[ExampleData.SMALL100] = "75b45c9f368c298685dd88018eeb4f80"
+_checks[ExampleData.TINY10] = "2ef94f3c2ca1537be67b922b84518bbc"
+_checks[ExampleData.SMALL100] = "6f0e5630cbf8dfe7b915d9ed0a53b342"
 _checks[ExampleData.LARGE2000S500] = "7a128c930d97059f0796b736164a721f"
 _checks[PretrainedModel.FIXED_NORM_STAGE2] = "eb1558b62b03ba939e9405080669689f"
 
@@ -33,7 +38,11 @@ def _fetch_example(item: Union[ExampleData, PretrainedModel], data_dir="data/"):
     """
     Downloads example data and returns the path to it
     """
-    url = f"{_URL_ROOT}/{item.value}.tgz"
+    if isinstance(item, PretrainedModel):
+        url_root = _MODELS_URL_ROOT
+    else:
+        url_root = _DATASETS_URL_ROOT
+    url = f"{url_root}/{item.value}.tgz"
     download_and_extract_archive(
         url=url,
         download_root=data_dir,
