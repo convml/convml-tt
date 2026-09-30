@@ -1,8 +1,8 @@
 # Changelog
 
-## [v0.14.3](https://github.com/convml/convml-tt/tree/v0.14.3)
+## [Unreleased](https://github.com/convml/convml-tt/tree/HEAD)
 
-[Full Changelog](https://github.com/convml/convml-tt/compare/v0.14.2...v0.14.3)
+[Full Changelog](https://github.com/convml/convml-tt/compare/v0.14.2...HEAD)
 
 *maintenance*
 
@@ -15,6 +15,7 @@
   changed. SSL certificate verification during download is re-enabled.
   Training tests now use `batch_size=3` so that the 9 training triplets of
   `TINY10` split into full batches.
+  [\#89](https://github.com/convml/convml-tt/pull/89)
 
 ## [v0.14.2](https://github.com/convml/convml-tt/tree/v0.14.2)
 
