@@ -2,6 +2,7 @@
 """
 Create offset label points using forced-directed graph drawing
 """
+
 import math
 
 import numpy as np

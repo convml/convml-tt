@@ -1,6 +1,7 @@
 """
 Functionality from fastai used in model architecture
 """
+
 import torch
 from torch import nn
 

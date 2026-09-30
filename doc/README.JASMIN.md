@@ -24,5 +24,5 @@ source /home/users/lcdenby/.bashrc
 # load conda env
 conda activate convml_tt
 # and train
-python -m convml_tt.trainer $DATASET --gpus 1 --max-epochs 100 --log-to-wandb --preload-data --num-dataloader-workers 32 --batch-size 64
+python -m convml_tt.trainer $DATASET --accelerator cuda --max-epochs 100 --log-to-wandb --preload-data --num-dataloader-workers 32 --batch-size 64
 ```

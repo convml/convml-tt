@@ -11,6 +11,20 @@
   `SMALL100` are recreated as subsets of `LARGE2000S500`, so their md5
   checksums have changed.
   [\#89](https://github.com/convml/convml-tt/pull/89)
+- Move packaging to `pyproject.toml` and CI from conda/mamba to uv, with
+  extras (`cpu`, `gpu-cu118`, `gpu-cu121`, `gpu-cu124`) to choose the
+  pytorch build, and update the pre-commit hooks. Now requires python >= 3.9
+  and `torch < 2.6`, and `esmpy` must be installed from conda-forge for the
+  `sattiles` extra.
+  [\#90](https://github.com/convml/convml-tt/pull/90)
+
+*new features*
+
+- Use Apple Silicon GPUs (`mps`) when available for training and computing
+  embeddings. The trainer CLI replaces `--gpus` with `--accelerator
+  {auto,cpu,cuda,mps}` (default `auto`, so a GPU is now used by default) and
+  `--devices N`.
+  [\#90](https://github.com/convml/convml-tt/pull/90)
 
 ## [v0.14.2](https://github.com/convml/convml-tt/tree/v0.14.2)
 

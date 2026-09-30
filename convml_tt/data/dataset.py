@@ -2,6 +2,7 @@
 Contains `Dataset` definition for loading sets of triplet files for training in
 pytorch
 """
+
 import enum
 import warnings
 from pathlib import Path
@@ -262,7 +263,7 @@ class ImageSingletDataset(_ImageDatasetBase):
                 " a dataset made of triplets"
             )
 
-        if tile_type is not None and type(tile_type) == str:
+        if tile_type is not None and type(tile_type) is str:
             tile_type = TileType[tile_type]
 
         if stage is not None:
@@ -326,7 +327,7 @@ class MemoryMappedImageTripletDataset(ImageTripletDataset):
         # load the first image to get the shape
         img0 = self.get_image(tile_id=0, tile_type=TileType.ANCHOR)
         img0_arr = np.array(img0)
-        (nx, ny, _) = img0_arr.shape
+        nx, ny, _ = img0_arr.shape
         nc = 3
         n_samples = len(self)
         n_tiles_per_sample = len(TileType)

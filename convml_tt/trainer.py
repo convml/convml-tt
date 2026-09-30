@@ -2,7 +2,9 @@
 Example on how to train convml_tt with logging on weights & biases
 (https://wandb.ai)
 """
+
 import os
+import warnings
 from pathlib import Path
 
 import pytorch_lightning as pl
@@ -33,7 +35,25 @@ def main(args=None):
         help="Log dendrogram plot before and after training",
     )
     parser.add_argument(
-        "--gpus", type=int, help="Number of GPUs to use for training", default=0
+        "--accelerator",
+        default="auto",
+        choices=["auto", "cpu", "cuda", "mps"],
+        help=(
+            "Device to train on. `auto` uses a CUDA GPU or an Apple Silicon GPU "
+            "(`mps`) if one is available, and otherwise the CPU"
+        ),
+    )
+    parser.add_argument(
+        "--devices",
+        type=int,
+        default=1,
+        help="Number of devices (e.g. GPUs) to train on",
+    )
+    parser.add_argument(
+        "--gpus",
+        type=int,
+        default=None,
+        help="Deprecated, use `--accelerator cuda --devices N` instead",
     )
     parser.add_argument(
         "--project",
@@ -81,10 +101,22 @@ def main(args=None):
     if "pretrained" in args and args.pretrained:
         trainer_kws["callbacks"] = [HeadFineTuner()]
 
-    if args.gpus not in [0, 1]:
+    if args.gpus is not None:
+        warnings.warn(
+            "`--gpus` is deprecated, use `--accelerator cuda --devices N` instead",
+            DeprecationWarning,
+        )
+        if args.gpus == 0:
+            args.accelerator, args.devices = "cpu", 1
+        else:
+            args.accelerator, args.devices = "cuda", args.gpus
+        # don't also pass `gpus` on to the trainer
+        args.gpus = None
+
+    if args.devices > 1:
         # default to Distributed Data Parallel when training on multiple GPUs
         # https://pytorch-lightning.readthedocs.io/en/stable/advanced/multi_gpu.html#distributed-data-parallel
-        trainer_kws["accelerator"] = "ddp"
+        trainer_kws["strategy"] = "ddp"
 
     if args.use_one_cycle_training:
         TrainerClass = OneCycleTrainer

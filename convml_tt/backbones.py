@@ -9,6 +9,7 @@ has a flash.vision.backbones module this was split into flash.image...
 Also, pytorch-lightning doens't have a routine to check for `lightning-bolts`
 so I've removed the bolts models.
 """
+
 # Copyright The PyTorch Lightning team.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");

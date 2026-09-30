@@ -114,15 +114,13 @@ def _save_embeddings(da_embs, dset):
     )
     writer.close()
 
-    print(
-        """
+    print("""
     embeddings saved for tensorboard to `runs/`
     now start tensorboard:
         $> tensorboard --logdir runs
     and open a browser to view the tensorboard embedding projector:
         http://localhost:6006/#projector
-    """
-    )
+    """)
 
 
 if __name__ == "__main__":

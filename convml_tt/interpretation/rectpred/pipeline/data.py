@@ -2,6 +2,7 @@
 luigi Tasks for producing embeddings with a trained neural network across a
 whole dataset
 """
+
 from pathlib import Path
 
 import luigi

@@ -1,0 +1,47 @@
+name: tests
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    # the tests take ~10min, fail rather than hang if the test process doesn't
+    # exit
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python-version: "3.9"
+          - os: ubuntu-latest
+            python-version: "3.12"
+          - os: windows-latest
+            python-version: "3.12"
+          # macOS is left out for now: the test process hangs at exit (after
+          # all tests pass) when using DataLoader workers, see
+          # https://github.com/convml/convml-tt/issues/91
+    name: Python ${{ matrix.python-version }} on ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # Fetch all history for all branches and tags.
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: install convml_tt
+        # `--locked` checks that uv.lock is up-to-date with pyproject.toml
+        run: uv sync --locked --extra cpu --group test
+
+      - name: cache example data downloaded from Zenodo
+        uses: actions/cache@v6
+        with:
+          path: data/*.tgz
+          key: example-data-${{ hashFiles('convml_tt/data/examples.py') }}
+
+      - name: Test with pytest
+        # `--no-sync` so that uv doesn't re-sync without the `cpu` extra
+        run: uv run --no-sync pytest
