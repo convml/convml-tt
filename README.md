@@ -22,19 +22,17 @@ uv sync --extra cpu        # CPU-only
 uv sync --extra gpu-cu124  # CUDA 12.4 (also gpu-cu118, gpu-cu121)
 ```
 
-GPUs can be used on all three platforms. Which extra to use:
+Without an extra, `uv sync` installs the default pytorch build from pypi, which
+differs by platform:
 
-| platform | NVIDIA GPU | Apple Silicon GPU | no GPU |
-|---|---|---|---|
-| linux | `gpu-cu124` (or `gpu-cu118`, `gpu-cu121`) | - | `cpu` |
-| windows | `gpu-cu124` (or `gpu-cu118`, `gpu-cu121`) | - | `cpu` |
-| macOS | - | `cpu` (includes [`mps`](https://pytorch.org/docs/stable/notes/mps.html) GPU support) | `cpu` |
-
-Pick the CUDA version your NVIDIA driver supports (`nvidia-smi` shows the
-highest supported version). Running `uv sync` without an extra installs the
-default pytorch build from pypi, which uses CUDA 12.4 on linux but is
-CPU-only on windows, so on windows you need a `gpu-*` extra to use an NVIDIA
-GPU.
+- **linux**: built with CUDA 12.4, so NVIDIA GPUs are used if available
+- **windows**: the default build only uses the CPU. NVIDIA GPUs can be used
+  on windows too, but you need to install with one of the `gpu-*` extras
+  (e.g. `uv sync --extra gpu-cu124`)
+- **macOS**: supports Apple Silicon GPUs through pytorch's
+  [`mps`](https://pytorch.org/docs/stable/notes/mps.html) backend. There are
+  no separate GPU builds for macOS, so there the `gpu-*` extras fall back to
+  the default build.
 
 To use `convml-tt` in your own uv project, add it with `uv add convml-tt`.
 The extras above only choose the pytorch build when working in this
