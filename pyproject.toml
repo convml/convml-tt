@@ -59,6 +59,18 @@ sattiles = [
     "convml-data>=0.2.0",
 ]
 
+# Extras to choose which pytorch build to install. These only choose the
+# pytorch wheel index when installing from source with uv (e.g. `uv sync
+# --extra gpu-cu124`, see `[tool.uv.sources]` below). When installing from
+# pypi, use `uv pip install --torch-backend <backend> convml-tt` instead.
+# Without an extra you get the default pypi build of pytorch, which is CUDA
+# 12.4 on linux, CPU-only on windows and supports Apple Silicon GPUs (MPS) on
+# macOS.
+cpu = ["torch<2.6", "torchvision>=0.4.0"]
+gpu-cu118 = ["torch<2.6", "torchvision>=0.4.0"]
+gpu-cu121 = ["torch<2.6", "torchvision>=0.4.0"]
+gpu-cu124 = ["torch<2.6", "torchvision>=0.4.0"]
+
 [project.urls]
 Homepage = "https://github.com/convml/convml-tt"
 
@@ -89,3 +101,49 @@ generated-members = ["numpy.*", "torch.*"]
 
 [tool.pylint.basic]
 good-names = ["i", "j", "df", "n_*"]
+
+[tool.uv]
+conflicts = [
+    [
+        { extra = "cpu" },
+        { extra = "gpu-cu118" },
+        { extra = "gpu-cu121" },
+        { extra = "gpu-cu124" },
+    ],
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu118"
+url = "https://download.pytorch.org/whl/cu118"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu121"
+url = "https://download.pytorch.org/whl/cu121"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true
+
+# the CUDA indexes have no macOS wheels, so on macOS the `gpu-*` extras fall
+# back to the default pypi build
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cpu", extra = "cpu" },
+    { index = "pytorch-cu118", extra = "gpu-cu118", marker = "sys_platform != 'darwin'" },
+    { index = "pytorch-cu121", extra = "gpu-cu121", marker = "sys_platform != 'darwin'" },
+    { index = "pytorch-cu124", extra = "gpu-cu124", marker = "sys_platform != 'darwin'" },
+]
+torchvision = [
+    { index = "pytorch-cpu", extra = "cpu" },
+    { index = "pytorch-cu118", extra = "gpu-cu118", marker = "sys_platform != 'darwin'" },
+    { index = "pytorch-cu121", extra = "gpu-cu121", marker = "sys_platform != 'darwin'" },
+    { index = "pytorch-cu124", extra = "gpu-cu124", marker = "sys_platform != 'darwin'" },
+]

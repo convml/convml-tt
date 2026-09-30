@@ -16,4 +16,3 @@ convml_tt.egg-info/
 
 # uv
 .venv/
-uv.lock
