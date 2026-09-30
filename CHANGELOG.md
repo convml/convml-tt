@@ -32,6 +32,7 @@
   the CPU. `--gpus` is deprecated. Multi-GPU training now correctly uses
   `strategy="ddp"`; it previously passed `accelerator="ddp"`, which
   pytorch-lightning no longer accepts.
+  [\#90](https://github.com/convml/convml-tt/pull/90)
 
 ## [v0.14.2](https://github.com/convml/convml-tt/tree/v0.14.2)
 
